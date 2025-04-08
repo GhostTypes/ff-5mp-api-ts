@@ -3,7 +3,7 @@ import { FiveMClient } from './index';
 
 async function runTest() {
     // Replace these values with your actual printer information
-    const ipAddress = '192.168.0.201'; // Replace with your printer's IP
+    const ipAddress = '192.168.0.200'; // Replace with your printer's IP
     const serialNumber = 'SNMOMC9900728'; // Replace with your printer's serial number
     const checkCode = 'e5c2bf77'; // Replace with your printer's check code
 
@@ -51,7 +51,7 @@ async function runTest() {
                 console.log(`- Estimated time remaining: ${info.PrintEta}`);
             }
 
-            await client.control.setLedOn();
+            await client.control.setLedOff();
 
         } else {
             console.error('Failed to get printer information!');
