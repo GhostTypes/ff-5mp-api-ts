@@ -65,10 +65,14 @@ export class MachineInfo {
                 IsPro: (detail.name || '').includes("Pro"), // Read camelCase source
                 NozzleSize: detail.nozzleModel || '', // Read camelCase source
 
-                PrintBedTemp: { value: detail.platTemp || 0 }, // Read camelCase source
-                PrintBedSetTemp: { value: detail.platTargetTemp || 0 }, // Read camelCase source
-                ExtruderTemp: { value: detail.rightTemp || 0 }, // Read camelCase source
-                ExtruderSetTemp: { value: detail.rightTargetTemp || 0 }, // Read camelCase source
+                PrintBed: {
+                    current: detail.platTemp || 0,
+                    set: detail.platTargetTemp || 0
+                },
+                Extruder: {
+                    current: detail.rightTemp || 0,
+                    set: detail.rightTargetTemp || 0
+                },
 
                 PrintDuration: detail.printDuration || 0, // Read camelCase source
                 PrintFileName: detail.printFileName || '', // Read camelCase source

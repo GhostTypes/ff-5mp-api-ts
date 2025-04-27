@@ -8,6 +8,7 @@ import { Files } from './api/controls/Files';
 import { TempControl } from './api/controls/TempControl';
 import { FlashForgeClient } from './tcpapi/FlashForgeClient';
 import { Endpoints } from './api/server/Endpoints';
+import {MachineInfo} from "./models/MachineInfo";
 
 export class FiveMClient {
     private readonly PORT = 8898;
@@ -99,8 +100,10 @@ export class FiveMClient {
     public cacheDetails(info: FFMachineInfo | null): boolean {
         if (!info) return false;
 
+        console.log(JSON.stringify(info, null, 2));
         // Add null checks for all properties
         this.printerName = info.Name || '';
+        // todo this is unreliable, need to check machine type from the TcpApi instead
         this.isPro = (info.Name || '').includes("Pro");
         this.firmwareVersion = info.FirmwareVersion || '';
         this.firmVer = info.FirmwareVersion ? info.FirmwareVersion.split('-')[0] : '';
@@ -119,6 +122,8 @@ export class FiveMClient {
     }
 
     public async verifyConnection(): Promise<boolean> {
+        // todo somewhere in here is where we should check if pro or not
+        // with the TcpApi
         try {
             const response = await this.info.getDetailResponse();
             if (!response || response.message !== "Success" || response.code !== 0) {
@@ -201,12 +206,4 @@ interface Product {
     lightCtrlState: number;
     nozzleTempCtrlState: number;
     platformTempCtrlState: number;
-}
-
-// This will be implemented in a separate file
-class MachineInfo {
-    fromDetail(detail: FFPrinterDetail): FFMachineInfo {
-        // Implementation will be in a separate file
-        return {} as FFMachineInfo;
-    }
 }

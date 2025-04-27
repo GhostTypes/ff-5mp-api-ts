@@ -102,10 +102,8 @@ export interface FFMachineInfo {
     NozzleSize: string;
 
     // Temperatures
-    PrintBedTemp: Temperature;
-    PrintBedSetTemp: Temperature;
-    ExtruderTemp: Temperature;
-    ExtruderSetTemp: Temperature;
+    PrintBed: Temperature;
+    Extruder: Temperature;
 
     // Current print stats
     PrintDuration: number;
@@ -137,7 +135,8 @@ export interface FFMachineInfo {
 
 // Supporting types
 export interface Temperature {
-    value: number;
+    current: number;
+    set: number;
 }
 
 export enum MachineState {

@@ -48,7 +48,7 @@ export { PrintStatus } from './tcpapi/replays/PrintStatus';
 export { TempInfo, TempData } from './tcpapi/replays/TempInfo';
 
 // Misc
-export { Temperature } from './api/misc/Temperature';
+//export { Temperature } from './api/misc/Temperature';
 export { formatScientificNotation } from './api/misc/ScientificNotationFloatConverter';
 
 export { FlashForgePrinter, FlashForgePrinterDiscovery } from './api/PrinterDiscovery';
