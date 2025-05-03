@@ -3,6 +3,7 @@ import { FiveMClient } from '../../FiveMClient';
 import { Commands } from '../server/Commands';
 import { FlashForgeClient } from '../../tcpapi/FlashForgeClient';
 import { Endpoints } from '../server/Endpoints';
+import { NetworkUtils } from '../network/NetworkUtils';
 import axios from 'axios';
 
 export class Control {
@@ -207,7 +208,7 @@ export class Control {
     }
 
     private isResponseOk(response: GenericResponse): boolean {
-        return response.code === 0 && response.message === "Success";
+        return NetworkUtils.isOk(response);
     }
 }
 

@@ -1,7 +1,8 @@
 // src/FiveMClient.ts
 import axios from 'axios';
 import { FFPrinterDetail, FFMachineInfo, MachineState, Temperature } from './models/ff-models';
-import { Control } from './api/controls/Control';
+import { Control, GenericResponse } from './api/controls/Control';
+import { NetworkUtils } from './api/network/NetworkUtils';
 import { JobControl } from './api/controls/JobControl';
 import { Info } from './api/controls/Info';
 import { Files } from './api/controls/Files';
@@ -126,7 +127,7 @@ export class FiveMClient {
         // with the TcpApi
         try {
             const response = await this.info.getDetailResponse();
-            if (!response || response.message !== "Success" || response.code !== 0) {
+            if (!response || !NetworkUtils.isOk(response)) {
                 console.log("Failed to get valid response from printer API");
                 return false;
             }
@@ -169,7 +170,7 @@ export class FiveMClient {
 
             try {
                 const productResponse = response.data as ProductResponse;
-                if (productResponse && productResponse.code === 0) {
+                if (productResponse && NetworkUtils.isOk(productResponse)) {
                     // Parse & set control states
                     const product = productResponse.product;
                     this.ledControl = product.lightCtrlState !== 0;
@@ -193,9 +194,7 @@ export class FiveMClient {
     }
 }
 
-interface ProductResponse {
-    code: number;
-    message: string;
+interface ProductResponse extends GenericResponse {
     product: Product;
 }
 

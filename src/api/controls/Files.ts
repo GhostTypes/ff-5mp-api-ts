@@ -1,6 +1,8 @@
 // src/api/controls/Files.ts
 import { FiveMClient } from '../../FiveMClient';
 import { Endpoints } from '../server/Endpoints';
+import { GenericResponse } from './Control';
+import { NetworkUtils } from '../network/NetworkUtils';
 import axios from 'axios';
 
 export class Files {
@@ -37,7 +39,7 @@ export class Files {
             if (response.status !== 200) return [];
 
             const result = response.data as GCodeListResponse;
-            if (result.code === 0 && result.message.toLowerCase() === "success") {
+            if (NetworkUtils.isOk(result)) {
                 return result.gcodeList;
             }
 
@@ -71,7 +73,7 @@ export class Files {
             if (response.status !== 200) return null;
 
             const result = response.data as ThumbnailResponse;
-            if (result.code === 0) {
+            if (NetworkUtils.isOk(result)) {
                 return Buffer.from(result.imageData, 'base64');
             }
 
@@ -85,14 +87,11 @@ export class Files {
     }
 }
 
-interface GCodeListResponse {
-    code: number;
+interface GCodeListResponse extends GenericResponse {
     gcodeList: string[];
-    message: string;
 }
 
-interface ThumbnailResponse {
-    code: number;
+interface ThumbnailResponse extends GenericResponse {
     imageData: string;
     message: string;
 }

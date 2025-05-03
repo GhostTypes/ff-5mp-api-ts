@@ -1,7 +1,8 @@
 // src/api/controls/JobControl.ts
 import { FiveMClient } from '../../FiveMClient';
-import { Control } from './Control';
+import { Control, GenericResponse } from './Control';
 import { Endpoints } from '../server/Endpoints';
+import { NetworkUtils } from '../network/NetworkUtils';
 import * as fs from 'fs';
 import * as path from 'path';
 import axios from 'axios';
@@ -107,8 +108,8 @@ export class JobControl {
 
             if (response.status !== 200) return false;
 
-            const result = response.data as any;
-            return result.code === 0 && result.message === "Success";
+            const result = response.data as GenericResponse;
+            return NetworkUtils.isOk(result);
         } catch (e) {
             //console.log(`UploadFile error: ${e.message}\n${e.stack}`);
             return false;
@@ -153,8 +154,8 @@ export class JobControl {
 
             if (response.status !== 200) return false;
 
-            const result = response.data as any;
-            return result.code === 0 && result.message === "Success";
+            const result = response.data as GenericResponse;
+            return NetworkUtils.isOk(result);
         } catch (e) {
             //console.log(`PrintLocalFile error: ${e.message}\n${e.stack}`);
             return false;
