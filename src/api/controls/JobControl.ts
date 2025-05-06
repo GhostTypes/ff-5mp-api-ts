@@ -1,11 +1,11 @@
 // src/api/controls/JobControl.ts
 import { FiveMClient } from '../../FiveMClient';
-import { Control, GenericResponse } from './Control';
+import { Control } from './Control';
 import { Endpoints } from '../server/Endpoints';
-import { NetworkUtils } from '../network/NetworkUtils';
 import * as fs from 'fs';
 import * as path from 'path';
 import axios from 'axios';
+import { NetworkUtils } from '../network/NetworkUtils';
 import FormData from 'form-data';
 
 export class JobControl {
@@ -63,55 +63,100 @@ export class JobControl {
      * @param levelBeforePrint Level the bed before printing
      */
     public async uploadFile(filePath: string, startPrint: boolean, levelBeforePrint: boolean): Promise<boolean> {
+        if (!fs.existsSync(filePath)) {
+            console.error(`UploadFile error: File not found at ${filePath}`);
+            return false;
+        }
+
         const stats = fs.statSync(filePath);
         const fileSize = stats.size;
         const fileName = path.basename(filePath);
 
+        console.log(`Starting upload for ${fileName}, Size: ${fileSize}, Start: ${startPrint}, Level: ${levelBeforePrint}`);
+
         try {
+            // Create FormData with the file content
             const form = new FormData();
-
-            if (this.isNewFirmwareVersion()) {
-                // New format for firmware >= 3.1.3
-                form.append('serialNumber', this.client.serialNumber);
-                form.append('checkCode', this.client.checkCode);
-                form.append('fileSize', fileSize.toString());
-                form.append('printNow', startPrint.toString().toLowerCase());
-                form.append('levelingBeforePrint', levelBeforePrint.toString().toLowerCase());
-                form.append('flowCalibration', 'false');
-                form.append('useMatlStation', 'false');
-                form.append('gcodeToolCnt', '0');
-                form.append('materialMappings', 'W10='); // Base64 encoded empty array "[]"
-            } else {
-                // Old format for firmware < 3.1.3
-                form.append('serialNumber', this.client.serialNumber);
-                form.append('checkCode', this.client.checkCode);
-                form.append('fileSize', fileSize.toString());
-                form.append('printNow', startPrint.toString().toLowerCase());
-                form.append('levelingBeforePrint', levelBeforePrint.toString().toLowerCase());
-            }
-
             form.append('gcodeFile', fs.createReadStream(filePath), {
                 filename: fileName,
-                contentType: 'application/octet-stream'
+                contentType: 'application/octet-stream' // Ensure correct MIME type
             });
 
+            // Prepare the custom HTTP headers with metadata
+            const customHeaders: Record<string, string> = {
+                'serialNumber': this.client.serialNumber,
+                'checkCode': this.client.checkCode,
+                'fileSize': fileSize.toString(),
+                'printNow': startPrint.toString().toLowerCase(),
+                'levelingBeforePrint': levelBeforePrint.toString().toLowerCase(),
+                'Expect': '100-continue'
+            };
+
+            // Add additional headers for new firmware
+            if (this.isNewFirmwareVersion()) {
+                console.log("Using new firmware headers for upload.");
+                customHeaders['flowCalibration'] = 'false';
+                customHeaders['useMatlStation'] = 'false';
+                customHeaders['gcodeToolCnt'] = '0';
+                // Base64 encode "[]" which is "W10="
+                customHeaders['materialMappings'] = 'W10=';
+            } else {
+                console.log("Using old firmware headers for upload.");
+            }
+
+            // Get necessary headers from FormData
+            const formHeaders = form.getHeaders();
+
+            // Combine custom headers and FormData headers
+            const requestHeaders = {
+                ...customHeaders,
+                'Content-Type': formHeaders['content-type'],
+            };
+
+            console.log("Upload Request Headers:", requestHeaders);
+
+            // Configure Axios request
+            // @ts-ignore
+            const config: AxiosRequestConfig = {
+                headers: requestHeaders,
+            };
+
+            // Make the POST request
             const response = await axios.post(
                 this.client.getEndpoint(Endpoints.UploadFile),
                 form,
-                {
-                    headers: {
-                        ...form.getHeaders(),
-                        'Expect': '100-continue'
-                    },
-                }
+                config
             );
 
-            if (response.status !== 200) return false;
+            console.log(`Upload Response Status: ${response.status}`);
+            console.log("Upload Response Data:", response.data); // Log the response body
 
-            const result = response.data as GenericResponse;
-            return NetworkUtils.isOk(result);
-        } catch (e) {
-            //console.log(`UploadFile error: ${e.message}\n${e.stack}`);
+            if (response.status !== 200) {
+                console.error(`Upload failed: Printer responded with status ${response.status}`);
+                return false;
+            }
+
+            // Assuming response.data is already parsed JSON by axios
+            const result = response.data as any;
+            if (NetworkUtils.isOk(result)) {
+                console.log("Upload successful according to printer response.");
+                return true;
+            } else {
+                console.error(`Upload failed: Printer response code=${result.code}, message=${result.message}`);
+                return false;
+            }
+
+        } catch (e: any) {
+            console.error(`UploadFile error: ${e.message}`);
+            if (e.response) {
+                console.error(`Error Status: ${e.response.status}`);
+                console.error("Error Response Data:", e.response.data);
+            } else if (e.request) {
+                console.error("Error Request:", e.request);
+            } else {
+                console.error('Error', e.message);
+            }
+            console.error(e.stack);
             return false;
         }
     }
@@ -156,9 +201,9 @@ export class JobControl {
 
             const result = response.data as GenericResponse;
             return NetworkUtils.isOk(result);
-        } catch (e) {
-            //console.log(`PrintLocalFile error: ${e.message}\n${e.stack}`);
-            return false;
+        } catch (error) {
+            console.error(`PrintLocalFile error: ${(error as Error).message}`);
+            throw error;
         }
     }
 }

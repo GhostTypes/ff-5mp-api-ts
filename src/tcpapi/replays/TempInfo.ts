@@ -20,10 +20,9 @@ export class TempInfo {
             this._extruderTemp = new TempData(e);
             this._bedTemp = new TempData(b);
             return this;
-        } catch (e) {
+        } catch (error) {
             console.log("Unable to create TempInfo instance from replay");
             console.log(replay);
-            //console.log(e.stack);
             return null;
         }
     }

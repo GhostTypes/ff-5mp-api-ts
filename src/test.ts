@@ -1,6 +1,12 @@
 // src/test.ts
 import { FiveMClient } from './index';
-import { FlashForgePrinterDiscovery, FlashForgePrinter } from './index';
+import { FlashForgePrinterDiscovery, FlashForgePrinter, MachineState } from './index';
+
+
+function failTest(reason: string) {
+    console.error(reason);
+    process.exit(69420);
+}
 
 async function testPrinterDiscovery() {
     console.log('=== FlashForge Printer Discovery Test ===');
@@ -37,7 +43,7 @@ runTest().catch(error => {
 
 async function runTest() {
     // Replace these values with your actual printer information
-    const ipAddress = '192.168.0.208'; // Replace with your printer's IP
+    const ipAddress = '192.168.0.202'; // Replace with your printer's IP
     const serialNumber = 'SNMOMC9900728'; // Replace with your printer's serial number
     const checkCode = 'e5c2bf77'; // Replace with your printer's check code
 
@@ -85,16 +91,21 @@ async function runTest() {
                 console.log(`- Estimated time remaining: ${info.PrintEta}`);
             }
 
-            await client.control.setLedOff();
+            // Check if we can get the local files list
+            let files = await client.files.getLocalFileList()
+            if (files.length < 1) failTest("No local files found, ensure the printer has at least one local file for proper testing.")
+            console.log('Local file(s) count: ' + files.length);
 
         } else {
             console.error('Failed to get printer information!');
         }
 
         // Close the connection
-        //console.log('\nTest completed. Closing connection...');
-        //client.dispose();
-        //console.log('Connection closed.');
+
+        console.log('\nTest completed.');
+        client.dispose();
+        console.log('Connection closed.');
+        process.exit(0);
 
     } catch (error: unknown) {
         const err = error as Error;
@@ -103,22 +114,8 @@ async function runTest() {
     }
 }
 
-// From your enums
-enum MachineState {
-    Ready,
-    Busy,
-    Calibrating,
-    Error,
-    Heating,
-    Printing,
-    Pausing,
-    Paused,
-    Cancelled,
-    Completed,
-    Unknown
-}
-
-// Run the test
-//runTest().catch(error => {
-//    console.error('Unhandled error in test:', error);
-//});
+// Run test function or uncomment to test printer discovery
+// testPrinterDiscovery();
+runTest().catch(error => {
+    console.error('Unhandled error in test:', error);
+});

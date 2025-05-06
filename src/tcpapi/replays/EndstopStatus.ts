@@ -60,7 +60,6 @@ export class EndstopStatus {
     }
 
     public isPaused(): boolean {
-        // todo what's the difference between the two states?
         return this._MachineStatus === MachineStatus.PAUSED || this._MoveMode === MoveMode.PAUSED;
     }
 }

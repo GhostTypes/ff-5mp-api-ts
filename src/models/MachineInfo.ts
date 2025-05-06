@@ -2,7 +2,7 @@
 import { FFPrinterDetail, FFMachineInfo, MachineState, Temperature } from './ff-models';
 
 export class MachineInfo {
-    // Input 'detail' will now correctly be typed with camelCase keys
+    // Converts printer details from API response format to our internal model
     public fromDetail(detail: FFPrinterDetail | null): FFMachineInfo | null {
         if (!detail) return null;
 
@@ -29,42 +29,53 @@ export class MachineInfo {
             const estWeight = (detail.estimatedRightWeight || 0) * (detail.printProgress || 0);
 
             return {
-                // Target object (FFMachineInfo) uses PascalCase
+                // Auto-shutdown settings
                 AutoShutdown: autoShutdown,
-                AutoShutdownTime: detail.autoShutdownTime || 0, // Read camelCase source
+                AutoShutdownTime: detail.autoShutdownTime || 0,
 
-                CameraStreamUrl: detail.cameraStreamUrl || '', // Read camelCase source
+                // Camera
+                CameraStreamUrl: detail.cameraStreamUrl || '',
 
-                ChamberFanSpeed: detail.chamberFanSpeed || 0, // Read camelCase source
-                CoolingFanSpeed: detail.coolingFanSpeed || 0, // Read camelCase source
+                // Fan speeds
+                ChamberFanSpeed: detail.chamberFanSpeed || 0,
+                CoolingFanSpeed: detail.coolingFanSpeed || 0,
 
-                CumulativeFilament: detail.cumulativeFilament || 0, // Read camelCase source
-                CumulativePrintTime: detail.cumulativePrintTime || 0, // Read camelCase source
+                // Cumulative stats
+                CumulativeFilament: detail.cumulativeFilament || 0,
+                CumulativePrintTime: detail.cumulativePrintTime || 0,
 
-                CurrentPrintSpeed: detail.currentPrintSpeed || 0, // Read camelCase source
+                // Current print speed
+                CurrentPrintSpeed: detail.currentPrintSpeed || 0,
 
-                FreeDiskSpace: (detail.remainingDiskSpace || 0).toFixed(2), // Read camelCase source
+                // Disk space
+                FreeDiskSpace: (detail.remainingDiskSpace || 0).toFixed(2),
 
+                // Door and error status
                 DoorOpen: doorOpen,
-                ErrorCode: detail.errorCode || '', // Read camelCase source
+                ErrorCode: detail.errorCode || '',
 
+                // Current print estimates
                 EstLength: estLength,
                 EstWeight: estWeight,
-                EstimatedTime: detail.estimatedTime || 0, // Read camelCase source
+                EstimatedTime: detail.estimatedTime || 0,
 
+                // Fans & LED status
                 ExternalFanOn: externalFanOn,
                 InternalFanOn: internalFanOn,
                 LightsOn: lightsOn,
 
-                IpAddress: detail.ipAddr || '', // Read camelCase source
-                MacAddress: detail.macAddr || '', // Read camelCase source
+                // Network
+                IpAddress: detail.ipAddr || '',
+                MacAddress: detail.macAddr || '',
 
-                FillAmount: detail.fillAmount || 0, // Read camelCase source
-                FirmwareVersion: detail.firmwareVersion || '', // Read camelCase source
-                Name: detail.name || '', // Read camelCase source
-                IsPro: (detail.name || '').includes("Pro"), // Read camelCase source
-                NozzleSize: detail.nozzleModel || '', // Read camelCase source
+                // Print settings
+                FillAmount: detail.fillAmount || 0,
+                FirmwareVersion: detail.firmwareVersion || '',
+                Name: detail.name || '',
+                IsPro: (detail.name || '').includes("Pro"),
+                NozzleSize: detail.nozzleModel || '',
 
+                // Temperatures
                 PrintBed: {
                     current: detail.platTemp || 0,
                     set: detail.platTargetTemp || 0
@@ -74,24 +85,28 @@ export class MachineInfo {
                     set: detail.rightTargetTemp || 0
                 },
 
-                PrintDuration: detail.printDuration || 0, // Read camelCase source
-                PrintFileName: detail.printFileName || '', // Read camelCase source
-                PrintFileThumbUrl: detail.printFileThumbUrl || '', // Read camelCase source
-                CurrentPrintLayer: detail.printLayer || 0, // Read camelCase source
-                PrintProgress: detail.printProgress || 0, // Read camelCase source
-                PrintProgressInt: Math.floor((detail.printProgress || 0) * 100), // Read camelCase source
-                PrintSpeedAdjust: detail.printSpeedAdjust || 0, // Read camelCase source
-                FilamentType: detail.rightFilamentType || '', // Read camelCase source
+                // Current print stats
+                PrintDuration: detail.printDuration || 0,
+                PrintFileName: detail.printFileName || '',
+                PrintFileThumbUrl: detail.printFileThumbUrl || '',
+                CurrentPrintLayer: detail.printLayer || 0,
+                PrintProgress: detail.printProgress || 0,
+                PrintProgressInt: Math.floor((detail.printProgress || 0) * 100),
+                PrintSpeedAdjust: detail.printSpeedAdjust || 0,
+                FilamentType: detail.rightFilamentType || '',
 
-                MachineState: this.getMachineState(detail.status || ''), // Read camelCase source
-                Status: detail.status || '', // Read camelCase source
-                TotalPrintLayers: detail.targetPrintLayer || 0, // Read camelCase source
-                Tvoc: detail.tvoc || 0, // Read camelCase source
-                ZAxisCompensation: detail.zAxisCompensation || 0, // Read camelCase source
+                // Machine state
+                MachineState: this.getMachineState(detail.status || ''),
+                Status: detail.status || '',
+                TotalPrintLayers: detail.targetPrintLayer || 0,
+                Tvoc: detail.tvoc || 0,
+                ZAxisCompensation: detail.zAxisCompensation || 0,
 
-                FlashCloudRegisterCode: detail.flashRegisterCode || '', // Read camelCase source
-                PolarCloudRegisterCode: detail.polarRegisterCode || '', // Read camelCase source
+                // Cloud codes
+                FlashCloudRegisterCode: detail.flashRegisterCode || '',
+                PolarCloudRegisterCode: detail.polarRegisterCode || '',
 
+                // Extras
                 PrintEta: printEta,
                 CompletionTime: completionTime,
                 FormattedRunTime: formattedRunTime,
@@ -104,7 +119,7 @@ export class MachineInfo {
         }
     }
 
-    // formatTimeFromSeconds and getMachineState remain the same as in the previous correct suggestion
+    // Remaining code is unchanged
     private formatTimeFromSeconds(seconds: number): string {
         try {
             const validSeconds = typeof seconds === 'number' ? seconds : 0;

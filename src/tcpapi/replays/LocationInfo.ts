@@ -12,9 +12,8 @@ export class LocationInfo {
             this.Y = locData[1].replace("Y:", "").trim();
             this.Z = locData[2].replace("Z:", "").trim();
             return this;
-        } catch (e) {
+        } catch (error) {
             console.log("LocationInfo replay has bad/null data");
-            //console.log(e.stack);
             return null;
         }
     }

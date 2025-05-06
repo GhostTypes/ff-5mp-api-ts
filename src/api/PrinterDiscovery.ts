@@ -2,6 +2,7 @@
 import * as dgram from 'dgram';
 import { networkInterfaces } from 'os';
 
+// Network discovery of FlashForge printers
 export class FlashForgePrinter {
     public name: string = '';
     public serialNumber: string = '';
@@ -15,7 +16,7 @@ export class FlashForgePrinter {
 export class FlashForgePrinterDiscovery {
     private static readonly DISCOVERY_PORT = 19000;
 
-    // Add instance property for accessing from instance methods
+    // Instance property for easy access to the discovery port
     private readonly discoveryPort = FlashForgePrinterDiscovery.DISCOVERY_PORT;
 
     public async discoverPrintersAsync(timeoutMs: number = 10000, idleTimeoutMs: number = 1500, maxRetries: number = 3): Promise<FlashForgePrinter[]> {
@@ -25,7 +26,6 @@ export class FlashForgePrinterDiscovery {
 
         while (attempt < maxRetries) {
             attempt++;
-            //console.log(`Broadcasting printer discovery (attempt ${attempt})...`);
 
             const udpClient = dgram.createSocket({ type: 'udp4', reuseAddr: true });
 
@@ -42,7 +42,6 @@ export class FlashForgePrinterDiscovery {
                 const discoveryMessage = Buffer.from('discover', 'ascii');
                 for (const broadcastAddress of broadcastAddresses) {
                     try {
-                        //console.log(`Broadcasting printer discovery to: ${broadcastAddress}`);
                         udpClient.send(discoveryMessage, this.discoveryPort, broadcastAddress);
                     } catch (ex) {
                         console.log(`Failed to send to ${broadcastAddress}: ${(ex as Error).message}`);
@@ -63,13 +62,9 @@ export class FlashForgePrinterDiscovery {
             }
 
             if (attempt >= maxRetries) continue;
-            //console.log("No printers found, retrying...");
             await new Promise(resolve => setTimeout(resolve, 1000)); // Wait before retrying
         }
 
-        //if (printers.length === 0) {
-            //console.log("No printers discovered after maximum retries.");
-        //}
 
         return printers;
     }
@@ -94,21 +89,18 @@ export class FlashForgePrinterDiscovery {
 
             // Set total timeout
             totalTimeoutHandle = setTimeout(() => {
-                //console.log("Total timeout reached");
                 cleanupAndResolve();
             }, totalTimeoutMs);
 
             const resetIdleTimeout = () => {
                 if (idleTimeoutHandle) clearTimeout(idleTimeoutHandle);
                 idleTimeoutHandle = setTimeout(() => {
-                    //console.log("Idle timeout reached");
                     cleanupAndResolve();
                 }, idleTimeoutMs);
             };
 
             // Handle incoming messages
             udpClient.on('message', (buffer, rinfo) => {
-                //console.log(`Printer discovery response from: ${rinfo.address}`);
                 resetIdleTimeout();
 
                 const printer = this.parsePrinterResponse(buffer, rinfo.address);
@@ -130,7 +122,6 @@ export class FlashForgePrinterDiscovery {
     }
 
     private parsePrinterResponse(response: Buffer, ipAddress: string): FlashForgePrinter | null {
-        //console.log(`Printer discovery response from: ${ipAddress}`);
         if (!response || response.length < 0xC4) {
             console.log("Invalid response, discarded.");
             return null;
@@ -138,8 +129,6 @@ export class FlashForgePrinterDiscovery {
 
         const name = response.toString('ascii', 0, 32).replace(/\0+$/, ''); // Printer name (offset 0x00)
         const serialNumber = response.toString('ascii', 0x92, 0x92 + 32).replace(/\0+$/, ''); // Serial number (offset 0x92)
-
-        //console.log(`Valid printer: ${name} (${serialNumber})`);
 
         const printer = new FlashForgePrinter();
         printer.name = name;

@@ -1,9 +1,9 @@
 // src/api/controls/Files.ts
 import { FiveMClient } from '../../FiveMClient';
 import { Endpoints } from '../server/Endpoints';
+import axios from 'axios';
 import { GenericResponse } from './Control';
 import { NetworkUtils } from '../network/NetworkUtils';
-import axios from 'axios';
 
 export class Files {
     private client: FiveMClient;
@@ -93,5 +93,4 @@ interface GCodeListResponse extends GenericResponse {
 
 interface ThumbnailResponse extends GenericResponse {
     imageData: string;
-    message: string;
 }

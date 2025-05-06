@@ -1,8 +1,7 @@
 // src/FiveMClient.ts
 import axios from 'axios';
 import { FFPrinterDetail, FFMachineInfo, MachineState, Temperature } from './models/ff-models';
-import { Control, GenericResponse } from './api/controls/Control';
-import { NetworkUtils } from './api/network/NetworkUtils';
+import { Control } from './api/controls/Control';
 import { JobControl } from './api/controls/JobControl';
 import { Info } from './api/controls/Info';
 import { Files } from './api/controls/Files';
@@ -10,6 +9,8 @@ import { TempControl } from './api/controls/TempControl';
 import { FlashForgeClient } from './tcpapi/FlashForgeClient';
 import { Endpoints } from './api/server/Endpoints';
 import {MachineInfo} from "./models/MachineInfo";
+import { GenericResponse } from './api/controls/Control';
+import { NetworkUtils } from './api/network/NetworkUtils';
 
 export class FiveMClient {
     private readonly PORT = 8898;
@@ -102,10 +103,7 @@ export class FiveMClient {
         if (!info) return false;
 
         console.log(JSON.stringify(info, null, 2));
-        // Add null checks for all properties
         this.printerName = info.Name || '';
-        // todo this is unreliable, need to check machine type from the TcpApi instead
-        this.isPro = (info.Name || '').includes("Pro");
         this.firmwareVersion = info.FirmwareVersion || '';
         this.firmVer = info.FirmwareVersion ? info.FirmwareVersion.split('-')[0] : '';
         this.macAddress = info.MacAddress || '';
@@ -123,8 +121,7 @@ export class FiveMClient {
     }
 
     public async verifyConnection(): Promise<boolean> {
-        // todo somewhere in here is where we should check if pro or not
-        // with the TcpApi
+
         try {
             const response = await this.info.getDetailResponse();
             if (!response || !NetworkUtils.isOk(response)) {
@@ -132,14 +129,19 @@ export class FiveMClient {
                 return false;
             }
 
-            // Debug output to see what's being returned
-            console.log("Received response from printer API");
-
             // Make sure MachineInfo handles null values properly
             const machineInfo = new MachineInfo().fromDetail(response.detail);
             if (!machineInfo) {
-                console.log("Failed to parse machine info from response");
+
                 return false;
+            }
+
+            // Check for Pro model with the machine TypeName (can't be changed by user)
+            const tcpInfo = await this.tcpClient.getPrinterInfo()
+            if (tcpInfo) {
+                if (tcpInfo.TypeName.includes("Pro")) this.isPro = true;
+            } else {
+                console.error("Unable to get PrinterInfo from TcpAPI , some things might be borked");
             }
 
             return this.cacheDetails(machineInfo);
@@ -181,11 +183,13 @@ export class FiveMClient {
 
                     return true;
                 }
-            } catch (e) {
-                //console.log(`SendProductCommand failure: ${e.message}\n${e.stack}`);
+            } catch (error) {
+                console.error(`SendProductCommand error: ${(error as Error).message}`);
+                throw error;
             }
-        } catch (e) {
-            //console.log(`SendProductCommand failure: ${e.message}\n${e.stack}`);
+        } catch (error) {
+            console.error(`SendProductCommand HTTP error: ${(error as Error).message}`);
+            throw error;
         } finally {
             this.httpClientBusy = false;
         }

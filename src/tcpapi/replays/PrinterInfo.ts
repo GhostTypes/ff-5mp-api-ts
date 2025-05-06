@@ -55,9 +55,8 @@ export class PrinterInfo {
 
             this.MacAddress = data[7].replace("Mac Address:", "");
             return this;
-        } catch (e) {
+        } catch (error) {
             console.log("Error creating PrinterInfo instance from replay");
-            //console.log(e.stack);
             return null;
         }
     }

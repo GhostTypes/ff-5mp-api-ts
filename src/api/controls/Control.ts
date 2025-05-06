@@ -143,7 +143,6 @@ export class Control {
             const result = data as GenericResponse;
             return this.isResponseOk(result);
         } catch (e) {
-            //console.log(`SendControlCommand failure: ${command}\n${JSON.stringify(args)}\n${e.message}\n${e.stack}`);
             return false;
         } finally {
             this.client.releaseHttpClient();

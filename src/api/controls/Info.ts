@@ -4,6 +4,7 @@ import { FFPrinterDetail, FFMachineInfo, MachineState } from '../../models/ff-mo
 import { Endpoints } from '../server/Endpoints';
 import axios from 'axios';
 import { MachineInfo } from '../../models/MachineInfo';
+import { GenericResponse } from './Control';
 
 export class Info {
     private client: FiveMClient;
@@ -32,7 +33,7 @@ export class Info {
         return info?.MachineState ?? null;
     }
 
-// In Info.ts, modify the getDetailResponse method to log the raw response
+
     public async getDetailResponse(): Promise<DetailResponse | null> {
         const payload = {
             serialNumber: this.client.serialNumber,
@@ -40,7 +41,6 @@ export class Info {
         };
 
         try {
-            console.log("Sending detail request to:", this.client.getEndpoint(Endpoints.Detail));
             const response = await axios.post(
                 this.client.getEndpoint(Endpoints.Detail),
                 payload,
@@ -56,7 +56,7 @@ export class Info {
                 return null;
             }
 
-            //console.log("Raw detail response:", JSON.stringify(response.data, null, 2));
+
             return response.data as DetailResponse;
         } catch (error: unknown) {
             const err = error as Error;
@@ -69,8 +69,6 @@ export class Info {
     }
 }
 
-export interface DetailResponse {
-    code: number;
+export interface DetailResponse extends GenericResponse {
     detail: FFPrinterDetail;
-    message: string;
 }

@@ -17,10 +17,9 @@ export class PrintStatus {
             let layerProgress;
             try {
                 layerProgress = data[2].replace("Layer: ", "").trim();
-            } catch (e) {
+            } catch (error) {
                 console.log("PrintStatus bad layer progress");
                 console.log("Raw printer replay: " + replay);
-                //console.log(e.stack);
                 return null;
             }
 
@@ -29,15 +28,13 @@ export class PrintStatus {
                 this._layerCurrent = lpData[0].trim();
                 this._layerTotal = lpData[1].trim();
                 return this;
-            } catch (e) {
+            } catch (error) {
                 console.log("PrintStatus bad layer progress");
                 console.log("layerProgress: " + layerProgress);
-                //console.log(e.stack);
                 return null;
             }
-        } catch (e) {
+        } catch (error) {
             console.log("Error parsing print status");
-            //console.log(e.stack);
             return null;
         }
     }

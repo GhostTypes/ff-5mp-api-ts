@@ -1,4 +1,3 @@
-// src/tcpapi/FlashForgeTcpClient.ts
 import * as net from 'net';
 import { setTimeout as sleep } from 'timers/promises';
 
@@ -79,6 +78,7 @@ export class FlashForgeTcpClient {
                 this.socket!.write(cmd + '\n', 'ascii', (err) => {
                     if (err) {
                         this.socketBusy = false;
+                        console.error("Error writing command to socket:", err);
                         reject(err);
                         return;
                     }
@@ -87,9 +87,10 @@ export class FlashForgeTcpClient {
                         .then(reply => {
                             this.socketBusy = false;
                             if (reply !== null) {
+                                console.log("Received reply for command:", reply);
                                 resolve(reply);
                             } else {
-                                console.log("Invalid or no replay received, resetting connection to printer.");
+                                console.log("Invalid or no reply received, resetting connection to printer.");
                                 this.resetSocket();
                                 this.checkSocket();
                                 resolve(null);
@@ -97,6 +98,7 @@ export class FlashForgeTcpClient {
                         })
                         .catch(error => {
                             this.socketBusy = false;
+                            console.error("Error receiving reply:", error);
                             reject(error);
                         });
                 });
@@ -107,12 +109,12 @@ export class FlashForgeTcpClient {
 
             if (err.code === 'ENETUNREACH') {
                 const errMsg = `Error while connecting. No route to host [${this.hostname}].`;
-                console.log(errMsg + "\n" + err.stack);
+                console.error(errMsg + "\n" + err.stack);
             } else if (err.code === 'ENOTFOUND') {
                 const errMsg = `Error while connecting. Unknown host [${this.hostname}].`;
-                console.log(errMsg + "\n" + err.stack);
+                console.error(errMsg + "\n" + err.stack);
             } else {
-                console.log(`Error while sending command: ${err.message}\n${err.stack}`);
+                console.error(`Error while sending command: ${err.message}\n${err.stack}`);
             }
             return null;
         }
@@ -173,59 +175,69 @@ export class FlashForgeTcpClient {
         console.log("ReceiveMultiLineReplayAsync()");
 
         if (!this.socket) {
+            console.error("Socket is null, cannot receive reply.");
             return null;
         }
 
         return new Promise<string | null>((resolve) => {
             const answer: Buffer[] = [];
             let timeoutId: NodeJS.Timeout;
+            let lastDataTime = Date.now();
 
             // Create our handler functions
             const dataHandler = (data: Buffer) => {
+                lastDataTime = Date.now();
                 answer.push(data);
                 const dataSoFar = Buffer.concat(answer).toString('ascii');
+                if ((cmd === "~M661" && dataSoFar.includes("ok")) ||
+                    (!cmd.startsWith("~M661") && dataSoFar.includes("ok"))) {
 
-                if ((cmd === "~M661" && dataSoFar.includes("~M662")) ||
-                    (cmd !== "~M661" && dataSoFar.includes("ok"))) {
-                    clearTimeout(timeoutId);
-
-                    // Remove our listeners properly
-                    this.socket!.removeListener('data', dataHandler);
-                    this.socket!.removeListener('error', errorHandler);
-
-                    const result = Buffer.concat(answer).toString('utf8');
-                    if (!result) {
-                        console.log("ReceiveMultiLineReplayAsync received an empty response.");
-                        resolve(null);
-                    } else {
-                        console.log("Multi-line replay received:\n" + result);
-                        resolve(result);
+                    // For M661, wait a fixed short duration after 'ok' to ensure the full response is captured
+                    if (cmd === "~M661") {
+                        clearTimeout(timeoutId); // Clear the main timeout
+                        setTimeout(() => {
+                            cleanup(true); // Resolve after the short delay
+                        }, 500); // Wait 500ms
+                        return; // Prevent immediate cleanup
                     }
+
+                    clearTimeout(timeoutId);
+                    cleanup(true);
                 }
             };
 
             const errorHandler = (err: Error) => {
-                console.log("Error receiving multi-line command reply");
-                console.log(err.stack);
+                console.error("Error receiving multi-line command reply:", err);
                 clearTimeout(timeoutId);
-
-                // Remove our listeners properly
-                this.socket!.removeListener('data', dataHandler);
-                this.socket!.removeListener('error', errorHandler);
-
-                resolve(null);
+                cleanup(false, err);
             };
 
-            // Set up the timeout
-            timeoutId = setTimeout(() => {
-                console.log("ReceiveMultiLineReplayAsync timed out.");
-
+            const cleanup = (success: boolean, error?: Error) => {
                 // Remove our listeners properly
                 this.socket!.removeListener('data', dataHandler);
                 this.socket!.removeListener('error', errorHandler);
 
-                resolve(null);
-            }, 5000);
+                if (!success) {
+                    console.error("Failed to receive complete response:", error?.message);
+                    resolve(null);
+                    return;
+                }
+
+                const result = Buffer.concat(answer).toString('utf8');
+                if (!result) {
+                    console.error("ReceiveMultiLineReplayAsync received an empty response.");
+                    resolve(null);
+                } else {
+                    resolve(result);
+                }
+            };
+
+            // Set up the timeout - increased for M661 command
+            const timeoutDuration = cmd === "~M661" ? 15000 : 5000;
+            timeoutId = setTimeout(() => {
+                console.error(`ReceiveMultiLineReplayAsync timed out after ${timeoutDuration}ms`);
+                cleanup(false);
+            }, timeoutDuration);
 
             // Add our listeners
             this.socket!.on('data', dataHandler);
@@ -238,31 +250,57 @@ export class FlashForgeTcpClient {
         if (response) {
             return this.parseFileListResponse(response);
         }
-        console.log("No response received for M661 command.");
+
         return [];
     }
 
+    /**
+     * Parses the file list response from the 3D printer
+     * Handles various delimiter patterns and special characters
+     */
     private parseFileListResponse(response: string): string[] {
-        const entries = response.split('::').filter(entry => entry.trim() !== '');
+        // Identify data section using various marker patterns
+        const startMarkers = [/D[\S\*]+D\{\:\:/, /D.*?D\{/, /CMD.*?D\{/];
+        let dataSection = response;
 
-        return entries
-            .map(entry => entry.trim())
-            .filter(trimmedEntry => {
-                const dataIndex = trimmedEntry.toLowerCase().indexOf('/data/');
-                return dataIndex >= 0;
-            })
-            .map(filePath => {
-                // Extract path after /data/
-                const dataIndex = filePath.toLowerCase().indexOf('/data/');
-                const extractedPath = filePath.substring(dataIndex);
+        // Try to find the start of the data section
+        for (const markerPattern of startMarkers) {
+            const match = response.match(markerPattern);
+            if (match) {
+                // @ts-ignore
+                dataSection = response.substring(match.index + match[0].length);
+                break;
+            }
+        }
 
-                // Remove non-printable characters
-                const cleanPath = extractedPath.replace(/[^\x20-\x7E]/g, '');
+        // Normalize all delimiters - replace different patterns with a standard delimiter
+        const normalizedData = dataSection
+            .replace(/\:\:\#\#/g, "||")  // Replace ::## with ||
+            .replace(/\:\:\S\S/g, "||")  // Replace ::�� and similar with ||
+            .replace(/\:\:/g, "||");     // Replace :: with ||
 
-                // Replace /data/ with empty string
-                return cleanPath.replace('/data/', '');
-            })
-            .filter(filePath => filePath !== '');
+        // Split by the normalized delimiter
+        const parts = normalizedData.split("||").filter(Boolean);
+
+        // Extract file paths
+        const files: string[] = [];
+        for (const part of parts) {
+            // Look for pattern /data/filename.3mf
+            const match = part.match(/\/data\/([^|"\r\n]*?\.(?:3mf|gcode|gx|stl|obj))/i);
+            if (match && match[1]) {
+                // Clean up the filename - only trim whitespace, preserve + characters
+                const fileName = match[1].trim();
+                if (fileName) {
+                    files.push(fileName);
+                }
+            }
+        }
+
+        // Remove duplicates
+        const uniqueFiles = [...new Set(files)];
+
+
+        return uniqueFiles;
     }
 
     public dispose(): void {
