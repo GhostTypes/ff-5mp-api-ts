@@ -54,6 +54,14 @@ export class FlashForgeClient extends FlashForgeTcpClient {
         return false;
     }
 
+    public async ledOn(): Promise<boolean> {
+        return await this.control.ledOn();
+    }
+
+    public async ledOff(): Promise<boolean> {
+        return await this.control.ledOff();
+    }
+
     public async homeAxes(): Promise<boolean> {
         return await this.control.home();
     }
