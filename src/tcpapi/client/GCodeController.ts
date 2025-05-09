@@ -9,6 +9,14 @@ export class GCodeController {
         this.tcpClient = tcpClient;
     }
 
+    public async ledOn(): Promise<boolean> {
+        return await this.tcpClient.sendCmdOk(GCodes.CmdLedOn);
+    }
+
+    public async ledOff(): Promise<boolean> {
+        return await this.tcpClient.sendCmdOk(GCodes.CmdLedOff);
+    }
+
     // Movement
     public async home(): Promise<boolean> {
         return await this.tcpClient.sendCmdOk(GCodes.CmdHomeAxes);

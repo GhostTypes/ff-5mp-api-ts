@@ -9,6 +9,9 @@ export class GCodes {
     public static readonly CmdInfoXyzab = "~M114";
     public static readonly CmdTemp = "~M105";
 
+    public static readonly CmdLedOn = "~M146 r255 g255 b255 F0";
+    public static readonly CmdLedOff = "~M146 r0 g0 b0 F0";
+
     public static readonly CmdRunoutSensorOn = "~M405";
     public static readonly CmdRunoutSensorOff = "~M406";
 

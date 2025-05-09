@@ -1,6 +1,6 @@
 // src/api/controls/JobControl.ts
 import { FiveMClient } from '../../FiveMClient';
-import { Control } from './Control';
+import {Control, GenericResponse} from './Control';
 import { Endpoints } from '../server/Endpoints';
 import * as fs from 'fs';
 import * as path from 'path';
