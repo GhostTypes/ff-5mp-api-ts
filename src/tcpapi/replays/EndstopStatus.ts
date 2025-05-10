@@ -19,6 +19,7 @@ export class EndstopStatus {
             else if (machineStatus.includes("BUILDING_COMPLETED")) this._MachineStatus = MachineStatus.BUILDING_COMPLETED;
             else if (machineStatus.includes("PAUSED")) this._MachineStatus = MachineStatus.PAUSED;
             else if (machineStatus.includes("READY")) this._MachineStatus = MachineStatus.READY;
+            else if (machineStatus.includes("BUSY")) this._MachineStatus = MachineStatus.BUSY;
             else {
                 console.log("EndstopStatus Encountered unknown MachineStatus: " + machineStatus);
                 this._MachineStatus = MachineStatus.DEFAULT;
@@ -28,6 +29,8 @@ export class EndstopStatus {
             if (moveM.includes("MOVING")) this._MoveMode = MoveMode.MOVING;
             else if (moveM.includes("PAUSED")) this._MoveMode = MoveMode.PAUSED;
             else if (moveM.includes("READY")) this._MoveMode = MoveMode.READY;
+            else if (moveM.includes("WAIT_ON_TOOL")) this._MoveMode = MoveMode.WAIT_ON_TOOL;
+            else if (moveM.includes("HOMING")) this._MoveMode = MoveMode.HOMING;
             else {
                 console.log("EndstopStatus Encountered unknown MoveMode: " + moveM);
                 this._MoveMode = MoveMode.DEFAULT;
@@ -102,6 +105,7 @@ export enum MachineStatus {
     BUILDING_COMPLETED,
     PAUSED,
     READY,
+    BUSY,
     DEFAULT
 }
 
@@ -109,5 +113,7 @@ export enum MoveMode {
     MOVING,
     PAUSED,
     READY,
+    WAIT_ON_TOOL,
+    HOMING,
     DEFAULT
 }
