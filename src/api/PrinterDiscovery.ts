@@ -14,7 +14,7 @@ export class FlashForgePrinter {
 }
 
 export class FlashForgePrinterDiscovery {
-    private static readonly DISCOVERY_PORT = 19000;
+    private static readonly DISCOVERY_PORT = 48899;
 
     // Instance property for easy access to the discovery port
     private readonly discoveryPort = FlashForgePrinterDiscovery.DISCOVERY_PORT;
@@ -32,14 +32,20 @@ export class FlashForgePrinterDiscovery {
             try {
                 // Set up socket
                 await new Promise<void>((resolve) => {
-                    udpClient.bind(() => {
+                    // Bind to port 18007 to receive responses
+                    udpClient.bind(18007, () => {
                         udpClient.setBroadcast(true);
                         resolve();
                     });
                 });
 
                 // Send discovery message to all broadcast addresses
-                const discoveryMessage = Buffer.from('discover', 'ascii');
+                // This is the exact discovery packet seen in Wireshark from FlashPrint
+                const discoveryMessage = Buffer.from([
+                    0x77, 0x77, 0x77, 0x2e, 0x75, 0x73, 0x72, 0x22, 
+                    0x65, 0x36, 0xc0, 0x00, 0x00, 0x00, 0x00, 0x00, 
+                    0x00, 0x00, 0x00, 0x00
+                ]);
                 for (const broadcastAddress of broadcastAddresses) {
                     try {
                         udpClient.send(discoveryMessage, this.discoveryPort, broadcastAddress);
