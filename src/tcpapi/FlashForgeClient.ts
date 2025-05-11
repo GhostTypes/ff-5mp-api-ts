@@ -63,6 +63,18 @@ export class FlashForgeClient extends FlashForgeTcpClient {
         return await this.control.ledOff();
     }
 
+    public async pauseJob(): Promise<boolean> {
+        return await this.control.pauseJob();
+    }
+
+    public async resumeJob(): Promise<boolean> {
+        return await this.control.resumeJob();
+    }
+
+    public async stopJob(): Promise<boolean> {
+        return await this.control.stopJob();
+    }
+
     public async homeAxes(): Promise<boolean> {
         return await this.control.home();
     }

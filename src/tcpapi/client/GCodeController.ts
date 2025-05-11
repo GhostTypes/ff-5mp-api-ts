@@ -2,6 +2,9 @@
 import { FlashForgeClient } from '../FlashForgeClient';
 import { GCodes } from './GCodes';
 
+// todo remove all manual gcode commands defined here
+// everything should be in GCodes...
+
 export class GCodeController {
     private tcpClient: FlashForgeClient;
 
@@ -15,6 +18,18 @@ export class GCodeController {
 
     public async ledOff(): Promise<boolean> {
         return await this.tcpClient.sendCmdOk(GCodes.CmdLedOff);
+    }
+
+    public async pauseJob() {
+        return await this.tcpClient.sendCmdOk(GCodes.CmdPausePrint);
+    }
+
+    public async resumeJob() {
+        return await this.tcpClient.sendCmdOk(GCodes.CmdResumePrint);
+    }
+
+    public async stopJob() {
+        return await this.tcpClient.sendCmdOk(GCodes.CmdStopPrint);
     }
 
     // Movement
@@ -50,7 +65,7 @@ export class GCodeController {
     public async setBedTemp(temp: number, waitFor: boolean = false): Promise<boolean> {
         const ok = await this.tcpClient.sendCmdOk(`~M140 S${temp}`);
         if (!waitFor) return ok;
-        return await this.waitForBedTemp(temp);
+        return await this.waitForBedTemp(temp, false);
     }
 
     public async cancelExtruderTemp(): Promise<boolean> {
@@ -60,10 +75,14 @@ export class GCodeController {
     public async cancelBedTemp(waitForCool: boolean = false): Promise<boolean> {
         const ok = await this.tcpClient.sendCmdOk("~M140 S0");
         if (!waitForCool) return ok;
-        return await this.waitForBedTemp(37); // *can* remove parts @ 40 but safer side
+        return await this.waitForBedTemp(37, true); // *can* remove parts @ 40 but safer side
     }
 
-    public async waitForBedTemp(temp: number): Promise<boolean> {
+    // todo both of these should have customizable timeouts
+    public async waitForBedTemp(temp: number, cooling: boolean): Promise<boolean> {
+        // wait machine-side as well
+        if (cooling) await this.tcpClient.sendCmdOk(GCodes.WaitForBedTemp + `R${temp}`);
+        else await this.tcpClient.sendCmdOk(GCodes.WaitForBedTemp + `S${temp}`);
         const startTime = Date.now();
         const timeout = 30000; // 30s timeout
 
@@ -78,6 +97,8 @@ export class GCodeController {
     }
 
     public async waitForExtruderTemp(temp: number): Promise<boolean> {
+        // wait machine-side as well
+        await this.tcpClient.sendCmdOk(GCodes.WaitForHotendTemp + `S${temp}`);
         const startTime = Date.now();
         const timeout = 30000; // 30s timeout
 

@@ -1,10 +1,9 @@
 // src/tcpapi/replays/PrintStatus.ts
 export class PrintStatus {
-    // This shouldn't be used by anything. Rely on the new api
-    private _sdCurrent: string = '';
-    private _sdTotal: string = '';
-    private _layerCurrent: string = '';
-    private _layerTotal: string = '';
+    public _sdCurrent: string = '';
+    public _sdTotal: string = '';
+    public _layerCurrent: string = '';
+    public _layerTotal: string = '';
 
     public fromReplay(replay: string): PrintStatus | null {
         try {
@@ -40,10 +39,11 @@ export class PrintStatus {
     }
 
     public getPrintPercent(): number {
-        const current = parseInt(this._sdCurrent, 10);
-        const total = parseInt(this._sdTotal, 10);
-        const perc = (current / total) * 100;
-        return Math.round(perc);
+        const currentLayer = parseInt(this._layerCurrent, 10);
+        const totalLayers = parseInt(this._layerTotal, 10);
+        const perc = (currentLayer / totalLayers) * 100;
+
+        return Math.round(Math.min(100, Math.max(0, perc))); // Clamp between 0 and 100
     }
 
     public getLayerProgress(): string {

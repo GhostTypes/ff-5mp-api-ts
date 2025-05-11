@@ -28,7 +28,7 @@ export class TempControl {
     }
 
     public async waitForPartCool(temp: number): Promise<void> {
-        await this.tcpClient.gCode().waitForBedTemp(temp);
+        await this.tcpClient.gCode().waitForBedTemp(temp, true);
     }
 
     /* TODO: This should work as is but needs verification

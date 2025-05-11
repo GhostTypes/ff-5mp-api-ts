@@ -1,5 +1,6 @@
 import * as net from 'net';
 import { setTimeout as sleep } from 'timers/promises';
+import {GCodes} from "./client/GCodes";
 
 export class FlashForgeTcpClient {
     protected socket: net.Socket | null = null;
@@ -191,13 +192,13 @@ export class FlashForgeTcpClient {
                 
                 // First, check for completion in non-binary response formats
                 // This is the standard case for most commands
-                if (!cmd.startsWith("~M662")) {
+                if (!cmd.startsWith(GCodes.CmdGetThumbnail)) {
                     // For text commands, we need a complete buffer to check for "ok"
                     const fullBufferSoFar = Buffer.concat(answer);
                     const dataSoFar = fullBufferSoFar.toString('ascii');
                     
                     // For M661 file list command
-                    if (cmd === "~M661" && dataSoFar.includes("ok")) {
+                    if (cmd === GCodes.CmdListLocalFiles && dataSoFar.includes("ok")) {
                         clearTimeout(timeoutId); // Clear the main timeout
                         setTimeout(() => {
                             cleanup(true); // Resolve after the short delay
@@ -226,7 +227,7 @@ export class FlashForgeTcpClient {
                             clearTimeout(timeoutId);
                             setTimeout(() => {
                                 cleanup(true);
-                            }, 1000); // Wait 1 second for binary data
+                            }, 1500); // Wait 1.5s for binary data
                             return;
                         }
                     } catch (e) {
@@ -253,7 +254,7 @@ export class FlashForgeTcpClient {
                 }
 
                 // For binary responses (M662), return the raw buffer as a binary string
-                if (cmd.startsWith("~M662")) {
+                if (cmd.startsWith(GCodes.CmdGetThumbnail)) {
                     const result = Buffer.concat(answer).toString('binary');
                     if (!result) {
                         console.error("Received empty thumbnail response.");
@@ -275,9 +276,9 @@ export class FlashForgeTcpClient {
 
             // Set up the timeout - increased for M661 and M662 commands
             let timeoutDuration = 5000; // default timeout
-            if (cmd === "~M661") {
+            if (cmd === GCodes.CmdListLocalFiles) {
                 timeoutDuration = 15000; // file list timeout
-            } else if (cmd.startsWith("~M662")) {
+            } else if (cmd.startsWith(GCodes.CmdGetThumbnail)) {
                 timeoutDuration = 30000; // thumbnail timeout - these can be large
                 // For thumbnails, immediately increase the socket timeout too
                 if (this.socket) {
@@ -297,7 +298,7 @@ export class FlashForgeTcpClient {
     }
 
     public async getFileListAsync(): Promise<string[]> {
-        const response = await this.sendCommandAsync("~M661");
+        const response = await this.sendCommandAsync(GCodes.CmdListLocalFiles);
         if (response) {
             return this.parseFileListResponse(response);
         }
