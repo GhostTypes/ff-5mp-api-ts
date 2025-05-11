@@ -42,7 +42,6 @@ export class PrintStatus {
         const currentLayer = parseInt(this._layerCurrent, 10);
         const totalLayers = parseInt(this._layerTotal, 10);
         const perc = (currentLayer / totalLayers) * 100;
-
         return Math.round(Math.min(100, Math.max(0, perc))); // Clamp between 0 and 100
     }
 

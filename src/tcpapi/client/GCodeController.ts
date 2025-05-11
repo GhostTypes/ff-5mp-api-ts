@@ -2,9 +2,6 @@
 import { FlashForgeClient } from '../FlashForgeClient';
 import { GCodes } from './GCodes';
 
-// todo remove all manual gcode commands defined here
-// everything should be in GCodes...
-
 export class GCodeController {
     private tcpClient: FlashForgeClient;
 

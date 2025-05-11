@@ -26,13 +26,12 @@ export class FiveMClient {
     public checkCode: string;
     public httpClient: ReturnType<typeof axios.create>;
 
-    // HTTP Client semaphore implementation will be different in JS
     private httpClientBusy = false;
 
     public printerName: string = '';
     public isPro: boolean = false;
     public firmwareVersion: string = '';
-    public firmVer: string = ''; // Version object in C#, will use string in TS
+    public firmVer: string = '';
 
     public ipAddress: string;
     public macAddress: string = '';
@@ -59,7 +58,10 @@ export class FiveMClient {
             }
         });
 
+        // FlashForgeClient is used internally for some "lower-level" stuff like sending direct g/m-code
+        // That isn't available over the new API
         this.tcpClient = new FlashForgeClient(ipAddress);
+
         this.control = new Control(this);
         this.jobControl = new JobControl(this);
         this.info = new Info(this);
@@ -70,7 +72,7 @@ export class FiveMClient {
     public async initialize(): Promise<boolean> {
         const connected = await this.verifyConnection();
         if (connected) {
-            console.log("Connected to printer successfully");
+            //console.log("Connected to printer successfully");
             return true;
         }
         console.log("Failed to connect to printer");
@@ -86,7 +88,7 @@ export class FiveMClient {
     }
 
     public async initControl(): Promise<boolean> {
-        console.log("InitControl()");
+        //console.log("InitControl()");
         if (await this.sendProductCommand()) {
             return await this.tcpClient.initControl();
         }
@@ -129,12 +131,9 @@ export class FiveMClient {
                 return false;
             }
 
-            // Make sure MachineInfo handles null values properly
+            // Make sure we get a valid detail response
             const machineInfo = new MachineInfo().fromDetail(response.detail);
-            if (!machineInfo) {
-
-                return false;
-            }
+            if (!machineInfo) { return false; }
 
             // Check for Pro model with the machine TypeName (can't be changed by user)
             const tcpInfo = await this.tcpClient.getPrinterInfo()
@@ -143,6 +142,7 @@ export class FiveMClient {
             } else {
                 console.error("Unable to get PrinterInfo from TcpAPI , some things might be borked");
             }
+            // we should probably return false if tcpInfo is null here, like we do for machineInfo
 
             return this.cacheDetails(machineInfo);
         } catch (error: unknown) {
@@ -154,7 +154,7 @@ export class FiveMClient {
     }
 
     public async sendProductCommand(): Promise<boolean> {
-        console.log("SendProductCommand()");
+        //console.log("SendProductCommand()");
         this.httpClientBusy = true;
 
         const payload = {
@@ -177,10 +177,8 @@ export class FiveMClient {
                     const product = productResponse.product;
                     this.ledControl = product.lightCtrlState !== 0;
                     this.filtrationControl = !(product.internalFanCtrlState === 0 || product.externalFanCtrlState === 0);
-
-                    console.log("LedControl: " + this.ledControl);
-                    console.log("FiltrationControl: " + this.filtrationControl);
-
+                    //console.log("LedControl: " + this.ledControl);
+                    //console.log("FiltrationControl: " + this.filtrationControl);
                     return true;
                 }
             } catch (error) {

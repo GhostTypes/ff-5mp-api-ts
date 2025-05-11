@@ -56,37 +56,21 @@ export class FlashForgeClient extends FlashForgeTcpClient {
         return false;
     }
 
-    public async ledOn(): Promise<boolean> {
-        return await this.control.ledOn();
-    }
+    public async ledOn(): Promise<boolean> { return await this.control.ledOn(); }
 
-    public async ledOff(): Promise<boolean> {
-        return await this.control.ledOff();
-    }
+    public async ledOff(): Promise<boolean> { return await this.control.ledOff(); }
 
-    public async pauseJob(): Promise<boolean> {
-        return await this.control.pauseJob();
-    }
+    public async pauseJob(): Promise<boolean> { return await this.control.pauseJob(); }
 
-    public async resumeJob(): Promise<boolean> {
-        return await this.control.resumeJob();
-    }
+    public async resumeJob(): Promise<boolean> { return await this.control.resumeJob(); }
 
-    public async stopJob(): Promise<boolean> {
-        return await this.control.stopJob();
-    }
+    public async stopJob(): Promise<boolean> { return await this.control.stopJob(); }
 
-    public async startJob(name: string): Promise<boolean> {
-        return await this.control.startJob(name);
-    }
+    public async startJob(name: string): Promise<boolean> { return await this.control.startJob(name); }
 
-    public async homeAxes(): Promise<boolean> {
-        return await this.control.home();
-    }
+    public async homeAxes(): Promise<boolean> { return await this.control.home(); }
 
-    public async rapidHome(): Promise<boolean> {
-        return await this.control.rapidHome();
-    }
+    public async rapidHome(): Promise<boolean> { return await this.control.rapidHome(); }
 
     public async turnRunoutSensorOn(): Promise<boolean> {
         if (this.is5mPro) {
@@ -222,9 +206,9 @@ export class FlashForgeClient extends FlashForgeTcpClient {
      * @returns ThumbnailInfo object or null if retrieval failed
      */
     public async getThumbnail(fileName: string): Promise<ThumbnailInfo | null> {
-        // Ensure the filename has the /data/ prefix required by the printer
+        // Ensure the filename has the required /data/ prefix
         const filePath = fileName.startsWith('/data/') ? fileName : `/data/${fileName}`;
-        console.log(`Getting thumbnail for: ${filePath}`);
+        //console.log(`Getting thumbnail for: ${filePath}`);
         
         try {
             const response = await this.sendCommandAsync(`${GCodes.CmdGetThumbnail} ${filePath}`);

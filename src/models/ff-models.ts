@@ -1,6 +1,6 @@
 // src/models/ff-models.ts
 export interface FFPrinterDetail {
-    autoShutdown?: string; // Use optional modifier (?) if properties might be missing
+    autoShutdown?: string;
     autoShutdownTime?: number;
     cameraStreamUrl?: string;
     chamberFanSpeed?: number;

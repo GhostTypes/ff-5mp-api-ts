@@ -1,5 +1,5 @@
 // src/api/models/MachineInfo.ts
-import { FFPrinterDetail, FFMachineInfo, MachineState, Temperature } from './ff-models';
+import {FFMachineInfo, FFPrinterDetail, MachineState} from './ff-models';
 
 export class MachineInfo {
     // Converts printer details from API response format to our internal model
@@ -7,7 +7,6 @@ export class MachineInfo {
         if (!detail) return null;
 
         try {
-            // Read camelCase from 'detail', assign to PascalCase in the result object
             const printEta = this.formatTimeFromSeconds(detail.estimatedTime || 0);
             const completionTime = new Date(Date.now() + (detail.estimatedTime || 0) * 1000);
             const formattedRunTime = this.formatTimeFromSeconds(detail.printDuration || 0);
@@ -24,8 +23,7 @@ export class MachineInfo {
             const lightsOn = (detail.lightStatus || '') === "open";
 
             const totalJobFilamentMeters = (detail.estimatedRightLen || 0) / 1000.0;
-            const filamentUsedSoFarMeters = totalJobFilamentMeters * (detail.printProgress || 0);
-            const estLength = filamentUsedSoFarMeters;
+            const estLength = totalJobFilamentMeters * (detail.printProgress || 0);
             const estWeight = (detail.estimatedRightWeight || 0) * (detail.printProgress || 0);
 
             return {
@@ -119,7 +117,7 @@ export class MachineInfo {
         }
     }
 
-    // Remaining code is unchanged
+
     private formatTimeFromSeconds(seconds: number): string {
         try {
             const validSeconds = typeof seconds === 'number' ? seconds : 0;

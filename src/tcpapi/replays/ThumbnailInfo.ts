@@ -32,17 +32,12 @@ export class ThumbnailInfo {
             // Skip the 'ok' text and any control characters after it
             const binaryStartIndex = okIndex + 2;
             const rawBinaryData = replay.substring(binaryStartIndex);
-            
-            //console.log(`ThumbnailInfo: Raw response length: ${replay.length} bytes`);
-            //console.log(`ThumbnailInfo: Binary portion length: ${rawBinaryData.length} bytes`);
-            
+
             // Convert string to binary buffer
             const binaryBuffer = Buffer.from(rawBinaryData, 'binary');
             
-            // Look for PNG signature in the buffer
-            // PNG signature is 89 50 4E 47 0D 0A 1A 0A (hex)
+            // Look for PNG signature in the buffer (89 50 4E 47 0D 0A 1A 0A)
             let pngStart = -1;
-            
             for (let i = 0; i < binaryBuffer.length - 4; i++) {
                 if (binaryBuffer[i] === 0x89 && 
                     binaryBuffer[i+1] === 0x50 && 
@@ -54,18 +49,14 @@ export class ThumbnailInfo {
             }
             
             if (pngStart >= 0) {
-                //console.log(`ThumbnailInfo: Found PNG signature at offset ${pngStart}`);
-                // Extract just the PNG data from the signature to the end
                 this._imageData = binaryBuffer.slice(pngStart);
-                //console.log(`ThumbnailInfo: Extracted ${this._imageData.length} bytes of PNG data`);
                 return this;
             } else {
                 console.log("ThumbnailInfo: No PNG signature found");
                 return null;
             }
         } catch (error) {
-            console.error("ThumbnailInfo: Error parsing response:", 
-                error instanceof Error ? error.message : String(error));
+            console.error("ThumbnailInfo: Error parsing response:", error instanceof Error ? error.message : String(error));
             return null;
         }
     }

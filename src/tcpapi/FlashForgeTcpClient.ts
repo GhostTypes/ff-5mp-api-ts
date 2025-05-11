@@ -24,18 +24,17 @@ export class FlashForgeTcpClient {
 
     public startKeepAlive(): void {
         if (this.keepAliveCancellationToken) return; // already running
-
         this.keepAliveCancellationToken = false;
 
         const runKeepAlive = async () => {
             try {
                 while (!this.keepAliveCancellationToken) {
-                    console.log("KeepAlive");
-                    const result = await this.sendCommandAsync("~M27");
+                    //console.log("KeepAlive");
+                    const result = await this.sendCommandAsync(GCodes.CmdPrintStatus);
                     if (result === null) {
                         // keep alive failed, connection error/timeout etc
                         this.keepAliveErrors++; // keep track of errors
-                        console.log(`Current keep alive failure: ${this.keepAliveErrors}`);
+                        //console.log(`Current keep alive failure: ${this.keepAliveErrors}`);
                         break;
                     }
 
@@ -49,13 +48,11 @@ export class FlashForgeTcpClient {
             }
         };
 
-        runKeepAlive();
+        runKeepAlive()
     }
 
     public stopKeepAlive(logout: boolean = false): void {
-        if (logout) {
-            this.sendCommandAsync("~M602").then(() => {});
-        }
+        if (logout) { this.sendCommandAsync(GCodes.CmdLogout).then(() => {}); } // release control
         this.keepAliveCancellationToken = true;
         console.log("Keep-alive stopped.");
     }
@@ -88,10 +85,10 @@ export class FlashForgeTcpClient {
                         .then(reply => {
                             this.socketBusy = false;
                             if (reply !== null) {
-                                console.log("Received reply for command:", reply);
+                                //console.log("Received reply for command:", reply);
                                 resolve(reply);
                             } else {
-                                console.log("Invalid or no reply received, resetting connection to printer.");
+                                console.warn("Invalid or no reply received, resetting connection to printer.");
                                 this.resetSocket();
                                 this.checkSocket();
                                 resolve(null);
@@ -139,21 +136,21 @@ export class FlashForgeTcpClient {
         let fix = false;
         if (this.socket === null) {
             fix = true;
-            console.log("TcpPrinterClient socket is null");
+            //console.warn("TcpPrinterClient socket is null");
         } else if (this.socket.destroyed) {
             fix = true;
-            console.log("TcpPrinterClient socket is closed");
+            //console.warn("TcpPrinterClient socket is closed");
         }
 
         if (!fix) return;
 
-        console.log("Reconnecting to socket...");
+        console.warn("Reconnecting to TCP socket...");
         this.connect();
         this.startKeepAlive(); // Start this here rather than Connect()
     }
 
     private connect(): void {
-        console.log("Connect()");
+        //console.log("Connect()");
         this.socket = new net.Socket();
         this.socket.connect(this.port, this.hostname);
         this.socket.setTimeout(this.timeout);
@@ -164,7 +161,7 @@ export class FlashForgeTcpClient {
     }
 
     private resetSocket(): void {
-        console.log("ResetSocket()");
+        //console.log("ResetSocket()");
         this.stopKeepAlive();
         if (this.socket) {
             this.socket.destroy();
@@ -173,10 +170,10 @@ export class FlashForgeTcpClient {
     }
 
     private async receiveMultiLineReplayAsync(cmd: string): Promise<string | null> {
-        console.log("ReceiveMultiLineReplayAsync()");
+        //console.log("ReceiveMultiLineReplayAsync()");
 
         if (!this.socket) {
-            console.error("Socket is null, cannot receive reply.");
+            //console.error("Socket is null, cannot receive reply.");
             return null;
         }
 
@@ -274,24 +271,16 @@ export class FlashForgeTcpClient {
                 }
             };
 
-            // Set up the timeout - increased for M661 and M662 commands
             let timeoutDuration = 5000; // default timeout
-            if (cmd === GCodes.CmdListLocalFiles) {
-                timeoutDuration = 15000; // file list timeout
-            } else if (cmd.startsWith(GCodes.CmdGetThumbnail)) {
-                timeoutDuration = 30000; // thumbnail timeout - these can be large
-                // For thumbnails, immediately increase the socket timeout too
-                if (this.socket) {
-                    this.socket.setTimeout(timeoutDuration);
-                }
-            }
+            if (cmd === GCodes.CmdListLocalFiles || cmd.startsWith(GCodes.CmdGetThumbnail)) { timeoutDuration = 10000; } // increase command timeout
+            if (this.socket) { this.socket.setTimeout(timeoutDuration); }
             
             timeoutId = setTimeout(() => {
                 console.error(`ReceiveMultiLineReplayAsync timed out after ${timeoutDuration}ms`);
                 cleanup(false);
             }, timeoutDuration);
 
-            // Add our listeners
+            // Add listeners
             this.socket!.on('data', dataHandler);
             this.socket!.on('error', errorHandler);
         });
@@ -341,11 +330,8 @@ export class FlashForgeTcpClient {
             const match = part.match(/\/data\/([^|"\r\n\s]+)/i);
             if (match && match[1]) {
                 const fileName = match[1].trim();
-
                 // Filter for supported file types with any combination of extensions
-                if (fileName && /\.(3mf|gcode|gcode\.gx|gx|stl|obj)$/i.test(fileName)) {
-                    files.push(fileName);
-                }
+                if (fileName && /\.(3mf|gcode|gcode\.gx|gx|stl|obj)$/i.test(fileName)) { files.push(fileName); }
             }
         }
 
