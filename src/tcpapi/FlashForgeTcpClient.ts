@@ -188,21 +188,50 @@ export class FlashForgeTcpClient {
             const dataHandler = (data: Buffer) => {
                 lastDataTime = Date.now();
                 answer.push(data);
-                const dataSoFar = Buffer.concat(answer).toString('ascii');
-                if ((cmd === "~M661" && dataSoFar.includes("ok")) ||
-                    (!cmd.startsWith("~M661") && dataSoFar.includes("ok"))) {
-
-                    // For M661, wait a fixed short duration after 'ok' to ensure the full response is captured
-                    if (cmd === "~M661") {
+                
+                // First, check for completion in non-binary response formats
+                // This is the standard case for most commands
+                if (!cmd.startsWith("~M662")) {
+                    // For text commands, we need a complete buffer to check for "ok"
+                    const fullBufferSoFar = Buffer.concat(answer);
+                    const dataSoFar = fullBufferSoFar.toString('ascii');
+                    
+                    // For M661 file list command
+                    if (cmd === "~M661" && dataSoFar.includes("ok")) {
                         clearTimeout(timeoutId); // Clear the main timeout
                         setTimeout(() => {
                             cleanup(true); // Resolve after the short delay
                         }, 500); // Wait 500ms
                         return; // Prevent immediate cleanup
                     }
-
-                    clearTimeout(timeoutId);
-                    cleanup(true);
+                    
+                    // For all other standard text commands
+                    if (dataSoFar.includes("ok")) {
+                        clearTimeout(timeoutId);
+                        cleanup(true);
+                        return;
+                    }
+                }
+                // Special case for M662 (thumbnail) command which returns binary data
+                else {
+                    // For binary responses, only check the text portion for "ok"
+                    // Look only at the beginning of the buffer for the text header
+                    try {
+                        // Just check for "ok" in the first 100 bytes
+                        const headerBuffer = Buffer.concat(answer).slice(0, 100);
+                        const header = headerBuffer.toString('ascii');
+                        
+                        if (header.includes("ok")) {
+                            // For thumbnail requests, wait longer after "ok" to ensure we get all binary data
+                            clearTimeout(timeoutId);
+                            setTimeout(() => {
+                                cleanup(true);
+                            }, 1000); // Wait 1 second for binary data
+                            return;
+                        }
+                    } catch (e) {
+                        console.log("Error checking binary response header: " + e);
+                    }
                 }
             };
 
@@ -223,17 +252,39 @@ export class FlashForgeTcpClient {
                     return;
                 }
 
-                const result = Buffer.concat(answer).toString('utf8');
-                if (!result) {
-                    console.error("ReceiveMultiLineReplayAsync received an empty response.");
-                    resolve(null);
+                // For binary responses (M662), return the raw buffer as a binary string
+                if (cmd.startsWith("~M662")) {
+                    const result = Buffer.concat(answer).toString('binary');
+                    if (!result) {
+                        console.error("Received empty thumbnail response.");
+                        resolve(null);
+                    } else {
+                        resolve(result);
+                    }
                 } else {
-                    resolve(result);
+                    // For text responses, convert to UTF-8
+                    const result = Buffer.concat(answer).toString('utf8');
+                    if (!result) {
+                        console.error("ReceiveMultiLineReplayAsync received an empty response.");
+                        resolve(null);
+                    } else {
+                        resolve(result);
+                    }
                 }
             };
 
-            // Set up the timeout - increased for M661 command
-            const timeoutDuration = cmd === "~M661" ? 15000 : 5000;
+            // Set up the timeout - increased for M661 and M662 commands
+            let timeoutDuration = 5000; // default timeout
+            if (cmd === "~M661") {
+                timeoutDuration = 15000; // file list timeout
+            } else if (cmd.startsWith("~M662")) {
+                timeoutDuration = 30000; // thumbnail timeout - these can be large
+                // For thumbnails, immediately increase the socket timeout too
+                if (this.socket) {
+                    this.socket.setTimeout(timeoutDuration);
+                }
+            }
+            
             timeoutId = setTimeout(() => {
                 console.error(`ReceiveMultiLineReplayAsync timed out after ${timeoutDuration}ms`);
                 cleanup(false);

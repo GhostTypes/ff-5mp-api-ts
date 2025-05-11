@@ -69,7 +69,7 @@ export class GCodeController {
 
         while (Date.now() - startTime < timeout) {
             const tempInfo = await this.tcpClient.getTempInfo();
-            if (tempInfo && tempInfo.getBedTemp().getCurrent() === temp) return true;
+            if (tempInfo && tempInfo.getBedTemp()?.getCurrent() === temp) return true;
             await new Promise(resolve => setTimeout(resolve, 1000));
         }
 
@@ -83,7 +83,7 @@ export class GCodeController {
 
         while (Date.now() - startTime < timeout) {
             const tempInfo = await this.tcpClient.getTempInfo();
-            if (tempInfo && tempInfo.getExtruderTemp().getCurrent() === temp) return true;
+            if (tempInfo && tempInfo.getExtruderTemp()?.getCurrent() === temp) return true;
             await new Promise(resolve => setTimeout(resolve, 1000));
         }
 

@@ -46,6 +46,7 @@ export { LocationInfo } from './tcpapi/replays/LocationInfo';
 export { PrinterInfo } from './tcpapi/replays/PrinterInfo';
 export { PrintStatus } from './tcpapi/replays/PrintStatus';
 export { TempInfo, TempData } from './tcpapi/replays/TempInfo';
+export { ThumbnailInfo } from './tcpapi/replays/ThumbnailInfo';
 
 // Misc
 export { formatScientificNotation } from './api/misc/ScientificNotationFloatConverter';

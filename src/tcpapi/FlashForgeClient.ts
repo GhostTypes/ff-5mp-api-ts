@@ -7,6 +7,7 @@ import { TempInfo } from './replays/TempInfo';
 import { EndstopStatus } from './replays/EndstopStatus';
 import { PrintStatus } from './replays/PrintStatus';
 import { LocationInfo } from './replays/LocationInfo';
+import { ThumbnailInfo } from './replays/ThumbnailInfo';
 import { Filament } from '../api/filament/Filament';
 
 export class FlashForgeClient extends FlashForgeTcpClient {
@@ -195,8 +196,33 @@ export class FlashForgeClient extends FlashForgeTcpClient {
 
     private async getNozzleTemp(): Promise<number> {
         const temps = await this.getTempInfo();
-        return temps ? temps.getExtruderTemp().getCurrent() : 0;
+        return temps?.getExtruderTemp()?.getCurrent() ?? 0;
     }
+
+    /**
+     * Retrieve the thumbnail for a specific print file
+     * @param fileName The name of the file to retrieve the thumbnail for (without /data/ prefix)
+     * @returns ThumbnailInfo object or null if retrieval failed
+     */
+    public async getThumbnail(fileName: string): Promise<ThumbnailInfo | null> {
+        // Ensure the filename has the /data/ prefix required by the printer
+        const filePath = fileName.startsWith('/data/') ? fileName : `/data/${fileName}`;
+        console.log(`Getting thumbnail for: ${filePath}`);
+        
+        try {
+            const response = await this.sendCommandAsync(`${GCodes.CmdGetThumbnail} ${filePath}`);
+            if (!response) {
+                console.log(`Failed to get thumbnail for ${fileName} - null response`);
+                return null;
+            }
+            
+            return new ThumbnailInfo().fromReplay(response, fileName);
+        } catch (error) {
+            console.log(`Failed to get thumbnail for ${fileName}: ${error instanceof Error ? error.message : String(error)}`);
+            return null;
+        }
+    }
+
 }
 
 // Helper function for sleep

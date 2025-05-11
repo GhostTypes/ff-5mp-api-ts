@@ -14,33 +14,69 @@ export class TempInfo {
             }
 
             const tempData = data[1].split(' ');
-            const e = tempData[0].replace("T0:", "").replace("/0.0", "");
-            const b = tempData[2].replace("B:", "").replace("/0.0", "");
-
-            this._extruderTemp = new TempData(e);
-            this._bedTemp = new TempData(b);
+            let extruderData = null;
+            let bedData = null;
+            
+            // Parse each temperature segment
+            for (const segment of tempData) {
+                // Check for extruder temperature (T0 or T) - some printers use T): instead of T0:
+                // Check for different extruder temperature formats
+                if (segment.startsWith('T0:')) {
+                    extruderData = segment.replace('T0:', '');
+                } else if (segment.startsWith('T):')) {
+                    extruderData = segment.replace('T):', '');
+                } else if (segment.startsWith('T:')) {
+                    extruderData = segment.replace('T:', '');
+                }
+                // Check for bed temperature
+                else if (segment.startsWith('B:')) {
+                    bedData = segment.replace('B:', '');
+                }
+            }
+            
+            // If we found extruder data, create TempData object
+            if (extruderData) {
+                this._extruderTemp = new TempData(extruderData);
+            } else {
+                console.log("No extruder temperature found in replay data");
+                return null;
+            }
+            
+            // If we found bed data, create TempData object
+            if (bedData) {
+                this._bedTemp = new TempData(bedData);
+            } else {
+                console.log("No bed temperature found in replay data");
+                // Create a default bed temperature with 0/0 if not found
+                this._bedTemp = new TempData('0/0');
+            }
+            
             return this;
         } catch (error) {
-            console.log("Unable to create TempInfo instance from replay");
-            console.log(replay);
+            console.log("Unable to create TempInfo instance from replay: " + (error instanceof Error ? error.message : String(error)));
+            console.log("Raw replay data: " + replay);
             return null;
         }
     }
 
-    public getExtruderTemp(): TempData {
-        return this._extruderTemp!;
+    public getExtruderTemp(): TempData | null {
+        return this._extruderTemp;
     }
 
-    public getBedTemp(): TempData {
-        return this._bedTemp!;
+    public getBedTemp(): TempData | null {
+        return this._bedTemp;
     }
 
     public isCooled(): boolean {
-        return this._bedTemp!.getCurrent() <= 40 && this._extruderTemp!.getCurrent() <= 200;
+        const bedTemp = this._bedTemp ? this._bedTemp.getCurrent() : 0;
+        const extruderTemp = this._extruderTemp ? this._extruderTemp.getCurrent() : 0;
+        return bedTemp <= 40 && extruderTemp <= 200;
     }
 
     public areTempsSafe(): boolean {
-        return this._extruderTemp!.getCurrent() < 250 && this._bedTemp!.getCurrent() < 100;
+        const bedTemp = this._bedTemp ? this._bedTemp.getCurrent() : 0;
+        const extruderTemp = this._extruderTemp ? this._extruderTemp.getCurrent() : 0;
+        return extruderTemp < 250 && bedTemp < 100;
     }
 }
 
@@ -49,6 +85,9 @@ export class TempData {
     private readonly _set: string | null;
 
     constructor(data: string) {
+        // Handle potential formatting issues by removing any non-relevant part
+        data = data.replace('/0.0', ''); // Remove trailing '/0.0' if exists
+        
         if (data.includes("/")) {
             // replay has current/set temps
             const splitTemps = data.split('/');
