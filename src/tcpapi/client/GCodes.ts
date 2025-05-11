@@ -24,10 +24,14 @@ export class GCodes {
 
     public static readonly CmdHomeAxes = "~G28";
 
+    public static readonly CmdStartPrint = "~M23 0:/user/%%filename%%"
     public static readonly CmdPausePrint = "~M25"
     public static readonly CmdResumePrint = "~M24"
     public static readonly CmdStopPrint = "~M26"
 
     public static readonly WaitForHotendTemp = "~M109"
     public static readonly WaitForBedTemp = "~M190";
+
+    //public static readonly CmdPrepFileUpload = "~M28 %%size%% 0:/user/%%filename%%"
+    //public static readonly CmdCompleteFileUpload = "~M29"
 }

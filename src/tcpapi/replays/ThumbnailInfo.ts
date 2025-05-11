@@ -22,66 +22,61 @@ export class ThumbnailInfo {
             // Store the file name
             this._fileName = fileName;
             
-            // Find where the PNG data starts (after the "ok" line)
+            // Find where the PNG data starts (after the "ok" text)
             const okIndex = replay.indexOf('ok');
             if (okIndex === -1) {
                 console.log("ThumbnailInfo: No 'ok' found in response");
                 return null;
             }
 
-            // The binary data starts after the "ok" and newline
-            const binaryStart = okIndex + 2;
+            // Skip the 'ok' text and any control characters after it
+            const binaryStartIndex = okIndex + 2;
+            const rawBinaryData = replay.substring(binaryStartIndex);
             
-            // Convert the raw string to a buffer, skipping the text part
-            const rawData = replay.substring(binaryStart);
+            //console.log(`ThumbnailInfo: Raw response length: ${replay.length} bytes`);
+            //console.log(`ThumbnailInfo: Binary portion length: ${rawBinaryData.length} bytes`);
             
-            // Convert string to Buffer by using a buffer of UTF-8 bytes, then creating a new buffer without text headers
-            const tempBuffer = Buffer.from(rawData, 'binary');
+            // Convert string to binary buffer
+            const binaryBuffer = Buffer.from(rawBinaryData, 'binary');
             
-            // Find PNG signature in buffer (PNG files start with these bytes: 89 50 4E 47)
-            const pngSignature = Buffer.from([0x89, 0x50, 0x4E, 0x47]);
+            // Look for PNG signature in the buffer
+            // PNG signature is 89 50 4E 47 0D 0A 1A 0A (hex)
             let pngStart = -1;
             
-            // Look for PNG signature in the first 100 bytes of data
-            for (let i = 0; i < Math.min(tempBuffer.length, 100); i++) {
-                if (tempBuffer[i] === pngSignature[0]) {
-                    let found = true;
-                    for (let j = 1; j < pngSignature.length; j++) {
-                        if (tempBuffer[i + j] !== pngSignature[j]) {
-                            found = false;
-                            break;
-                        }
-                    }
-                    if (found) {
-                        pngStart = i;
-                        break;
-                    }
+            for (let i = 0; i < binaryBuffer.length - 4; i++) {
+                if (binaryBuffer[i] === 0x89 && 
+                    binaryBuffer[i+1] === 0x50 && 
+                    binaryBuffer[i+2] === 0x4E && 
+                    binaryBuffer[i+3] === 0x47) {
+                    pngStart = i;
+                    break;
                 }
             }
             
-            if (pngStart === -1) {
-                console.log("ThumbnailInfo: No PNG signature found in response");
+            if (pngStart >= 0) {
+                //console.log(`ThumbnailInfo: Found PNG signature at offset ${pngStart}`);
+                // Extract just the PNG data from the signature to the end
+                this._imageData = binaryBuffer.slice(pngStart);
+                //console.log(`ThumbnailInfo: Extracted ${this._imageData.length} bytes of PNG data`);
+                return this;
+            } else {
+                console.log("ThumbnailInfo: No PNG signature found");
                 return null;
             }
-            
-            // Create the final image buffer starting from the PNG signature
-            this._imageData = Buffer.from(tempBuffer.subarray(pngStart));
-            
-            return this;
         } catch (error) {
-            console.log("Unable to create ThumbnailInfo instance from replay: " + 
-                (error instanceof Error ? error.message : String(error)));
-            console.log("Raw replay data length: " + replay.length);
+            console.error("ThumbnailInfo: Error parsing response:", 
+                error instanceof Error ? error.message : String(error));
             return null;
         }
     }
 
     /**
-     * Get the thumbnail image data as a Buffer
-     * @returns Buffer containing the PNG image data or null if no data
+     * Get the thumbnail image data as Base64
+     * @returns Base64 encoded string of the PNG data or null if no data
      */
-    public getImageData(): Buffer | null {
-        return this._imageData;
+    public getImageData(): string | null {
+        if (!this._imageData) return null;
+        return this._imageData.toString('base64');
     }
 
     /**

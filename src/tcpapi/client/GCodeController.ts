@@ -32,6 +32,10 @@ export class GCodeController {
         return await this.tcpClient.sendCmdOk(GCodes.CmdStopPrint);
     }
 
+    public async startJob(filename: string) {
+        return await this.tcpClient.sendCmdOk(GCodes.CmdStartPrint.replace("%%filename%%", filename));
+    }
+
     // Movement
     public async home(): Promise<boolean> {
         return await this.tcpClient.sendCmdOk(GCodes.CmdHomeAxes);

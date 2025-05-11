@@ -9,6 +9,7 @@ import { PrintStatus } from './replays/PrintStatus';
 import { LocationInfo } from './replays/LocationInfo';
 import { ThumbnailInfo } from './replays/ThumbnailInfo';
 import { Filament } from '../api/filament/Filament';
+import path from "node:path";
 
 export class FlashForgeClient extends FlashForgeTcpClient {
     private control: GCodeController;
@@ -73,6 +74,10 @@ export class FlashForgeClient extends FlashForgeTcpClient {
 
     public async stopJob(): Promise<boolean> {
         return await this.control.stopJob();
+    }
+
+    public async startJob(name: string): Promise<boolean> {
+        return await this.control.startJob(name);
     }
 
     public async homeAxes(): Promise<boolean> {

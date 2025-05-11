@@ -1,5 +1,5 @@
 import * as net from 'net';
-import { setTimeout as sleep } from 'timers/promises';
+import {setTimeout as sleep} from 'timers/promises';
 import {GCodes} from "./client/GCodes";
 
 export class FlashForgeTcpClient {
@@ -337,22 +337,20 @@ export class FlashForgeTcpClient {
         // Extract file paths
         const files: string[] = [];
         for (const part of parts) {
-            // Look for pattern /data/filename.3mf
-            const match = part.match(/\/data\/([^|"\r\n]*?\.(?:3mf|gcode|gx|stl|obj))/i);
+            // Look for complete paths starting with /data/ until a delimiter is encountered
+            const match = part.match(/\/data\/([^|"\r\n\s]+)/i);
             if (match && match[1]) {
-                // Clean up the filename - only trim whitespace, preserve + characters
                 const fileName = match[1].trim();
-                if (fileName) {
+
+                // Filter for supported file types with any combination of extensions
+                if (fileName && /\.(3mf|gcode|gcode\.gx|gx|stl|obj)$/i.test(fileName)) {
                     files.push(fileName);
                 }
             }
         }
 
         // Remove duplicates
-        const uniqueFiles = [...new Set(files)];
-
-
-        return uniqueFiles;
+        return [...new Set(files)];
     }
 
     public dispose(): void {
