@@ -5,21 +5,26 @@ This is a *work-in-progress* API for FlashForge 3D printers, created through rev
 Based on my previous C# API [here](https://github.com/GhostTypes/ff-5mp-api), this is designed for easier cross-platform usage and development.
 <br>
 
-While the current repository naming suggests, and previous API only supported the 5M/Pro, this will support all network-enabled FlashForge printers - as long as it's compatible with either FlashPrint or Orca-FlashForge.
-<br>
+## Printer Coverage & Testing
+| Printer  | Supported | Tested | API |
+| ------------- | ------------- | ------------- | ------------- |
+| Adventurer 5X  | Yes? (Needs work)  | No  | HTTP (New) + TCP (Additional Features)  |
+| Adventurer 5M/Pro  | Yes  | Yes  | HTTP (New) + TCP (Additional Features)  |
+| Adventurer 3/4  | Yes?  | Partially  | TCP (Legacy Mode)  |
+| Guider III/II  | Yes?  | No  | TCP (Legacy Mode)  |
 
 ## Feature Coverage
-- [x] Automatic discovery of FlashForge printers on the local network
-- [x] Communication and control of the "legacy" TCP API & "new" HTTP Rest API (used by FlashPrint and Orca-FlashForge)
-- [x] Sending G/M Code commands (older printers use this for everything, newer printers need this for things like homing the axes)
-- [x] Retrieving (last 10) recent job list and full local file list
-- [x] Retrieving (current) job information , printer and system information, and much more (for both "legacy" and "new" API) 
-- [x] Job Control (Start a Local Job, Pause, Resume, Stop)
+- Legacy Mode covers all network-enabled printers before the Adventurer 5 series
 
-## Printer Coverage
-- [x] Adventurer 5M / Pro (All *Stock* firmware versions)
-- [ ] Adventurer 4
-- [ ] Adventurer 3
-- [ ] Guider III
-- [ ] Guider II
-- [ ] Guider
+| ------------- | Legacy Mode | "New" API |
+| ------------- | ------------- | ------------- |
+| Get Recent & Local Files  | Yes  | Yes  |
+| Get Model Preview Images  | Yes (Slow)  | Yes (Fast!)  |
+| Full Job Control (Start, Stop, Pause, Resume, etc.)  | Yes  | Yes  |
+| LED Control (On/Off)  | Yes  | Yes  |
+| Uploading New Files  | No (Not planned)  | Yes  |
+| Printer Information  | Limited  | Yes  |
+| (Extra) Job Information  | Very Limited  | Yes  |
+| Job Time & ETA  | Not Available  | Yes  |
+| Homing/Direct G&M Code Control  | Yes  | Yes  |
+
