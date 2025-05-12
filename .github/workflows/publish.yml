@@ -6,6 +6,10 @@ on:
     tags: [ 'v*' ]
   workflow_dispatch:
 
+permissions:
+  contents: read
+  packages: write
+
 jobs:
   build-and-publish:
     runs-on: ubuntu-latest
@@ -17,7 +21,7 @@ jobs:
         with:
           node-version: '20'
           registry-url: 'https://npm.pkg.github.com'
-          scope: '@${{ github.repository_owner }}'
+          scope: '@ghosttypes'
       
       - name: Install dependencies
         run: npm install
