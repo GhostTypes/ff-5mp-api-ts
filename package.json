@@ -10,14 +10,19 @@
   "scripts": {
     "build": "tsc",
     "prepare": "npm run build",
-    "test": "tsx src/test.ts"
+    "test": "jest",
+    "test:watch": "jest --watch",
+    "test:legacy": "tsx src/test.ts"
   },
   "keywords": ["flashforge", "3d-printer", "api"],
   "author": "GhostTypes",
   "license": "ISC",
   "devDependencies": {
     "@types/axios": "^0.9.36",
+    "@types/jest": "^29.5.11",
     "@types/node": "^22.14.0",
+    "jest": "^29.7.0",
+    "ts-jest": "^29.1.1",
     "typescript": "^5.8.3",
     "tsx": "^4.0.0"
   },
@@ -31,5 +36,15 @@
   "repository": {
     "type": "git",
     "url": "git+https://github.com/GhostTypes/ff-5mp-api-ts.git"
+  },
+  "jest": {
+    "preset": "ts-jest",
+    "testEnvironment": "node",
+    "testMatch": ["**/*.test.ts"],
+    "transform": {
+      "^.+\\.ts$": ["ts-jest", {
+        "diagnostics": false
+      }]
+    }
   }
 }

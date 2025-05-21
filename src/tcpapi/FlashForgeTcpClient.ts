@@ -296,47 +296,37 @@ export class FlashForgeTcpClient {
     }
 
     /**
-     * Parses the file list response from the 3D printer
-     * Handles various delimiter patterns and special characters
+     * Parses the response from the M661 command to get the list of files on the printer.
+     * @param response The raw response from the printer
+     * @returns An array of filenames without the '/data/' prefix
      */
     private parseFileListResponse(response: string): string[] {
-        // Identify data section using various marker patterns
-        const startMarkers = [/D[\S\*]+D\{\:\:/, /D.*?D\{/, /CMD.*?D\{/];
-        let dataSection = response;
-
-        // Try to find the start of the data section
-        for (const markerPattern of startMarkers) {
-            const match = response.match(markerPattern);
-            if (match) {
-                // @ts-ignore
-                dataSection = response.substring(match.index + match[0].length);
-                break;
-            }
-        }
-
-        // Normalize all delimiters - replace different patterns with a standard delimiter
-        const normalizedData = dataSection
-            .replace(/\:\:\#\#/g, "||")  // Replace ::## with ||
-            .replace(/\:\:\S\S/g, "||")  // Replace ::�� and similar with ||
-            .replace(/\:\:/g, "||");     // Replace :: with ||
-
-        // Split by the normalized delimiter
-        const parts = normalizedData.split("||").filter(Boolean);
-
+        const segments = response.split('::');
+        
         // Extract file paths
-        const files: string[] = [];
-        for (const part of parts) {
-            // Look for complete paths starting with /data/ until a delimiter is encountered
-            const match = part.match(/\/data\/([^|"\r\n\s]+)/i);
-            if (match && match[1]) {
-                const fileName = match[1].trim();
-                // Filter for supported file types with any combination of extensions
-                if (fileName && /\.(3mf|gcode|gcode\.gx|gx|stl|obj)$/i.test(fileName)) { files.push(fileName); }
+        const filePaths: string[] = [];
+        for (const segment of segments) {
+            const dataIndex = segment.indexOf('/data/');
+            if (dataIndex !== -1) {
+                const fullPath = segment.substring(dataIndex);
+                if (fullPath.startsWith('/data/')) {
+                    let filename = fullPath.substring(6);
+                    
+                    // Trim at the first invalid character (if any)
+                    const invalidCharIndex = filename.search(/[^\w\s\-\.\(\)\+%,@\[\]{}:;!#$^&*=<>?\/]/);
+                    if (invalidCharIndex !== -1) {
+                        filename = filename.substring(0, invalidCharIndex);
+                    }
+                    
+                    // Only add non-empty filenames
+                    if (filename.trim().length > 0) {
+                        filePaths.push(filename);
+                    }
+                }
             }
         }
-
-        // Remove duplicates
-        return [...new Set(files)];
+        
+        return filePaths;
     }
 
     public dispose(): void {
