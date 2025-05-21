@@ -11,7 +11,6 @@ Based on my previous C# API [here](https://github.com/GhostTypes/ff-5mp-api), th
 | Adventurer 5X  | Yes? (Needs work)  | No  | HTTP (New) + TCP (Additional Features)  |
 | Adventurer 5M/Pro  | Yes  | Yes  | HTTP (New) + TCP (Additional Features)  |
 | Adventurer 3/4  | Yes?  | Partially  | TCP (Legacy Mode)  |
-| Guider III/II  | Yes?  | No  | TCP (Legacy Mode)  |
 
 ## Feature Coverage
 - Legacy Mode covers all network-enabled printers before the Adventurer 5 series
