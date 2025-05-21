@@ -12,20 +12,34 @@ import {MachineInfo} from "./models/MachineInfo";
 import { GenericResponse } from './api/controls/Control';
 import { NetworkUtils } from './api/network/NetworkUtils';
 
+/**
+ * Represents a client for interacting with a FlashForge 3D printer.
+ * This class provides methods for controlling the printer, managing print jobs,
+ * retrieving information, and handling file operations.
+ */
 export class FiveMClient {
+    /** Port used for HTTP communication with the printer. */
     private readonly PORT = 8898;
 
+    /** Instance for general printer control operations. */
     public control: Control;
+    /** Instance for managing print jobs. */
     public jobControl: JobControl;
+    /** Instance for retrieving printer information. */
     public info: Info;
+    /** Instance for managing files on the printer. */
     public files: Files;
+    /** Instance for controlling printer temperatures. */
     public tempControl: TempControl;
+    /** Instance for lower-level TCP communication with the printer. */
     public tcpClient: FlashForgeClient;
 
     public serialNumber: string;
     public checkCode: string;
+    /** HTTP client for making requests to the printer's API. */
     public httpClient: ReturnType<typeof axios.create>;
 
+    /** Flag indicating if the HTTP client is currently busy with a request. */
     private httpClientBusy = false;
 
     public printerName: string = '';
@@ -43,9 +57,17 @@ export class FiveMClient {
     public lifetimeFilamentMeters: string = '';
 
     // Control states
+    /** State of the LED light control. */
     public ledControl: boolean = false;
+    /** State of the filtration system control. */
     public filtrationControl: boolean = false;
 
+    /**
+     * Creates an instance of FiveMClient.
+     * @param ipAddress The IP address of the printer.
+     * @param serialNumber The serial number of the printer.
+     * @param checkCode The check code for the printer.
+     */
     constructor(ipAddress: string, serialNumber: string, checkCode: string) {
         this.ipAddress = ipAddress;
         this.serialNumber = serialNumber;
@@ -69,6 +91,10 @@ export class FiveMClient {
         this.tempControl = new TempControl(this);
     }
 
+    /**
+     * Initializes the FiveMClient and verifies the connection to the printer.
+     * @returns A Promise that resolves to true if initialization is successful, false otherwise.
+     */
     public async initialize(): Promise<boolean> {
         const connected = await this.verifyConnection();
         if (connected) {
@@ -79,14 +105,26 @@ export class FiveMClient {
         return false;
     }
 
+    /**
+     * Checks if the HTTP client is currently busy.
+     * @returns A Promise that resolves to true if the HTTP client is busy, false otherwise.
+     */
     public async isHttpClientBusy(): Promise<boolean> {
         return this.httpClientBusy;
     }
 
+    /**
+     * Releases the HTTP client, allowing it to be used for new requests.
+     */
     public releaseHttpClient(): void {
         this.httpClientBusy = false;
     }
 
+    /**
+     * Initializes the control interface with the printer.
+     * This involves sending a product command and initializing TCP control.
+     * @returns A Promise that resolves to true if control initialization is successful, false otherwise.
+     */
     public async initControl(): Promise<boolean> {
         //console.log("InitControl()");
         if (await this.sendProductCommand()) {
@@ -96,15 +134,23 @@ export class FiveMClient {
         return false;
     }
 
+    /**
+     * Disposes of the FiveMClient instance, stopping keep-alive messages and cleaning up resources.
+     */
     public dispose(): void {
         this.tcpClient.stopKeepAlive(true);
         this.tcpClient.dispose();
     }
 
+    /**
+     * Caches machine details from the provided FFMachineInfo object.
+     * @param info The FFMachineInfo object containing printer details.
+     * @returns True if caching is successful, false otherwise.
+     */
     public cacheDetails(info: FFMachineInfo | null): boolean {
         if (!info) return false;
 
-        console.log(JSON.stringify(info, null, 2));
+        // console.log(JSON.stringify(info, null, 2)); // Useful for debugging
         this.printerName = info.Name || '';
         this.firmwareVersion = info.FirmwareVersion || '';
         this.firmVer = info.FirmwareVersion ? info.FirmwareVersion.split('-')[0] : '';
@@ -118,10 +164,19 @@ export class FiveMClient {
         return true;
     }
 
+    /**
+     * Constructs the full API endpoint URL.
+     * @param endpoint The specific API endpoint path.
+     * @returns The full URL for the API endpoint.
+     */
     public getEndpoint(endpoint: string): string {
         return `http://${this.ipAddress}:${this.PORT}${endpoint}`;
     }
 
+    /**
+     * Verifies the connection to the printer by retrieving machine details and TCP information.
+     * @returns A Promise that resolves to true if the connection is verified, false otherwise.
+     */
     public async verifyConnection(): Promise<boolean> {
 
         try {
@@ -153,6 +208,12 @@ export class FiveMClient {
         }
     }
 
+    /**
+     * Sends a product command to the printer to retrieve control states.
+     * This method sets the `httpClientBusy` flag while the request is in progress.
+     * @returns A Promise that resolves to true if the product command is sent successfully and valid data is received, false otherwise.
+     * @throws Error if there is an HTTP error or an error parsing the response.
+     */
     public async sendProductCommand(): Promise<boolean> {
         //console.log("SendProductCommand()");
         this.httpClientBusy = true;
@@ -196,15 +257,37 @@ export class FiveMClient {
     }
 }
 
+/**
+ * Represents the expected structure of the response from the "product command"
+ * sent to the printer (typically to the `/product` endpoint).
+ * This response includes general status information (via `GenericResponse`)
+ * and a nested `product` object containing specific control states.
+ * @see Product
+ * @see GenericResponse
+ */
 interface ProductResponse extends GenericResponse {
+    /** Contains various control state flags from the printer. See {@link Product}. */
     product: Product;
 }
 
+/**
+ * Defines the structure of the `product` object nested within a `ProductResponse`.
+ * This interface contains various control state flags reported by the printer,
+ * indicating the status or availability of certain features like temperature controls,
+ * fan controls, and light controls. A state of 0 often means off/unavailable,
+ * while other numbers (typically 1) mean on/available or a specific mode.
+ */
 interface Product {
+    /** State of the chamber temperature control. */
     chamberTempCtrlState: number;
+    /** State of the external fan control. */
     externalFanCtrlState: number;
+    /** State of the internal fan control. */
     internalFanCtrlState: number;
+    /** State of the light control. */
     lightCtrlState: number;
+    /** State of the nozzle temperature control. */
     nozzleTempCtrlState: number;
+    /** State of the platform (bed) temperature control. */
     platformTempCtrlState: number;
 }

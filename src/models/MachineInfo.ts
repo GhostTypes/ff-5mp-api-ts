@@ -1,8 +1,28 @@
 // src/api/models/MachineInfo.ts
 import {FFMachineInfo, FFPrinterDetail, MachineState} from './ff-models';
 
+/**
+ * Transforms printer detail data from the API response format into a structured `FFMachineInfo` object.
+ * This class centralizes the logic for mapping and calculating various properties of the printer's state
+ * and capabilities based on the raw data received from the printer.
+ */
 export class MachineInfo {
-    // Converts printer details from API response format to our internal model
+    /**
+     * Converts printer details from the API response format (`FFPrinterDetail`)
+     * to our internal `FFMachineInfo` model.
+     *
+     * This method performs several transformations:
+     * - Calculates print ETA and completion time.
+     * - Formats total run time and current print duration.
+     * - Converts status strings (like "open", "close") to boolean values for states like auto-shutdown, door status, fan status, and light status.
+     * - Calculates estimated filament length and weight used for the current job based on progress.
+     * - Maps raw status strings to the `MachineState` enum.
+     * - Formats disk space to two decimal places.
+     *
+     * @param detail The `FFPrinterDetail` object received from the printer's API. If null, the method returns null.
+     * @returns An `FFMachineInfo` object containing structured and formatted printer information,
+     *          or null if the input `detail` is null or an error occurs during processing.
+     */
     public fromDetail(detail: FFPrinterDetail | null): FFMachineInfo | null {
         if (!detail) return null;
 
@@ -117,7 +137,14 @@ export class MachineInfo {
         }
     }
 
-
+    /**
+     * Formats a duration given in seconds into a "HH:MM" string format.
+     *
+     * @param seconds The total number of seconds to format.
+     * @returns A string representing the formatted time (e.g., "02:30" for 9000 seconds).
+     *          Returns "00:00" if the input is invalid or an error occurs.
+     * @private
+     */
     private formatTimeFromSeconds(seconds: number): string {
         try {
             const validSeconds = typeof seconds === 'number' ? seconds : 0;
@@ -130,6 +157,15 @@ export class MachineInfo {
         }
     }
 
+    /**
+     * Maps a raw status string from the printer API to a `MachineState` enum value.
+     * Handles various known status strings and defaults to `MachineState.Unknown` for unrecognized statuses,
+     * logging a warning in such cases.
+     *
+     * @param status The raw status string (e.g., "ready", "printing", "error"). Case-insensitive.
+     * @returns The corresponding `MachineState` enum value.
+     * @private
+     */
     private getMachineState(status: string): MachineState {
         const validStatus = typeof status === 'string' ? status.toLowerCase() : '';
         switch (validStatus) {

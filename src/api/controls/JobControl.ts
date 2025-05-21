@@ -8,29 +8,55 @@ import axios from 'axios';
 import { NetworkUtils } from '../network/NetworkUtils';
 import FormData from 'form-data';
 
+/**
+ * Provides methods for managing print jobs on the FlashForge 3D printer.
+ * This includes pausing, resuming, canceling prints, uploading files for printing,
+ * and starting prints from local files.
+ */
 export class JobControl {
     private client: FiveMClient;
     private control: Control;
 
+    /**
+     * Creates an instance of the JobControl class.
+     * @param printerClient The FiveMClient instance used for communication with the printer.
+     */
     constructor(printerClient: FiveMClient) {
         this.client = printerClient;
         this.control = printerClient.control;
     }
 
     // Basic controls
+    /**
+     * Pauses the current print job.
+     * @returns A Promise that resolves to true if the command is successful, false otherwise.
+     */
     public async pausePrintJob(): Promise<boolean> {
         return await this.control.sendJobControlCmd("pause");
     }
 
+    /**
+     * Resumes a paused print job.
+     * @returns A Promise that resolves to true if the command is successful, false otherwise.
+     */
     public async resumePrintJob(): Promise<boolean> {
         return await this.control.sendJobControlCmd("continue");
     }
 
+    /**
+     * Cancels the current print job.
+     * @returns A Promise that resolves to true if the command is successful, false otherwise.
+     */
     public async cancelPrintJob(): Promise<boolean> {
         return await this.control.sendJobControlCmd("cancel");
     }
 
-    // Check for firmware 3.1.3+
+    /**
+     * Checks if the printer's firmware version is 3.1.3 or newer.
+     * This is used to determine which API payload format to use for certain commands.
+     * @returns True if the firmware is new (>= 3.1.3), false otherwise or if version cannot be determined.
+     * @private
+     */
     private isNewFirmwareVersion(): boolean {
         try {
             const currentVersion = this.client.firmVer.split('.');
@@ -48,6 +74,12 @@ export class JobControl {
         }
     }
 
+    /**
+     * Sends a command to clear the printer's build platform.
+     * (Note: The exact behavior of "setClearPlatform" might need further clarification from printer documentation,
+     * it's assumed here it's a command to potentially move the print head out of the way or a similar action.)
+     * @returns A Promise that resolves to true if the command is successful, false otherwise.
+     */
     public async clearPlatform(): Promise<boolean> {
         const args = {
             action: "setClearPlatform"
@@ -57,10 +89,13 @@ export class JobControl {
     }
 
     /**
-     * Upload a GCode/3MF file to the printer
-     * @param filePath Path to the file to upload
-     * @param startPrint Start the printer after uploading
-     * @param levelBeforePrint Level the bed before printing
+     * Uploads a G-code or 3MF file to the printer and optionally starts printing.
+     * It handles different API requirements based on the printer's firmware version.
+     *
+     * @param filePath The local path to the G-code or 3MF file to upload.
+     * @param startPrint If true, the printer will start printing the file immediately after upload.
+     * @param levelBeforePrint If true, the printer will perform bed leveling before starting the print.
+     * @returns A Promise that resolves to true if the file upload (and optional print start) is successful, false otherwise.
      */
     public async uploadFile(filePath: string, startPrint: boolean, levelBeforePrint: boolean): Promise<boolean> {
         if (!fs.existsSync(filePath)) {
@@ -161,6 +196,15 @@ export class JobControl {
         }
     }
 
+    /**
+     * Starts printing a file that is already stored locally on the printer.
+     * It handles different API payload formats based on the printer's firmware version.
+     *
+     * @param fileName The name of the file on the printer (e.g., "my_model.gcode") to print.
+     * @param levelingBeforePrint If true, the printer will perform bed leveling before starting the print.
+     * @returns A Promise that resolves to true if the print command is successfully sent and acknowledged, false otherwise.
+     * @throws Error if there's an issue sending the command (e.g., network error).
+     */
     public async printLocalFile(fileName: string, levelingBeforePrint: boolean): Promise<boolean> {
         let payload: any;
 
