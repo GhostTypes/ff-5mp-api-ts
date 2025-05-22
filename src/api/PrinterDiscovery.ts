@@ -2,23 +2,51 @@
 import * as dgram from 'dgram';
 import { networkInterfaces } from 'os';
 
-// Network discovery of FlashForge printers
+/**
+ * Represents a discovered FlashForge 3D printer.
+ * Stores information such as name, serial number, and IP address.
+ */
 export class FlashForgePrinter {
+    /** The name of the printer. */
     public name: string = '';
+    /** The serial number of the printer. */
     public serialNumber: string = '';
+    /** The IP address of the printer. */
     public ipAddress: string = '';
 
+    /**
+     * Returns a string representation of the FlashForgePrinter object.
+     * @returns A string containing the printer's name, serial number, and IP address.
+     */
     public toString(): string {
         return `Name: ${this.name}, Serial: ${this.serialNumber}, IP: ${this.ipAddress}`;
     }
 }
 
+/**
+ * Handles the discovery of FlashForge printers on the local network.
+ * Uses UDP broadcast messages to find printers and parses their responses.
+ */
 export class FlashForgePrinterDiscovery {
+    /** The UDP port used for sending discovery messages to FlashForge printers. */
     private static readonly DISCOVERY_PORT = 48899;
 
     // Instance property for easy access to the discovery port
+    /** The UDP port used for sending discovery messages. */
     private readonly discoveryPort = FlashForgePrinterDiscovery.DISCOVERY_PORT;
 
+    /**
+     * Discovers FlashForge printers on the network asynchronously.
+     * It sends UDP broadcast messages and listens for responses from printers.
+     * The discovery process involves sending a specific UDP packet to the `DISCOVERY_PORT`.
+     * Printers respond with a packet containing their details, which is then parsed.
+     * Retries are implemented in case of no initial response.
+     *
+     * @param timeoutMs The total time (in milliseconds) to wait for printer responses. Defaults to 10000ms.
+     * @param idleTimeoutMs The time (in milliseconds) to wait for additional responses after the last received one. Defaults to 1500ms.
+     * @param maxRetries The maximum number of discovery attempts. Defaults to 3.
+     * @returns A Promise that resolves to an array of `FlashForgePrinter` objects found on the network.
+     */
     public async discoverPrintersAsync(timeoutMs: number = 10000, idleTimeoutMs: number = 1500, maxRetries: number = 3): Promise<FlashForgePrinter[]> {
         const printers: FlashForgePrinter[] = [];
         const broadcastAddresses = this.getBroadcastAddresses();
@@ -40,10 +68,16 @@ export class FlashForgePrinterDiscovery {
                 });
 
                 // Send discovery message to all broadcast addresses
-                // This is the exact discovery packet seen in Wireshark from FlashPrint
+                // The discovery UDP packet is a 20-byte message.
+                // It starts with "www.usr" followed by specific bytes.
+                // This packet structure is based on observations from FlashPrint software.
+                // Bytes:
+                // 0x77, 0x77, 0x77, 0x2e, 0x75, 0x73, 0x72, 0x22, (www.usr")
+                // 0x65, 0x36, 0xc0, 0x00, 0x00, 0x00, 0x00, 0x00,
+                // 0x00, 0x00, 0x00, 0x00
                 const discoveryMessage = Buffer.from([
-                    0x77, 0x77, 0x77, 0x2e, 0x75, 0x73, 0x72, 0x22, 
-                    0x65, 0x36, 0xc0, 0x00, 0x00, 0x00, 0x00, 0x00, 
+                    0x77, 0x77, 0x77, 0x2e, 0x75, 0x73, 0x72, 0x22,
+                    0x65, 0x36, 0xc0, 0x00, 0x00, 0x00, 0x00, 0x00,
                     0x00, 0x00, 0x00, 0x00
                 ]);
                 for (const broadcastAddress of broadcastAddresses) {
@@ -75,6 +109,18 @@ export class FlashForgePrinterDiscovery {
         return printers;
     }
 
+    /**
+     * Receives and processes printer responses from the UDP socket.
+     * Listens for messages on the socket and parses them using `parsePrinterResponse`.
+     * Manages timeouts for the overall discovery process and for idle periods between responses.
+     *
+     * @param udpClient The dgram.Socket instance to listen on.
+     * @param printers An array to store the discovered `FlashForgePrinter` objects.
+     * @param totalTimeoutMs The total duration (in milliseconds) to listen for responses.
+     * @param idleTimeoutMs The maximum idle time (in milliseconds) to wait for a new response before stopping.
+     * @returns A Promise that resolves when the listening period is over or an error occurs.
+     * @private
+     */
     private async receivePrinterResponses(
         udpClient: dgram.Socket,
         printers: FlashForgePrinter[],
@@ -127,14 +173,28 @@ export class FlashForgePrinterDiscovery {
         });
     }
 
+    /**
+     * Parses the UDP response received from a FlashForge printer.
+     * The response is a buffer containing printer information at specific offsets.
+     * - Printer Name: ASCII string at offset 0x00 (32 bytes).
+     * - Serial Number: ASCII string at offset 0x92 (32 bytes).
+     *
+     * @param response The Buffer containing the printer's response.
+     * @param ipAddress The IP address from which the response was received.
+     * @returns A `FlashForgePrinter` object if parsing is successful, otherwise null.
+     * @private
+     */
     private parsePrinterResponse(response: Buffer, ipAddress: string): FlashForgePrinter | null {
+        // Expected response length is at least 0xC4 (196 bytes) to contain name and serial.
         if (!response || response.length < 0xC4) {
             console.log("Invalid response, discarded.");
             return null;
         }
 
-        const name = response.toString('ascii', 0, 32).replace(/\0+$/, ''); // Printer name (offset 0x00)
-        const serialNumber = response.toString('ascii', 0x92, 0x92 + 32).replace(/\0+$/, ''); // Serial number (offset 0x92)
+        // Printer name is at offset 0x00, padded with null characters.
+        const name = response.toString('ascii', 0, 32).replace(/\0+$/, '');
+        // Serial number is at offset 0x92, padded with null characters.
+        const serialNumber = response.toString('ascii', 0x92, 0x92 + 32).replace(/\0+$/, '');
 
         const printer = new FlashForgePrinter();
         printer.name = name;
@@ -144,6 +204,13 @@ export class FlashForgePrinterDiscovery {
         return printer;
     }
 
+    /**
+     * Retrieves a list of broadcast addresses for all active IPv4 network interfaces.
+     * This is used to send the discovery UDP packet to all devices on the local network(s).
+     *
+     * @returns An array of string representations of broadcast addresses.
+     * @private
+     */
     private getBroadcastAddresses(): string[] {
         const broadcastAddresses: string[] = [];
         const interfaces = networkInterfaces();
@@ -168,6 +235,15 @@ export class FlashForgePrinterDiscovery {
         return broadcastAddresses;
     }
 
+    /**
+     * Calculates the broadcast address for a given IP address and subnet mask.
+     * The broadcast address is calculated as `IP | (~SUBNET_MASK)`.
+     *
+     * @param ipAddress The IPv4 address string (e.g., "192.168.1.10").
+     * @param subnetMask The IPv4 subnet mask string (e.g., "255.255.255.0").
+     * @returns The calculated broadcast address string, or null if input is invalid.
+     * @private
+     */
     private calculateBroadcastAddress(ipAddress: string, subnetMask: string): string | null {
         try {
             // Convert IP and subnet to arrays of numbers
@@ -187,6 +263,14 @@ export class FlashForgePrinterDiscovery {
         }
     }
 
+    /**
+     * Prints detailed debugging information about a received UDP response.
+     * This includes a hex dump and an ASCII dump of the response buffer.
+     * Useful for inspecting the raw data received from printers.
+     *
+     * @param response The Buffer containing the response data.
+     * @param ipAddress The IP address from which the response was received.
+     */
     public printDebugInfo(response: Buffer, ipAddress: string): void {
         console.log(`Received response from ${ipAddress}:`);
         console.log(`Response length: ${response.length} bytes`);

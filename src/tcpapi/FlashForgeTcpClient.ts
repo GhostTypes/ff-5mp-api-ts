@@ -2,15 +2,37 @@ import * as net from 'net';
 import {setTimeout as sleep} from 'timers/promises';
 import {GCodes} from "./client/GCodes";
 
+/**
+ * Provides the foundational TCP client for communicating with FlashForge 3D printers.
+ * This class manages the socket connection, sending raw commands, handling responses,
+ * and maintaining a keep-alive connection. It serves as the base class for
+ * `FlashForgeClient`, which implements more specific G-code command logic.
+ *
+ * The communication protocol typically involves sending ASCII G-code/M-code commands
+ * terminated by a newline character ('\n') and receiving text-based responses,
+ * often ending with "ok" to indicate success.
+ */
 export class FlashForgeTcpClient {
+    /** The underlying network socket for TCP communication. Null if not connected. */
     protected socket: net.Socket | null = null;
+    /** The default TCP port used for connecting to FlashForge printers. */
     protected readonly port = 8899;
+    /** The default timeout (in milliseconds) for socket operations. */
     protected readonly timeout = 5000;
+    /** The hostname or IP address of the printer. */
     protected hostname: string;
+    /** Token to signal cancellation of the keep-alive loop. */
     private keepAliveCancellationToken: boolean = false;
+    /** Counter for consecutive keep-alive errors. */
     private keepAliveErrors: number = 0;
+    /** Flag indicating if the socket is currently busy sending a command and awaiting a response. */
     private socketBusy: boolean = false;
 
+    /**
+     * Creates an instance of FlashForgeTcpClient.
+     * Initializes the hostname and attempts to connect to the printer.
+     * @param hostname The IP address or hostname of the FlashForge printer.
+     */
     constructor(hostname: string) {
         this.hostname = hostname;
         try {
@@ -22,6 +44,13 @@ export class FlashForgeTcpClient {
         }
     }
 
+    /**
+     * Starts a keep-alive mechanism to maintain the TCP connection with the printer.
+     * Periodically sends a status command (`GCodes.CmdPrintStatus`) to the printer.
+     * Adjusts the keep-alive interval based on error counts.
+     * This method runs asynchronously and will continue until `stopKeepAlive` is called
+     * or too many consecutive errors occur.
+     */
     public startKeepAlive(): void {
         if (this.keepAliveCancellationToken) return; // already running
         this.keepAliveCancellationToken = false;
@@ -51,16 +80,34 @@ export class FlashForgeTcpClient {
         runKeepAlive()
     }
 
+    /**
+     * Stops the keep-alive mechanism.
+     * @param logout If true, sends a logout command to the printer before stopping. Defaults to false.
+     */
     public stopKeepAlive(logout: boolean = false): void {
         if (logout) { this.sendCommandAsync(GCodes.CmdLogout).then(() => {}); } // release control
         this.keepAliveCancellationToken = true;
         console.log("Keep-alive stopped.");
     }
 
+    /**
+     * Checks if the socket is currently busy processing a command.
+     * @returns A Promise that resolves to true if the socket is busy, false otherwise.
+     */
     public async isSocketBusy(): Promise<boolean> {
         return this.socketBusy;
     }
 
+    /**
+     * Sends a command string to the printer asynchronously via the TCP socket.
+     * It ensures the socket is available, writes the command (appending a newline),
+     * and then waits to receive a multi-line reply.
+     * Handles socket busy state and various connection errors.
+     *
+     * @param cmd The command string to send (e.g., "~M115").
+     * @returns A Promise that resolves to the printer's string reply, or null if an error occurs,
+     *          the reply is invalid, or the connection needs to be reset.
+     */
     public async sendCommandAsync(cmd: string): Promise<string | null> {
         if (this.socketBusy) {
             await this.waitUntilSocketAvailable();
@@ -118,6 +165,12 @@ export class FlashForgeTcpClient {
         }
     }
 
+    /**
+     * Waits until the socket is no longer busy or a timeout is reached.
+     * This is used to serialize commands sent over the socket.
+     * @throws Error if the socket remains busy for too long (10 seconds).
+     * @private
+     */
     private async waitUntilSocketAvailable(): Promise<void> {
         const maxWaitTime = 10000; // 10 seconds
         const startTime = Date.now();
@@ -131,6 +184,11 @@ export class FlashForgeTcpClient {
         }
     }
 
+    /**
+     * Checks the status of the socket connection and attempts to reconnect if it's null or destroyed.
+     * If reconnection occurs, it also restarts the keep-alive mechanism.
+     * @private
+     */
     private checkSocket(): void {
         console.log("CheckSocket()");
         let fix = false;
@@ -149,6 +207,11 @@ export class FlashForgeTcpClient {
         this.startKeepAlive(); // Start this here rather than Connect()
     }
 
+    /**
+     * Establishes a TCP connection to the printer.
+     * Initializes the socket, sets the timeout, and sets up an error handler.
+     * @private
+     */
     private connect(): void {
         //console.log("Connect()");
         this.socket = new net.Socket();
@@ -160,6 +223,11 @@ export class FlashForgeTcpClient {
         });
     }
 
+    /**
+     * Resets the current socket connection.
+     * Stops the keep-alive mechanism and destroys the socket.
+     * @private
+     */
     private resetSocket(): void {
         //console.log("ResetSocket()");
         this.stopKeepAlive();
@@ -169,6 +237,19 @@ export class FlashForgeTcpClient {
         }
     }
 
+    /**
+     * Asynchronously receives a multi-line reply from the printer for a given command.
+     * It listens for 'data' events on the socket, concatenates incoming data buffers,
+     * and determines when the full reply has been received based on command-specific delimiters
+     * (usually "ok" for text commands, or specific logic for binary data like thumbnails).
+     * Handles timeouts and errors during reception.
+     *
+     * @param cmd The command string for which the reply is expected. This influences how completion is detected.
+     * @returns A Promise that resolves to the complete string reply from the printer,
+     *          or null if an error occurs, the reply is incomplete, or a timeout happens.
+     *          For thumbnail commands (M662), the response is a binary string.
+     * @private
+     */
     private async receiveMultiLineReplayAsync(cmd: string): Promise<string | null> {
         //console.log("ReceiveMultiLineReplayAsync()");
 
@@ -286,6 +367,12 @@ export class FlashForgeTcpClient {
         });
     }
 
+    /**
+     * Retrieves a list of G-code files stored on the printer's local storage.
+     * Sends the `GCodes.CmdListLocalFiles` (M661) command and parses the response.
+     * @returns A Promise that resolves to an array of file names (strings, without '/data/' prefix).
+     *          Returns an empty array if the command fails or no files are found.
+     */
     public async getFileListAsync(): Promise<string[]> {
         const response = await this.sendCommandAsync(GCodes.CmdListLocalFiles);
         if (response) {
@@ -296,9 +383,12 @@ export class FlashForgeTcpClient {
     }
 
     /**
-     * Parses the response from the M661 command to get the list of files on the printer.
-     * @param response The raw response from the printer
-     * @returns An array of filenames without the '/data/' prefix
+     * Parses the raw string response from the `M661` (list files) command.
+     * The response format typically includes segments separated by "::", with file paths
+     * prefixed by "/data/". This method extracts and cleans these file names.
+     * @param response The raw string response from the M661 command.
+     * @returns An array of file names, with the "/data/" prefix removed and any trailing invalid characters trimmed.
+     * @private
      */
     private parseFileListResponse(response: string): string[] {
         const segments = response.split('::');
@@ -329,6 +419,10 @@ export class FlashForgeTcpClient {
         return filePaths;
     }
 
+    /**
+     * Cleans up resources by destroying the socket connection.
+     * This should be called when the client is no longer needed.
+     */
     public dispose(): void {
         try {
             console.log("TcpPrinterClient closing socket");
