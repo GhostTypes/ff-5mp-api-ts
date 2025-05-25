@@ -426,6 +426,7 @@ export class FlashForgeTcpClient {
     public dispose(): void {
         try {
             console.log("TcpPrinterClient closing socket");
+            this.stopKeepAlive(true); // Stop keep-alive timer and send logout command
             if (this.socket) {
                 this.socket.destroy();
                 this.socket = null;
