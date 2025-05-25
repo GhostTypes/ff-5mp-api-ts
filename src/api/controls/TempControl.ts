@@ -85,20 +85,3 @@ export class TempControl {
      * }
      */
 }
-    private async sendTempControlCommand(
-        bedTemp: number,
-        rightExtruder: number,
-        leftExtruder: number,
-        chamberTemp: number
-    ): Promise<boolean> {
-        const payload = {
-            platformTemp: bedTemp,
-            rightTemp: rightExtruder,
-            leftTemp: leftExtruder,
-            chamberTemp: chamberTemp
-        };
-
-        return await this.printerClient.control.sendControlCommand(Commands.TempControlCmd, payload);
-    }
-    */
-}
