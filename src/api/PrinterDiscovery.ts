@@ -13,13 +13,19 @@ export class FlashForgePrinter {
     public serialNumber: string = '';
     /** The IP address of the printer. */
     public ipAddress: string = '';
+    /** Optional flag indicating if the discovered printer is an AD5X model, based on its name. */
+    public isAD5X?: boolean;
 
     /**
      * Returns a string representation of the FlashForgePrinter object.
-     * @returns A string containing the printer's name, serial number, and IP address.
+     * @returns A string containing the printer's name, serial number, IP address, and AD5X status if applicable.
      */
     public toString(): string {
-        return `Name: ${this.name}, Serial: ${this.serialNumber}, IP: ${this.ipAddress}`;
+        let str = `Name: ${this.name}, Serial: ${this.serialNumber}, IP: ${this.ipAddress}`;
+        if (this.isAD5X) {
+            str += ", Model: AD5X";
+        }
+        return str;
     }
 }
 
@@ -200,6 +206,9 @@ export class FlashForgePrinterDiscovery {
         printer.name = name;
         printer.serialNumber = serialNumber;
         printer.ipAddress = ipAddress;
+        if (name === "AD5X") {
+            printer.isAD5X = true;
+        }
 
         return printer;
     }

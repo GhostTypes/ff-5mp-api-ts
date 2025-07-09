@@ -19,8 +19,10 @@ export interface FFPrinterDetail {
     chamberTargetTemp?: number;
     /** Current temperature of the chamber, if applicable. */
     chamberTemp?: number;
-    /** Current speed of the part cooling fan. */
+    /** Current speed of the part cooling fan (right fan for dual setups, or main fan). */
     coolingFanSpeed?: number;
+    /** Current speed of the left part cooling fan (for dual setups like AD5X). */
+    coolingFanLeftSpeed?: number;
     /** Total filament extruded by the printer over its lifetime, typically in millimeters or meters. */
     cumulativeFilament?: number;
     /** Total print time accumulated by the printer over its lifetime, often in minutes. */
@@ -49,6 +51,16 @@ export interface FFPrinterDetail {
     firmwareVersion?: string;
     /** Registration code for FlashCloud services. */
     flashRegisterCode?: string;
+    /** Indicates if the printer has a material station (e.g., for AD5X). */
+    hasMatlStation?: boolean;
+    /** Detailed information about the material station, if present. */
+    matlStationInfo?: MatlStationInfo;
+    /** Information about independent material loading (e.g., for AD5X single extruder with material station). */
+    indepMatlInfo?: IndepMatlInfo;
+    /** Indicates if filament is present in the left extruder/path. */
+    hasLeftFilament?: boolean;
+    /** Indicates if filament is present in the right extruder/path. */
+    hasRightFilament?: boolean;
     /** Status of the internal fan (e.g., "open" for on, "close" for off). */
     internalFanStatus?: string;
     /** IP address of the printer on the local network. */
@@ -114,6 +126,53 @@ export interface FFPrinterDetail {
 }
 
 /**
+ * Information about a single slot in the material station.
+ */
+export interface SlotInfo {
+    /** Indicates if filament is present in this slot. */
+    hasFilament: boolean;
+    /** Color of the material in this slot (e.g., "#FFFFFF"). */
+    materialColor: string;
+    /** Name of the material in this slot (e.g., "PLA"). */
+    materialName: string;
+    /** Identifier for this slot. */
+    slotId: number;
+}
+
+/**
+ * Detailed information about the material station.
+ */
+export interface MatlStationInfo {
+    /** Currently loading slot ID (0 if none). */
+    currentLoadSlot: number;
+    /** Currently active/printing slot ID (0 if none). */
+    currentSlot: number;
+    /** Total number of slots in the station. */
+    slotCnt: number;
+    /** Array of information for each slot. */
+    slotInfos: SlotInfo[];
+    /** Current action state of the material station. */
+    stateAction: number;
+    /** Current step within the state action. */
+    stateStep: number;
+}
+
+/**
+ * Information related to independent material loading,
+ * often used when a single extruder printer has a material station.
+ */
+export interface IndepMatlInfo {
+    /** Color of the material. */
+    materialColor: string;
+    /** Name of the material (can be "?" if unknown). */
+    materialName: string;
+    /** Current action state. */
+    stateAction: number;
+    /** Current step within the state action. */
+    stateStep: number;
+}
+
+/**
  * Represents a structured and user-friendly model of the printer's information and state.
  * This interface is typically populated by transforming data from `FFPrinterDetail`.
  * It uses clearer property names and boolean types for states.
@@ -129,8 +188,10 @@ export interface FFMachineInfo {
 
     /** Current speed of the chamber fan. */
     ChamberFanSpeed: number;
-    /** Current speed of the part cooling fan. */
+    /** Current speed of the part cooling fan (right or main). */
     CoolingFanSpeed: number;
+    /** Current speed of the left part cooling fan (if applicable). */
+    CoolingFanLeftSpeed?: number;
 
     /** Total filament extruded over the printer's lifetime (unit depends on source, e.g., mm or m). */
     CumulativeFilament: number;
@@ -175,6 +236,8 @@ export interface FFMachineInfo {
     Name: string;
     /** Indicates if the printer model is a "Pro" version. */
     IsPro: boolean;
+    /** Indicates if the printer is an AD5X model. */
+    IsAD5X: boolean;
     /** Nozzle size (e.g., "0.4mm"). */
     NozzleSize: string;
 
@@ -224,6 +287,13 @@ export interface FFMachineInfo {
     FormattedRunTime: string;
     /** Formatted string of the printer's total accumulated run time (e.g., "Xh:Ym"). */
     FormattedTotalRunTime: string;
+
+    /** Indicates if the printer has a material station. */
+    HasMatlStation?: boolean;
+    /** Detailed information about the material station, if present. */
+    MatlStationInfo?: MatlStationInfo; // Using the raw type directly for now
+    /** Information about independent material loading. */
+    IndepMatlInfo?: IndepMatlInfo; // Using the raw type directly for now
 }
 
 /**
@@ -262,4 +332,44 @@ export enum MachineState {
     Completed,
     /** Printer state is unknown or cannot be determined. */
     Unknown
+}
+
+// --- Interfaces for Gcode List Entries (AD5X and similar) ---
+
+/**
+ * Represents data for a single tool/material used in a G-code file,
+ * typically part of a multi-material print.
+ */
+export interface FFGcodeToolData {
+    /** Calculated filament weight for this tool/material in the print. */
+    filamentWeight: number;
+    /** Material color hex string (e.g., "#FFFF00"). */
+    materialColor: string;
+    /** Name of the material (e.g., "PLA"). */
+    materialName: string;
+    /** Slot ID from the material station, if applicable (0 if not or direct). */
+    slotId: number;
+    /** Tool ID or extruder number. */
+    toolId: number;
+}
+
+/**
+ * Represents a single G-code file entry as returned by the /gcodeList endpoint,
+ * especially for printers like AD5X that provide detailed material info.
+ */
+export interface FFGcodeFileEntry {
+    /** The name of the G-code file (e.g., "FISH_PLA.3mf"). */
+    gcodeFileName: string;
+    /** Number of tools/materials used in this G-code file. */
+    gcodeToolCnt?: number;
+    /** Array of detailed information for each tool/material. */
+    gcodeToolDatas?: FFGcodeToolData[];
+    /** Estimated printing time in seconds. */
+    printingTime: number; // Assuming this is seconds, as is common
+    /** Total estimated filament weight for the print. */
+    totalFilamentWeight?: number;
+    /** Indicates if the G-code file is intended for use with a material station. */
+    useMatlStation?: boolean;
+    // Potentially other fields might exist for non-AD5X printers in a simpler format
+    // For now, focusing on AD5X structure.
 }
