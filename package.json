@@ -14,7 +14,11 @@
     "test:watch": "jest --watch",
     "test:legacy": "tsx src/test.ts"
   },
-  "keywords": ["flashforge", "3d-printer", "api"],
+  "keywords": [
+    "flashforge",
+    "3d-printer",
+    "api"
+  ],
   "author": "GhostTypes",
   "license": "ISC",
   "devDependencies": {
@@ -23,8 +27,8 @@
     "@types/node": "^22.14.0",
     "jest": "^29.7.0",
     "ts-jest": "^29.1.1",
-    "typescript": "^5.8.3",
-    "tsx": "^4.0.0"
+    "tsx": "^4.20.3",
+    "typescript": "^5.8.3"
   },
   "dependencies": {
     "axios": "^1.8.4",
@@ -40,11 +44,16 @@
   "jest": {
     "preset": "ts-jest",
     "testEnvironment": "node",
-    "testMatch": ["**/*.test.ts"],
+    "testMatch": [
+      "**/*.test.ts"
+    ],
     "transform": {
-      "^.+\\.ts$": ["ts-jest", {
-        "diagnostics": false
-      }]
+      "^.+\\.ts$": [
+        "ts-jest",
+        {
+          "diagnostics": false
+        }
+      ]
     }
   }
 }

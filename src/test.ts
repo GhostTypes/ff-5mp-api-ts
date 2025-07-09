@@ -86,9 +86,9 @@ async function testRecentFiles(client: FiveMClient) {
 
 async function runTest() {
     // Replace these values with your actual printer information
-    const ipAddress = '192.168.0.202'; // Replace with your printer's IP
-    const serialNumber = 'SNMOMC9900728'; // Replace with your printer's serial number
-    const checkCode = 'e5c2bf77'; // Replace with your printer's check code
+    const ipAddress = '192.168.0.204'; // Replace with your printer's IP
+    const serialNumber = 'SNMQRE9400951'; // Replace with your printer's serial number
+    const checkCode = '0e35a229'; // Replace with your printer's check code
 
     console.log('=== FlashForge API Test ===');
     console.log(`Attempting to connect to printer at ${ipAddress}`);
