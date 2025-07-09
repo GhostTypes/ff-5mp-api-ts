@@ -9,10 +9,9 @@ Built upon the foundation of my previous [C# API](https://github.com/GhostTypes/
 ---
 
 ## 🖨️ Printer Coverage & Testing
-
 | 🖨️ Printer | ✅ Supported | 🧪 Tested | 🔌 API |
 |-------------|--------------|-----------|--------|
-| **Adventurer 5X** | ⚠️ Not sure | ❌ No | HTTP (New) + TCP (Additional Features) |
+| **Adventurer 5X** | ⚠️ Basic | ✅ Yes | HTTP (New) + TCP (Additional Features) |
 | **Adventurer 5M/Pro** | ✅ Yes | ✅ Yes | HTTP (New) + TCP (Additional Features) |
 | **Adventurer 3/4** | ✅ Yes | 🔄 Partially | TCP (Legacy Mode) |
 
@@ -38,5 +37,5 @@ Built upon the foundation of my previous [C# API](https://github.com/GhostTypes/
 
 ## 🚀 Getting Started
 
-*Documentation and installation instructions coming soon...*
+*Documentation coming soon...*
         
