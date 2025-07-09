@@ -1,5 +1,5 @@
 // src/api/models/MachineInfo.ts
-import {FFMachineInfo, FFPrinterDetail, MachineState} from './ff-models';
+import {FFMachineInfo, FFPrinterDetail, MachineState, MatlStationInfo, IndepMatlInfo} from './ff-models';
 
 /**
  * Transforms printer detail data from the API response format into a structured `FFMachineInfo` object.
@@ -57,6 +57,7 @@ export class MachineInfo {
                 // Fan speeds
                 ChamberFanSpeed: detail.chamberFanSpeed || 0,
                 CoolingFanSpeed: detail.coolingFanSpeed || 0,
+                CoolingFanLeftSpeed: detail.coolingFanLeftSpeed, // Keep as undefined if not present
 
                 // Cumulative stats
                 CumulativeFilament: detail.cumulativeFilament || 0,
@@ -90,8 +91,14 @@ export class MachineInfo {
                 FillAmount: detail.fillAmount || 0,
                 FirmwareVersion: detail.firmwareVersion || '',
                 Name: detail.name || '',
-                IsPro: (detail.name || '').includes("Pro"),
+                IsPro: (detail.name || '').includes("Pro") && detail.name !== "AD5X", // AD5X is special
+                IsAD5X: detail.name === "AD5X",
                 NozzleSize: detail.nozzleModel || '',
+
+                // Material Station Info
+                HasMatlStation: detail.hasMatlStation,
+                MatlStationInfo: detail.matlStationInfo, // Assign directly
+                IndepMatlInfo: detail.indepMatlInfo, // Assign directly
 
                 // Temperatures
                 PrintBed: {

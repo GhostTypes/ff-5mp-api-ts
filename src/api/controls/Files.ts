@@ -1,5 +1,6 @@
 // src/api/controls/Files.ts
 import { FiveMClient } from '../../FiveMClient';
+import { FFGcodeFileEntry } from '../../models/ff-models'; // Import the new model
 import { Endpoints } from '../server/Endpoints';
 import axios from 'axios';
 import { GenericResponse } from './Control';
@@ -30,11 +31,13 @@ export class Files {
 
     /**
      * Retrieves a list of the 10 most recently printed files from the printer's API.
-     * This is a quick way to get a list of recent jobs.
-     * @returns A Promise that resolves to an array of G-code file names.
+     * For AD5X and similar printers, this returns detailed file entries.
+     * For older printers, it might return just a list of names, or this implementation
+     * will attempt to normalize it.
+     * @returns A Promise that resolves to an array of `FFGcodeFileEntry` objects.
      *          Returns an empty array if the request fails or an error occurs.
      */
-    public async getRecentFileList(): Promise<string[]> {
+    public async getRecentFileList(): Promise<FFGcodeFileEntry[]> {
         const payload = {
             serialNumber: this.client.serialNumber,
             checkCode: this.client.checkCode
@@ -53,12 +56,30 @@ export class Files {
 
             if (response.status !== 200) return [];
 
+            // The structure of result.gcodeList can vary.
+            // AD5X returns FFGcodeFileEntry[], older might return string[]
             const result = response.data as GCodeListResponse;
+
             if (NetworkUtils.isOk(result)) {
-                return result.gcodeList;
+                if (result.gcodeList && result.gcodeList.length > 0) {
+                    // Check if the first element is a string or an object
+                    if (typeof result.gcodeList[0] === 'string') {
+                        // Handle older format: array of strings
+                        // Convert string[] to FFGcodeFileEntry[]
+                        return (result.gcodeList as string[]).map(fileName => ({
+                            gcodeFileName: fileName,
+                            printingTime: 0, // Default or mark as unknown
+                            // Other fields can be undefined or have default values
+                        }));
+                    } else if (typeof result.gcodeList[0] === 'object') {
+                        // Handle newer format: array of FFGcodeFileEntry objects
+                        return result.gcodeList as FFGcodeFileEntry[];
+                    }
+                }
+                return []; // Empty list or unknown format
             }
 
-            console.log(`Error retrieving file list: ${result.message}`);
+            console.log(`Error retrieving file list: ${result.message || 'Unknown error'}`);
             return [];
         } catch (error: unknown) {
             const err = error as Error;
@@ -110,8 +131,9 @@ export class Files {
     }
 }
 
+// Updated GCodeListResponse to reflect that gcodeList can be string[] or FFGcodeFileEntry[]
 interface GCodeListResponse extends GenericResponse {
-    gcodeList: string[];
+    gcodeList: string[] | FFGcodeFileEntry[];
 }
 
 interface ThumbnailResponse extends GenericResponse {

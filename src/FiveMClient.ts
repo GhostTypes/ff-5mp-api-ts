@@ -44,6 +44,7 @@ export class FiveMClient {
 
     public printerName: string = '';
     public isPro: boolean = false;
+    public isAD5X: boolean = false;
     public firmwareVersion: string = '';
     public firmVer: string = '';
 
@@ -152,6 +153,8 @@ export class FiveMClient {
 
         // console.log(JSON.stringify(info, null, 2)); // Useful for debugging
         this.printerName = info.Name || '';
+        this.isPro = info.IsPro; // Use the value from MachineInfo
+        this.isAD5X = info.IsAD5X; // Cache the AD5X status
         this.firmwareVersion = info.FirmwareVersion || '';
         this.firmVer = info.FirmwareVersion ? info.FirmwareVersion.split('-')[0] : '';
         this.macAddress = info.MacAddress || '';
@@ -191,13 +194,23 @@ export class FiveMClient {
             if (!machineInfo) { return false; }
 
             // Check for Pro model with the machine TypeName (can't be changed by user)
-            const tcpInfo = await this.tcpClient.getPrinterInfo()
+            // We now rely on MachineInfo.fromDetail to set IsPro and IsAD5X based on detail.name
+            // So, the TCP check for "Pro" might be redundant or could be a fallback.
+            // For now, let's keep it but prioritize what's in machineInfo.
+            const tcpInfo = await this.tcpClient.getPrinterInfo();
             if (tcpInfo) {
-                if (tcpInfo.TypeName.includes("Pro")) this.isPro = true;
+                // If machineInfo hasn't already set isPro, we can use TCP info as a fallback.
+                // However, machineInfo.IsPro (derived from detail.name) should be more reliable.
+                // This line effectively gets overridden by cacheDetails if machineInfo.IsPro is set.
+                if (tcpInfo.TypeName.includes("Pro") && !machineInfo.IsPro && !machineInfo.IsAD5X) {
+                    // Only set this if not already determined by machineInfo, and it's not an AD5X
+                    this.isPro = true;
+                }
             } else {
-                console.error("Unable to get PrinterInfo from TcpAPI , some things might be borked");
+                console.error("Unable to get PrinterInfo from TcpAPI, some details might be incomplete");
             }
-            // we should probably return false if tcpInfo is null here, like we do for machineInfo
+            // we should probably return false if tcpInfo is null here, like we do for machineInfo,
+            // but for now, we'll let cacheDetails be the primary source of truth for these flags.
 
             return this.cacheDetails(machineInfo);
         } catch (error: unknown) {
