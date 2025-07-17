@@ -31,9 +31,8 @@ export class Files {
 
     /**
      * Retrieves a list of the 10 most recently printed files from the printer's API.
-     * For AD5X and similar printers, this returns detailed file entries.
-     * For older printers, it might return just a list of names, or this implementation
-     * will attempt to normalize it.
+     * For AD5X and newer printers, returns detailed file entries with material info.
+     * For older printers, returns basic file entries with normalized data.
      * @returns A Promise that resolves to an array of `FFGcodeFileEntry` objects.
      *          Returns an empty array if the request fails or an error occurs.
      */
@@ -47,39 +46,39 @@ export class Files {
             const response = await axios.post(
                 this.client.getEndpoint(Endpoints.GCodeList),
                 payload,
-                {
-                    headers: {
-                        'Content-Type': 'application/json'
-                    }
-                }
+                { headers: { 'Content-Type': 'application/json' } }
             );
 
             if (response.status !== 200) return [];
 
-            // The structure of result.gcodeList can vary.
-            // AD5X returns FFGcodeFileEntry[], older might return string[]
             const result = response.data as GCodeListResponse;
 
-            if (NetworkUtils.isOk(result)) {
-                if (result.gcodeList && result.gcodeList.length > 0) {
-                    // Check if the first element is a string or an object
-                    if (typeof result.gcodeList[0] === 'string') {
-                        // Handle older format: array of strings
-                        // Convert string[] to FFGcodeFileEntry[]
-                        return (result.gcodeList as string[]).map(fileName => ({
-                            gcodeFileName: fileName,
-                            printingTime: 0, // Default or mark as unknown
-                            // Other fields can be undefined or have default values
-                        }));
-                    } else if (typeof result.gcodeList[0] === 'object') {
-                        // Handle newer format: array of FFGcodeFileEntry objects
-                        return result.gcodeList as FFGcodeFileEntry[];
-                    }
-                }
-                return []; // Empty list or unknown format
+            if (!NetworkUtils.isOk(result)) {
+                console.log(`Error retrieving file list: ${result.message || 'Unknown error'}`);
+                return [];
             }
 
-            console.log(`Error retrieving file list: ${result.message || 'Unknown error'}`);
+            // AD5X and newer printers provide detailed info in gcodeListDetail
+            if (result.gcodeListDetail && result.gcodeListDetail.length > 0) {
+                return result.gcodeListDetail;
+            }
+
+            // Fallback for older printers using gcodeList
+            if (result.gcodeList?.length > 0) {
+                const firstItem = result.gcodeList[0];
+                
+                if (typeof firstItem === 'string') {
+                    // Convert string array to FFGcodeFileEntry objects
+                    return (result.gcodeList as string[]).map(fileName => ({
+                        gcodeFileName: fileName,
+                        printingTime: 0
+                    }));
+                } else {
+                    // Already FFGcodeFileEntry objects
+                    return result.gcodeList as FFGcodeFileEntry[];
+                }
+            }
+
             return [];
         } catch (error: unknown) {
             const err = error as Error;
@@ -134,6 +133,7 @@ export class Files {
 // Updated GCodeListResponse to reflect that gcodeList can be string[] or FFGcodeFileEntry[]
 interface GCodeListResponse extends GenericResponse {
     gcodeList: string[] | FFGcodeFileEntry[];
+    gcodeListDetail?: FFGcodeFileEntry[]; // AD5X and newer printers provide detailed info here
 }
 
 interface ThumbnailResponse extends GenericResponse {
@@ -144,10 +144,7 @@ interface ThumbnailResponse extends GenericResponse {
  * @interface GCodeListResponse
  * @extends GenericResponse
  */
-interface GCodeListResponse extends GenericResponse {
-    /** An array of G-code file names. */
-    gcodeList: string[];
-}
+
 
 /**
  * Represents the response structure for a G-code thumbnail request.

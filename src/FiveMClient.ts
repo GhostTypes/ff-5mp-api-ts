@@ -62,6 +62,8 @@ export class FiveMClient {
     public ledControl: boolean = false;
     /** State of the filtration system control. */
     public filtrationControl: boolean = false;
+    /** Raw product info containing all control states */
+    public productInfo: Product | null = null;
 
     /**
      * Creates an instance of FiveMClient.
@@ -249,6 +251,7 @@ export class FiveMClient {
                 if (productResponse && NetworkUtils.isOk(productResponse)) {
                     // Parse & set control states
                     const product = productResponse.product;
+                    this.productInfo = product; // Store raw product data
                     this.ledControl = product.lightCtrlState !== 0;
                     this.filtrationControl = !(product.internalFanCtrlState === 0 || product.externalFanCtrlState === 0);
                     //console.log("LedControl: " + this.ledControl);
@@ -290,7 +293,7 @@ interface ProductResponse extends GenericResponse {
  * fan controls, and light controls. A state of 0 often means off/unavailable,
  * while other numbers (typically 1) mean on/available or a specific mode.
  */
-interface Product {
+export interface Product {
     /** State of the chamber temperature control. */
     chamberTempCtrlState: number;
     /** State of the external fan control. */

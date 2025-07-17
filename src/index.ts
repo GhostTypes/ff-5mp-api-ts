@@ -1,6 +1,6 @@
 // src/index.ts
 // Main client
-export { FiveMClient } from './FiveMClient';
+export { FiveMClient, Product } from './FiveMClient';
 
 // API Controls
 export { Control, FiltrationArgs, GenericResponse } from './api/controls/Control';
@@ -14,7 +14,9 @@ export {
     FFPrinterDetail,
     FFMachineInfo,
     Temperature as TemperatureInterface,
-    MachineState
+    MachineState,
+    FFGcodeFileEntry,
+    FFGcodeToolData
 } from './models/ff-models';
 
 // Filament

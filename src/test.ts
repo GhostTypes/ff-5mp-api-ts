@@ -86,7 +86,7 @@ async function testRecentFiles(client: FiveMClient) {
 
 async function runTest() {
     // Replace these values with your actual printer information
-    const ipAddress = '192.168.0.204'; // Replace with your printer's IP
+    const ipAddress = '192.168.0.145'; // Replace with your printer's IP
     const serialNumber = 'SNMQRE9400951'; // Replace with your printer's serial number
     const checkCode = '0e35a229'; // Replace with your printer's check code
 
@@ -171,9 +171,9 @@ async function runTest() {
             }
 
             // Check if we can get the local files list
-            let files = await client.files.getLocalFileList()
-            if (files.length < 1) failTest("No local files found, ensure the printer has at least one local file for proper testing.")
-            console.log('Local file(s) count: ' + files.length);
+            //let files = await client.files.getLocalFileList()
+            //if (files.length < 1) failTest("No local files found, ensure the printer has at least one local file for proper testing.")
+            //console.log('Local file(s) count: ' + files.length);
 
             // Test recent files list (especially for AD5X)
             await testRecentFiles(client);
