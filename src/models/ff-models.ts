@@ -373,3 +373,46 @@ export interface FFGcodeFileEntry {
     // Potentially other fields might exist for non-AD5X printers in a simpler format
     // For now, focusing on AD5X structure.
 }
+
+// --- AD5X Local Job Start Interfaces ---
+
+/**
+ * Represents a material mapping for AD5X multi-color printing.
+ * Maps a tool (extruder) to a specific material station slot.
+ */
+export interface AD5XMaterialMapping {
+    /** Tool ID (0-based: 0, 1, 2, 3) */
+    toolId: number;
+    /** Slot ID (1-based: 1, 2, 3, 4) */
+    slotId: number;
+    /** Name of the material (e.g., "PLA", "SILK") */
+    materialName: string;
+    /** Hex color code for the tool material (e.g., "#FFFFFF") */
+    toolMaterialColor: string;
+    /** Hex color code for the slot material (e.g., "#46328E") */
+    slotMaterialColor: string;
+}
+
+/**
+ * Parameters for starting an AD5X local job with material mappings.
+ * Used for multi-color prints that utilize the material station.
+ */
+export interface AD5XLocalJobParams {
+    /** Name of the file on the printer to start */
+    fileName: string;
+    /** Whether to perform bed leveling before printing */
+    levelingBeforePrint: boolean;
+    /** Array of material mappings (1-4 items) */
+    materialMappings: AD5XMaterialMapping[];
+}
+
+/**
+ * Parameters for starting an AD5X single-color local job.
+ * Used for single-color prints that do not require the material station.
+ */
+export interface AD5XSingleColorJobParams {
+    /** Name of the file on the printer to start */
+    fileName: string;
+    /** Whether to perform bed leveling before printing */
+    levelingBeforePrint: boolean;
+}

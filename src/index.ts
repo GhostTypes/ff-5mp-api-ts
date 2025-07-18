@@ -16,7 +16,12 @@ export {
     Temperature as TemperatureInterface,
     MachineState,
     FFGcodeFileEntry,
-    FFGcodeToolData
+    FFGcodeToolData,
+    AD5XMaterialMapping,
+    AD5XLocalJobParams,
+    AD5XSingleColorJobParams,
+    MatlStationInfo,
+    SlotInfo
 } from './models/ff-models';
 
 // Filament

@@ -2,6 +2,7 @@
 import { FiveMClient } from '../../FiveMClient';
 import {Control, GenericResponse} from './Control';
 import { Endpoints } from '../server/Endpoints';
+import { AD5XLocalJobParams, AD5XMaterialMapping, AD5XSingleColorJobParams } from '../../models/ff-models';
 import * as fs from 'fs';
 import * as path from 'path';
 import axios from 'axios';
@@ -249,5 +250,192 @@ export class JobControl {
             console.error(`PrintLocalFile error: ${(error as Error).message}`);
             throw error;
         }
+    }
+
+    /**
+     * Starts a multi-color local print job on AD5X printers with material mappings.
+     * This method automatically configures the material station settings and validates
+     * all parameters before sending the print command.
+     * 
+     * @param params Job parameters including file name, leveling option, and material mappings
+     * @returns Promise resolving to true if successful, false if validation fails or printer rejects
+     * @throws Error if there's a network issue sending the command
+     */
+    public async startAD5XMultiColorJob(params: AD5XLocalJobParams): Promise<boolean> {
+        // Validate that this is an AD5X printer
+        if (!this.validateAD5XPrinter()) {
+            return false;
+        }
+
+        // Validate material mappings
+        if (!this.validateMaterialMappings(params.materialMappings)) {
+            return false;
+        }
+
+        // Validate file name
+        if (!params.fileName || params.fileName.trim() === '') {
+            console.error('AD5X Multi-Color Job error: fileName cannot be empty');
+            return false;
+        }
+
+        // Create payload with AD5X-specific parameters
+        const payload = {
+            serialNumber: this.client.serialNumber,
+            checkCode: this.client.checkCode,
+            fileName: params.fileName,
+            levelingBeforePrint: params.levelingBeforePrint,
+            firstLayerInspection: false,
+            flowCalibration: false,
+            timeLapseVideo: false,
+            useMatlStation: true, // Automatically set to true for multi-color jobs
+            gcodeToolCnt: params.materialMappings.length, // Set based on material mappings count
+            materialMappings: params.materialMappings
+        };
+
+        try {
+            const response = await axios.post(
+                this.client.getEndpoint(Endpoints.GCodePrint),
+                payload,
+                {
+                    headers: {
+                        'Content-Type': 'application/json'
+                    }
+                }
+            );
+
+            if (response.status !== 200) return false;
+
+            const result = response.data as GenericResponse;
+            return NetworkUtils.isOk(result);
+        } catch (error) {
+            console.error(`AD5X Multi-Color Job error: ${(error as Error).message}`);
+            throw error;
+        }
+    }
+
+    /**
+     * Starts a single-color local print job on AD5X printers.
+     * This method automatically configures the printer for single-color printing
+     * without using the material station.
+     * 
+     * @param params Job parameters including file name and leveling option
+     * @returns Promise resolving to true if successful, false if validation fails or printer rejects
+     * @throws Error if there's a network issue sending the command
+     */
+    public async startAD5XSingleColorJob(params: AD5XSingleColorJobParams): Promise<boolean> {
+        // Validate that this is an AD5X printer
+        if (!this.validateAD5XPrinter()) {
+            return false;
+        }
+
+        // Validate file name
+        if (!params.fileName || params.fileName.trim() === '') {
+            console.error('AD5X Single-Color Job error: fileName cannot be empty');
+            return false;
+        }
+
+        // Create payload with AD5X-specific parameters for single-color printing
+        const payload = {
+            serialNumber: this.client.serialNumber,
+            checkCode: this.client.checkCode,
+            fileName: params.fileName,
+            levelingBeforePrint: params.levelingBeforePrint,
+            firstLayerInspection: false,
+            flowCalibration: false,
+            timeLapseVideo: false,
+            useMatlStation: false, // Set to false for single-color jobs
+            gcodeToolCnt: 0, // Set to 0 for single-color jobs
+            materialMappings: [] // Empty array for single-color jobs
+        };
+
+        try {
+            const response = await axios.post(
+                this.client.getEndpoint(Endpoints.GCodePrint),
+                payload,
+                {
+                    headers: {
+                        'Content-Type': 'application/json'
+                    }
+                }
+            );
+
+            if (response.status !== 200) return false;
+
+            const result = response.data as GenericResponse;
+            return NetworkUtils.isOk(result);
+        } catch (error) {
+            console.error(`AD5X Single-Color Job error: ${(error as Error).message}`);
+            throw error;
+        }
+    }
+
+    /**
+     * Validates that the current printer is an AD5X model.
+     * @returns True if the printer is AD5X, false otherwise
+     * @private
+     */
+    private validateAD5XPrinter(): boolean {
+        if (!this.client.isAD5X) {
+            console.error('AD5X Job error: This method can only be used with AD5X printers');
+            return false;
+        }
+        return true;
+    }
+
+    /**
+     * Validates material mappings for AD5X multi-color jobs.
+     * Checks toolId range (0-3), slotId range (1-4), and color format (#RRGGBB).
+     * @param materialMappings Array of material mappings to validate
+     * @returns True if all mappings are valid, false otherwise
+     * @private
+     */
+    private validateMaterialMappings(materialMappings: AD5XMaterialMapping[]): boolean {
+        if (!materialMappings || materialMappings.length === 0) {
+            console.error('Material mappings validation error: materialMappings array cannot be empty for multi-color jobs');
+            return false;
+        }
+
+        if (materialMappings.length > 4) {
+            console.error('Material mappings validation error: Maximum 4 material mappings allowed');
+            return false;
+        }
+
+        const hexColorRegex = /^#[0-9A-Fa-f]{6}$/;
+
+        for (let i = 0; i < materialMappings.length; i++) {
+            const mapping = materialMappings[i];
+
+            // Validate toolId (0-3)
+            if (mapping.toolId < 0 || mapping.toolId > 3) {
+                console.error(`Material mappings validation error: toolId must be between 0-3, got ${mapping.toolId} at index ${i}`);
+                return false;
+            }
+
+            // Validate slotId (1-4)
+            if (mapping.slotId < 1 || mapping.slotId > 4) {
+                console.error(`Material mappings validation error: slotId must be between 1-4, got ${mapping.slotId} at index ${i}`);
+                return false;
+            }
+
+            // Validate materialName is not empty
+            if (!mapping.materialName || mapping.materialName.trim() === '') {
+                console.error(`Material mappings validation error: materialName cannot be empty at index ${i}`);
+                return false;
+            }
+
+            // Validate toolMaterialColor format
+            if (!hexColorRegex.test(mapping.toolMaterialColor)) {
+                console.error(`Material mappings validation error: toolMaterialColor must be in #RRGGBB format, got ${mapping.toolMaterialColor} at index ${i}`);
+                return false;
+            }
+
+            // Validate slotMaterialColor format
+            if (!hexColorRegex.test(mapping.slotMaterialColor)) {
+                console.error(`Material mappings validation error: slotMaterialColor must be in #RRGGBB format, got ${mapping.slotMaterialColor} at index ${i}`);
+                return false;
+            }
+        }
+
+        return true;
     }
 }
