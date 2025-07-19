@@ -185,7 +185,7 @@ async function runTest() {
         // Close the connection
 
         console.log('\nTest completed.');
-        client.dispose();
+        await client.dispose();
         console.log('Connection closed.');
         process.exit(0);
 

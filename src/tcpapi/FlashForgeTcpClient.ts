@@ -423,14 +423,30 @@ export class FlashForgeTcpClient {
      * Cleans up resources by destroying the socket connection.
      * This should be called when the client is no longer needed.
      */
-    public dispose(): void {
+    public async dispose(): Promise<void> {
         try {
             console.log("TcpPrinterClient closing socket");
-            this.stopKeepAlive(true); // Stop keep-alive timer and send logout command
+            
+            // First stop the keep-alive loop
+            this.keepAliveCancellationToken = true;
+            
+            // Send logout command if socket is available and not busy
+            if (this.socket && !this.socket.destroyed && !this.socketBusy) {
+                try {
+                    await this.sendCommandAsync(GCodes.CmdLogout);
+                } catch (error) {
+                    // Ignore logout errors during disposal
+                    console.log("Logout command failed during disposal (expected)");
+                }
+            }
+            
+            // Now destroy the socket
             if (this.socket) {
                 this.socket.destroy();
                 this.socket = null;
             }
+            
+            console.log("Keep-alive stopped.");
         } catch (error: unknown) {
             const err = error as Error;
             console.log(err.message);

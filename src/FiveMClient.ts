@@ -140,9 +140,8 @@ export class FiveMClient {
     /**
      * Disposes of the FiveMClient instance, stopping keep-alive messages and cleaning up resources.
      */
-    public dispose(): void {
-        this.tcpClient.stopKeepAlive(true);
-        this.tcpClient.dispose();
+    public async dispose(): Promise<void> {
+        await this.tcpClient.dispose();
     }
 
     /**
