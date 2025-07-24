@@ -20,6 +20,7 @@ export {
     AD5XMaterialMapping,
     AD5XLocalJobParams,
     AD5XSingleColorJobParams,
+    AD5XUploadParams,
     MatlStationInfo,
     SlotInfo
 } from './models/ff-models';

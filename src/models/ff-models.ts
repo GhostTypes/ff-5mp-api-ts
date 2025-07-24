@@ -416,3 +416,25 @@ export interface AD5XSingleColorJobParams {
     /** Whether to perform bed leveling before printing */
     levelingBeforePrint: boolean;
 }
+
+/**
+ * Parameters for uploading a file to AD5X printer with material station support.
+ * Extends basic upload functionality with AD5X-specific features like material mappings,
+ * flow calibration, and first layer inspection.
+ */
+export interface AD5XUploadParams {
+    /** Local file path to upload */
+    filePath: string;
+    /** Whether to start printing immediately after upload */
+    startPrint: boolean;
+    /** Whether to perform bed leveling before printing */
+    levelingBeforePrint: boolean;
+    /** Whether to enable flow calibration */
+    flowCalibration: boolean;
+    /** Whether to enable first layer inspection */
+    firstLayerInspection: boolean;
+    /** Whether to enable time lapse video recording */
+    timeLapseVideo: boolean;
+    /** Array of material mappings for the material station (1-4 items) */
+    materialMappings: AD5XMaterialMapping[];
+}

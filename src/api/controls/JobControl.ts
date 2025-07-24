@@ -2,7 +2,7 @@
 import { FiveMClient } from '../../FiveMClient';
 import {Control, GenericResponse} from './Control';
 import { Endpoints } from '../server/Endpoints';
-import { AD5XLocalJobParams, AD5XMaterialMapping, AD5XSingleColorJobParams } from '../../models/ff-models';
+import { AD5XLocalJobParams, AD5XMaterialMapping, AD5XSingleColorJobParams, AD5XUploadParams } from '../../models/ff-models';
 import * as fs from 'fs';
 import * as path from 'path';
 import axios from 'axios';
@@ -184,6 +184,121 @@ export class JobControl {
 
         } catch (e: any) {
             console.error(`UploadFile error: ${e.message}`);
+            if (e.response) {
+                console.error(`Error Status: ${e.response.status}`);
+                console.error("Error Response Data:", e.response.data);
+            } else if (e.request) {
+                console.error("Error Request:", e.request);
+            } else {
+                console.error('Error', e.message);
+            }
+            console.error(e.stack);
+            return false;
+        }
+    }
+
+    /**
+     * Uploads a G-code or 3MF file to AD5X printer with material station support.
+     * Handles material mappings, flow calibration, and other AD5X-specific features.
+     * Material mappings are base64-encoded in HTTP headers according to AD5X API requirements.
+     *
+     * @param params AD5X upload parameters including file path, print options, and material mappings
+     * @returns A Promise that resolves to true if the file upload is successful, false otherwise
+     */
+    public async uploadFileAD5X(params: AD5XUploadParams): Promise<boolean> {
+        // Validate that this is an AD5X printer
+        if (!this.validateAD5XPrinter()) {
+            return false;
+        }
+
+        // Validate material mappings
+        if (!this.validateMaterialMappings(params.materialMappings)) {
+            return false;
+        }
+
+        // Validate file exists
+        if (!fs.existsSync(params.filePath)) {
+            console.error(`UploadFileAD5X error: File not found at ${params.filePath}`);
+            return false;
+        }
+
+        const stats = fs.statSync(params.filePath);
+        const fileSize = stats.size;
+        const fileName = path.basename(params.filePath);
+
+        console.log(`Starting AD5X upload for ${fileName}, Size: ${fileSize}, Start: ${params.startPrint}, Level: ${params.levelingBeforePrint}, Tools: ${params.materialMappings.length}`);
+
+        try {
+            // Create FormData with the file content
+            const form = new FormData();
+            form.append('gcodeFile', fs.createReadStream(params.filePath), {
+                filename: fileName,
+                contentType: 'application/octet-stream'
+            });
+
+            // Encode material mappings to base64
+            const materialMappingsBase64 = this.encodeMaterialMappingsToBase64(params.materialMappings);
+
+            // Prepare AD5X-specific HTTP headers
+            const customHeaders: Record<string, string> = {
+                'serialNumber': this.client.serialNumber,
+                'checkCode': this.client.checkCode,
+                'fileSize': fileSize.toString(),
+                'printNow': params.startPrint.toString().toLowerCase(),
+                'levelingBeforePrint': params.levelingBeforePrint.toString().toLowerCase(),
+                'flowCalibration': params.flowCalibration.toString().toLowerCase(),
+                'firstLayerInspection': params.firstLayerInspection.toString().toLowerCase(),
+                'timeLapseVideo': params.timeLapseVideo.toString().toLowerCase(),
+                'useMatlStation': 'true', // Always true for AD5X uploads with material mappings
+                'gcodeToolCnt': params.materialMappings.length.toString(),
+                'materialMappings': materialMappingsBase64,
+                'Expect': '100-continue'
+            };
+
+            // Get necessary headers from FormData
+            const formHeaders = form.getHeaders();
+
+            // Combine custom headers and FormData headers
+            const requestHeaders = {
+                ...customHeaders,
+                'Content-Type': formHeaders['content-type']
+            };
+
+            console.log("AD5X Upload Request Headers:", requestHeaders);
+
+            // Configure Axios request
+            // @ts-ignore
+            const config: AxiosRequestConfig = {
+                headers: requestHeaders
+            };
+
+            // Make the POST request
+            const response = await axios.post(
+                this.client.getEndpoint(Endpoints.UploadFile),
+                form,
+                config
+            );
+
+            console.log(`AD5X Upload Response Status: ${response.status}`);
+            console.log("AD5X Upload Response Data:", response.data);
+
+            if (response.status !== 200) {
+                console.error(`AD5X Upload failed: Printer responded with status ${response.status}`);
+                return false;
+            }
+
+            // Assuming response.data is already parsed JSON by axios
+            const result = response.data as any;
+            if (NetworkUtils.isOk(result)) {
+                console.log("AD5X Upload successful according to printer response.");
+                return true;
+            } else {
+                console.error(`AD5X Upload failed: Printer response code=${result.code}, message=${result.message}`);
+                return false;
+            }
+
+        } catch (e: any) {
+            console.error(`UploadFileAD5X error: ${e.message}`);
             if (e.response) {
                 console.error(`Error Status: ${e.response.status}`);
                 console.error("Error Response Data:", e.response.data);
@@ -380,6 +495,24 @@ export class JobControl {
             return false;
         }
         return true;
+    }
+
+    /**
+     * Encodes material mappings array to base64 string for HTTP headers.
+     * Converts AD5XMaterialMapping array to JSON and then to base64 encoding.
+     * @param materialMappings Array of material mappings to encode
+     * @returns Base64-encoded JSON string
+     * @throws Error if encoding fails
+     * @private
+     */
+    private encodeMaterialMappingsToBase64(materialMappings: AD5XMaterialMapping[]): string {
+        try {
+            const jsonString = JSON.stringify(materialMappings);
+            return Buffer.from(jsonString, 'utf8').toString('base64');
+        } catch (error) {
+            console.error('Failed to encode material mappings to base64:', error);
+            throw new Error('Failed to encode material mappings for upload');
+        }
     }
 
     /**
