@@ -46,7 +46,7 @@ Older FlashForge printers use a "legacy" TCP-based API. This API is more limited
 To connect to a legacy printer, you only need its IP address.
 
 ```typescript
-import { FlashForgeClient } from './src';
+import { FlashForgeClient } from 'ff-api';
 
 async function main() {
     // Replace with your printer's IP address
@@ -90,7 +90,7 @@ The Adventurer 5 series introduced a new, more powerful HTTP-based API, while re
 To connect, you'll need the printer's IP address, serial number, and a "check code". These can be found in the printer's network settings.
 
 ```typescript
-import { FiveMClient } from './src';
+import { FiveMClient } from 'ff-api';
 
 async function main() {
     // Replace with your printer's details
@@ -147,7 +147,7 @@ After connecting, you can get detailed information about the Intelligent Filamen
 The `MatlStationInfo` property provides a comprehensive status of the IFS, including the state of each slot.
 
 ```typescript
-import { FiveMClient } from './src';
+import { FiveMClient } from 'ff-api';
 
 async function checkIFS() {
     const client = new FiveMClient('192.168.1.102', 'SNADVA5X12345', '54321');
@@ -191,7 +191,7 @@ To start a multi-color print, you need to provide `materialMappings`. This array
 - `slotId`: The physical slot on the material station (1-4).
 
 ```typescript
-import { FiveMClient, AD5XLocalJobParams, AD5XMaterialMapping } from './src';
+import { FiveMClient, AD5XLocalJobParams, AD5XMaterialMapping } from 'ff-api';
 
 async function startMultiColor() {
     const client = new FiveMClient('192.168.1.102', 'SNADVA5X12345', '54321');
@@ -224,7 +224,7 @@ async function startMultiColor() {
 For single-color prints, you can use a simpler method that doesn't require material mappings. The printer will use the currently loaded filament.
 
 ```typescript
-import { FiveMClient, AD5XSingleColorJobParams } from './src';
+import { FiveMClient, AD5XSingleColorJobParams } from 'ff-api';
 
 async function startSingleColor() {
     const client = new FiveMClient('192.168.1.102', 'SNADVA5X12345', '54321');
