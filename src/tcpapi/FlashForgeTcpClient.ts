@@ -354,6 +354,7 @@ export class FlashForgeTcpClient {
 
             let timeoutDuration = 5000; // default timeout
             if (cmd === GCodes.CmdListLocalFiles || cmd.startsWith(GCodes.CmdGetThumbnail)) { timeoutDuration = 10000; } // increase command timeout
+            if (cmd === GCodes.CmdHomeAxes || cmd === '~G28') { timeoutDuration = 15000; } // homing takes longer
             if (this.socket) { this.socket.setTimeout(timeoutDuration); }
             
             timeoutId = setTimeout(() => {
