@@ -1,49 +1,138 @@
-# 🖨️ FlashForge TypeScript API
+<div align="center">
+  <h1>FlashForge TypeScript API</h1>
+  <p>
+    A robust, cross-platform API for FlashForge 3D printers, created through
+    reverse-engineering the communication between the printers and FlashForge software.
+  </p>
+</div>
 
-> 🔧 A robust, cross-platform API for FlashForge 3D printers, created through reverse-engineering of the communication between the printer(s) and FlashForge software.
 
-## 🌟 About
+<br>
+<div align="center">
+  <h2>Printer Coverage & Testing</h2>
+</div>
 
-Built upon the foundation of my previous [C# API](https://github.com/GhostTypes/ff-5mp-api), this TypeScript implementation is designed for **easier cross-platform usage and development**.
+<div align="center">
+<table>
+  <tr>
+    <th>Printer</th>
+    <th>Supported</th>
+    <th>Tested</th>
+    <th>API</th>
+  </tr>
 
----
+  <tr>
+    <td><strong>Adventurer 5X</strong></td>
+    <td>Yes</td>
+    <td>Yes</td>
+    <td>HTTP + TCP</td>
+  </tr>
 
-## 🖨️ Printer Coverage & Testing
-| 🖨️ Printer | ✅ Supported | 🧪 Tested | 🔌 API |
-|-------------|--------------|-----------|--------|
-| **Adventurer 5X** | ⚠️ Basic | ✅ Yes | HTTP (New) + TCP (Additional Features) |
-| **Adventurer 5M/Pro** | ✅ Yes | ✅ Yes | HTTP (New) + TCP (Additional Features) |
-| **Adventurer 3/4** | ✅ Yes | 🔄 Partially | TCP (Legacy Mode) |
+  <tr>
+    <td><strong>Adventurer 5M / 5M Pro</strong></td>
+    <td>Yes</td>
+    <td>Yes</td>
+    <td>HTTP + TCP</td>
+  </tr>
 
----
+  <tr>
+    <td><strong>Adventurer 3 / 4</strong></td>
+    <td>Yes</td>
+    <td>Partial</td>
+    <td>TCP Only</td>
+  </tr>
+</table>
+</div>
 
-## ⚡ Feature Coverage
+<br>
 
-> 💡 **Legacy Mode** covers all network-enabled printers before the Adventurer 5 series
+<div align="center">
+  <h2>Feature Coverage</h2>
+</div>
 
-| 🔧 Feature | 🔄 Legacy Mode | 🆕 "New" API |
-|------------|----------------|---------------|
-| 📁 **Get Recent & Local Files** | ✅ Yes | ✅ Yes |
-| 🖼️ **Get Model Preview Images** | ✅ Yes (Slow) | ⚡ Yes (Fast!) |
-| 🎮 **Full Job Control** (Start, Stop, Pause, Resume, etc.) | ✅ Yes | ✅ Yes |
-| 💡 **LED Control** (On/Off) | ✅ Yes | ✅ Yes |
-| 📤 **Uploading New Files** | ❌ No (Not planned) | ✅ Yes |
-| ℹ️ **Printer Information** | ⚠️ Limited | ✅ Yes |
-| 📊 **(Extra) Job Information** | ⚠️ Very Limited | ✅ Yes |
-| ⏰ **Job Time & ETA** | ❌ Not Available | ✅ Yes |
-| 🏠 **Homing/Direct G&M Code Control** | ✅ Yes | ✅ Yes |
+<div align="center">
+<table>
+  <tr>
+    <th>Feature</th>
+    <th>TCP Only</th>
+    <th>TCP + HTTP</th>
+  </tr>
 
----
+  <tr>
+    <td>Get Recent & Local Files</td>
+    <td>Yes</td>
+    <td>Yes</td>
+  </tr>
 
-## 🚀 Getting Started
+  <tr>
+    <td>Model Preview Images</td>
+    <td>Yes (Slow)</td>
+    <td>Yes (Fast)</td>
+  </tr>
 
-This guide will walk you through using the API with different generations of FlashForge printers.
+  <tr>
+    <td>Full Job Control<br><small>(Start / Stop / Pause / Resume)</small></td>
+    <td>Yes</td>
+    <td>Yes</td>
+  </tr>
 
-### Legacy Printers (Adventurer 3/4, etc.)
+  <tr>
+    <td>LED Control</td>
+    <td>Yes</td>
+    <td>Yes</td>
+  </tr>
 
-Older FlashForge printers use a "legacy" TCP-based API. This API is more limited but still provides core functionality like job control and status monitoring.
+  <tr>
+    <td>Upload New Files</td>
+    <td>No (Not planned)</td>
+    <td>Yes</td>
+  </tr>
 
-To connect to a legacy printer, you only need its IP address.
+  <tr>
+    <td>Printer Information</td>
+    <td>Limited</td>
+    <td>Yes</td>
+  </tr>
+
+  <tr>
+    <td>Job Information</td>
+    <td>Very Limited</td>
+    <td>Yes</td>
+  </tr>
+
+  <tr>
+    <td>Job Time & ETA</td>
+    <td>Not Available</td>
+    <td>Yes</td>
+  </tr>
+
+  <tr>
+    <td>Homing / Direct G&M Code Control</td>
+    <td>Yes</td>
+    <td>Yes</td>
+  </tr>
+</table>
+</div>
+
+<br>
+
+<div align="center">
+  <h2>Getting Started</h2>
+  <p>
+    This section covers how to use the API with both legacy FlashForge printers and
+    newer models such as the Adventurer 5M / 5M Pro and AD5X.
+  </p>
+</div>
+
+<br>
+
+<div align="center">
+  <h3>Legacy Printers (Adventurer 3 / 4)</h3>
+  <p>
+    Legacy FlashForge printers use a TCP-based protocol which provides basic job control,
+    printer information, and status monitoring. Connecting only requires the printer’s IP address.
+  </p>
+</div>
 
 ```typescript
 import { FlashForgeClient } from 'ff-api';
@@ -65,7 +154,6 @@ async function main() {
             console.log(`Firmware: ${info.FirmwareVersion}`);
         }
 
-        // Remember to dispose of the client when done
         await client.dispose();
     } else {
         console.log("Failed to connect to printer.");
@@ -74,20 +162,11 @@ async function main() {
 
 main();
 ```
-
-**Functionality Notes:**
-- **Basic Control:** Full control over starting, stopping, and pausing jobs.
-- **Status Monitoring:** Get basic printer info, temperature, and job progress.
-- **No File Uploads:** The legacy API does not support uploading files. You must print files already on the printer.
-- **Slower Thumbnails:** Retrieving model preview images can be slow.
-
----
-
-### Adventurer 5M / 5M Pro
-
-The Adventurer 5 series introduced a new, more powerful HTTP-based API, while retaining the legacy TCP API for specific features like direct G-code control. This hybrid approach offers the best of both worlds.
-
-To connect, you'll need the printer's IP address, serial number, and a "check code". These can be found in the printer's network settings.
+<br>
+<div align="center"> 
+    <h3>Adventurer 5M / 5M Pro</h3>
+    <p> The Adventurer 5 series uses an improved HTTP API for fast, modern communication, while still supporting legacy TCP-based G-code control. You will need the printer’s <strong>IP address</strong>, <strong>serial number</strong>, and <strong>check code</strong></p>
+</div>
 
 ```typescript
 import { FiveMClient } from 'ff-api';
@@ -126,25 +205,11 @@ async function main() {
 main();
 ```
 
-**Functionality Notes:**
-- **All Legacy Features:** Includes all capabilities of the legacy API.
-- **File Uploads:** Easily upload G-code files directly to the printer.
-- **Rich Information:** Access detailed information about the printer, job status, and print time estimates.
-- **Fast Thumbnails:** Model previews are retrieved quickly over the HTTP API.
-
----
-
-### Adventurer 5X (AD5X)
-
-The AD5X uses the same powerful HTTP API as the 5M series but adds specialized support for its **Intelligent Filament Station (IFS)**, enabling multi-color and multi-material printing. The API provides dedicated methods and data models to manage this functionality.
-
-Connecting to an AD5X is identical to a standard 5M.
-
-#### Checking the Material Station (IFS)
-
-After connecting, you can get detailed information about the Intelligent Filament Station. The `FFMachineInfo` object, accessible via `client.info.machineInfo` after a successful connection, contains all the details.
-
-The `MatlStationInfo` property provides a comprehensive status of the IFS, including the state of each slot.
+<div align="center">   
+    <h3>Adventurer 5X (AD5X)</h3>  
+    <p>The AD5X uses the same powerful HTTP API as the 5M series but adds specialized support for its <strong>Intelligent Filament Station (IFS)</strong>, enabling multi-color and multi-material printing. The API provides dedicated methods and data models to manage this functionality.</p>   
+    <p> Connecting to an AD5X is identical to a standard 5M. </p> 
+</div>
 
 ```typescript
 import { FiveMClient } from 'ff-api';
@@ -183,12 +248,10 @@ async function checkIFS() {
 checkIFS();
 ```
 
-#### Starting a Multi-Color Print
+<div align="center">   <h4>Starting a Multi-Color Print</h4>   <p>     To start a multi-color print, you need to provide <code>materialMappings</code>. This array links the tool ID from your G-code file to a specific slot in the material station.   </p>   <p>         - <code>toolId</code>: The tool index from your slicing software (0-3).        
 
-To start a multi-color print, you need to provide `materialMappings`. This array links the tool ID from your G-code file to a specific slot in the material station.
 
-- `toolId`: The tool index from your slicing software (0-3).
-- `slotId`: The physical slot on the material station (1-4).
+- <code>slotId</code>: The physical slot on the material station (1-4).   </p> </div>
 
 ```typescript
 import { FiveMClient, AD5XLocalJobParams, AD5XMaterialMapping } from 'ff-api';
@@ -219,9 +282,7 @@ async function startMultiColor() {
 }
 ```
 
-#### Starting a Single-Color Print
-
-For single-color prints, you can use a simpler method that doesn't require material mappings. The printer will use the currently loaded filament.
+<div align="center">   <h4>Starting a Single-Color Print</h4>   <p>     For single-color prints, you can use a simpler method that doesn't require material mappings. The printer will use the currently loaded filament.   </p> </div>
 
 ```typescript
 import { FiveMClient, AD5XSingleColorJobParams } from 'ff-api';
@@ -246,13 +307,5 @@ async function startSingleColor() {
 }
 ```
 
-#### Uploading Files for AD5X
+<div align="center">   <h4>Uploading Files for AD5X</h4>   <p>     You can also upload files with material mappings directly using <code>uploadFileAD5X</code>. The material mappings are Base64-encoded and sent in the headers automatically.  </p> </div>
 
-You can also upload files with material mappings directly using `uploadFileAD5X`. The `materialMappings` are Base64-encoded and sent in the headers automatically.
-
-**Functionality Notes:**
-- **All 5M/Pro Features:** Inherits all functionality from the standard 5M series.
-- **Intelligent Filament Station (IFS):** Provides detailed status and control over the multi-material station.
-- **Material Mapping:** Allows precise control over which filament is used for each part of a multi-material print.
-- **Dedicated Job Methods:** Separate, validated methods for starting single-color and multi-color jobs simplify development.
-        
