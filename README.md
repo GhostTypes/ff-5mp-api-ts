@@ -11,6 +11,10 @@
     A robust, cross-platform API for FlashForge 3D printers, created through
     reverse-engineering the communication between the printers and FlashForge software.
   </p>
+  <p>
+    <img src="https://img.shields.io/github/stars/GhostTypes/ff-5mp-api-ts.svg?style=for-the-badge&labelColor=black&color=yellow" alt="Stars">
+    <img src="https://img.shields.io/github/forks/GhostTypes/ff-5mp-api-ts.svg?style=for-the-badge&labelColor=black&color=blue" alt="Forks">
+  </p>
 </div>
 
 
