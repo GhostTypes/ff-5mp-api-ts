@@ -12,7 +12,7 @@
     "prepare": "npm run build",
     "test": "jest",
     "test:watch": "jest --watch",
-    "test:legacy": "tsx src/test.ts"
+    "test:coverage": "jest --coverage"
   },
   "keywords": [
     "flashforge",
@@ -54,6 +54,19 @@
           "diagnostics": false
         }
       ]
+    },
+    "collectCoverageFrom": [
+      "src/**/*.ts",
+      "!src/**/*.test.ts",
+      "!src/firmware-test.ts"
+    ],
+    "coverageThreshold": {
+      "global": {
+        "branches": 40,
+        "functions": 20,
+        "lines": 30,
+        "statements": 30
+      }
     }
   }
 }
