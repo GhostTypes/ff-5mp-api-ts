@@ -436,4 +436,57 @@ describe('JobControl', () => {
       expect(result).toBe(false);
     });
   });
+
+  describe('uploadFileAD5X', () => {
+    beforeEach(() => {
+      mockFiveMClient.isAD5X = true;
+    });
+
+    const validParams = {
+        filePath: 'test.gcode',
+        startPrint: false,
+        levelingBeforePrint: false,
+        flowCalibration: false,
+        firstLayerInspection: false,
+        timeLapseVideo: false,
+        materialMappings: [{
+            toolId: 0,
+            slotId: 1,
+            materialName: 'PLA',
+            toolMaterialColor: '#FF0000',
+            slotMaterialColor: '#FF0000'
+        } as AD5XMaterialMapping]
+    };
+
+    it('should upload file successfully on AD5X', async () => {
+        const fs = require('fs');
+        const fsStatSpy = jest.spyOn(fs.promises, 'stat').mockResolvedValue({ size: 1024 } as any);
+        const fsCreateReadStreamSpy = jest.spyOn(fs, 'createReadStream').mockReturnValue('mockStream' as any);
+
+        mockedAxios.post.mockResolvedValue({
+            status: 200,
+            data: { code: 0, message: 'Success' }
+        });
+
+        const result = await jobControl.uploadFileAD5X(validParams);
+
+        expect(result).toBe(true);
+        expect(fsStatSpy).toHaveBeenCalledWith('test.gcode');
+
+        fsStatSpy.mockRestore();
+        fsCreateReadStreamSpy.mockRestore();
+    });
+
+    it('should fail if file does not exist', async () => {
+        const fs = require('fs');
+        const fsStatSpy = jest.spyOn(fs.promises, 'stat').mockRejectedValue(new Error('File not found'));
+
+        const result = await jobControl.uploadFileAD5X(validParams);
+
+        expect(result).toBe(false);
+        expect(fsStatSpy).toHaveBeenCalledWith('test.gcode');
+
+        fsStatSpy.mockRestore();
+    });
+  });
 });

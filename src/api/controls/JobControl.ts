@@ -216,15 +216,17 @@ export class JobControl {
             return false;
         }
 
-        // Validate file exists
-        if (!fs.existsSync(params.filePath)) {
-            console.error(`UploadFileAD5X error: File not found at ${params.filePath}`);
+        // Validate file exists and get stats
+        let fileSize: number;
+        let fileName: string;
+        try {
+            const stats = await fs.promises.stat(params.filePath);
+            fileSize = stats.size;
+            fileName = path.basename(params.filePath);
+        } catch (err: any) {
+            console.error(`UploadFileAD5X error: File check failed at ${params.filePath}. ${err.message}`);
             return false;
         }
-
-        const stats = fs.statSync(params.filePath);
-        const fileSize = stats.size;
-        const fileName = path.basename(params.filePath);
 
         console.log(`Starting AD5X upload for ${fileName}, Size: ${fileSize}, Start: ${params.startPrint}, Level: ${params.levelingBeforePrint}, Tools: ${params.materialMappings.length}`);
 
