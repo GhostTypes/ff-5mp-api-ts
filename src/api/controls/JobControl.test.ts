@@ -1,4 +1,5 @@
 import axios from 'axios';
+import * as fs from 'fs';
 import { JobControl } from './JobControl';
 import { FiveMClient } from '../../FiveMClient';
 import { Control } from './Control';
@@ -6,7 +7,9 @@ import { Endpoints } from '../server/Endpoints';
 import { AD5XMaterialMapping } from '../../models/ff-models';
 
 jest.mock('axios');
+jest.mock('fs');
 const mockedAxios = axios as jest.Mocked<typeof axios>;
+const mockedFs = fs as jest.Mocked<typeof fs>;
 
 jest.mock('./Control');
 
@@ -103,6 +106,47 @@ describe('JobControl', () => {
       const result = await jobControl.clearPlatform();
 
       expect(result).toBe(false);
+    });
+  });
+
+  describe('uploadFile', () => {
+    const testFilePath = '/path/to/test.gcode';
+    const testFileSize = 1024;
+
+    beforeEach(() => {
+      // @ts-ignore
+      mockedFs.promises = {
+        access: jest.fn().mockResolvedValue(undefined),
+        stat: jest.fn().mockResolvedValue({ size: testFileSize } as fs.Stats)
+      } as any;
+      // @ts-ignore
+      fs.promises = mockedFs.promises;
+      mockedFs.createReadStream.mockReturnValue('dummy-stream' as any);
+    });
+
+    it('should return false if file does not exist', async () => {
+      // @ts-ignore
+      mockedFs.promises.access.mockRejectedValue(new Error('File not found'));
+
+      const result = await jobControl.uploadFile(testFilePath, false, false);
+
+      expect(result).toBe(false);
+      expect(mockedFs.promises.access).toHaveBeenCalledWith(testFilePath);
+    });
+
+    it('should upload file successfully', async () => {
+      mockedAxios.post.mockResolvedValue({
+        status: 200,
+        data: { code: 0, message: 'Success' }
+      });
+
+      const result = await jobControl.uploadFile(testFilePath, false, false);
+
+      expect(result).toBe(true);
+      expect(mockedFs.promises.access).toHaveBeenCalledWith(testFilePath);
+      expect(mockedFs.promises.stat).toHaveBeenCalledWith(testFilePath);
+      expect(mockedFs.createReadStream).toHaveBeenCalledWith(testFilePath);
+      expect(mockedAxios.post).toHaveBeenCalled();
     });
   });
 

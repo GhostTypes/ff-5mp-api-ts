@@ -99,12 +99,14 @@ export class JobControl {
      * @returns A Promise that resolves to true if the file upload (and optional print start) is successful, false otherwise.
      */
     public async uploadFile(filePath: string, startPrint: boolean, levelBeforePrint: boolean): Promise<boolean> {
-        if (!fs.existsSync(filePath)) {
+        try {
+            await fs.promises.access(filePath);
+        } catch {
             console.error(`UploadFile error: File not found at ${filePath}`);
             return false;
         }
 
-        const stats = fs.statSync(filePath);
+        const stats = await fs.promises.stat(filePath);
         const fileSize = stats.size;
         const fileName = path.basename(filePath);
 
@@ -217,12 +219,14 @@ export class JobControl {
         }
 
         // Validate file exists
-        if (!fs.existsSync(params.filePath)) {
+        try {
+            await fs.promises.access(params.filePath);
+        } catch {
             console.error(`UploadFileAD5X error: File not found at ${params.filePath}`);
             return false;
         }
 
-        const stats = fs.statSync(params.filePath);
+        const stats = await fs.promises.stat(params.filePath);
         const fileSize = stats.size;
         const fileName = path.basename(params.filePath);
 
