@@ -18,7 +18,11 @@ Welcome to the comprehensive documentation for the FlashForge API. This library 
 ### Installation
 
 ```bash
+# npm
 npm install @ghosttypes/ff-api
+
+# pnpm
+pnpm add @ghosttypes/ff-api
 ```
 
 ### Discovery

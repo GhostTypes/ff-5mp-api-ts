@@ -15,20 +15,26 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 10.28.0
+
       - name: Set up Node.js
         uses: actions/setup-node@v4
         with:
           node-version: '20'
           registry-url: 'https://npm.pkg.github.com'
           scope: '@ghosttypes'
-      
+          cache: 'pnpm'
+
       - name: Install dependencies
-        run: npm install
-      
+        run: pnpm install --frozen-lockfile
+
       - name: Build
-        run: npm run build
-      
+        run: pnpm build
+
       - name: Set version
         id: set_version
         run: |
@@ -43,20 +49,20 @@ jobs:
             VERSION="${CURRENT_VERSION}-${TIMESTAMP}"
           fi
           echo "Using version: $VERSION"
-          npm version $VERSION --no-git-tag-version
+          pnpm version $VERSION --no-git-tag-version
           echo "version=$VERSION" >> $GITHUB_OUTPUT
-      
+
       - name: Publish to GitHub Packages
-        run: npm publish
+        run: pnpm publish
         env:
           NODE_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          
+
       - name: Report error details if failed
         if: failure()
         run: |
           echo "::error::Package publish failed. Please check authentication and configuration."
-          echo "::group::NPM Config"
-          npm config list
+          echo "::group::PNPM Config"
+          pnpm config list
           echo "::endgroup::"
           echo "::group::Repository Info"
           echo "Owner: ${{ github.repository_owner }}"

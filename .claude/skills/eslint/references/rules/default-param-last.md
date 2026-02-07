@@ -1,0 +1,72 @@
+<!-- Metadata
+title: default-param-last
+rule_type: suggestion
+-->
+
+
+Putting default parameter at last allows function calls to omit optional tail arguments.
+
+```js
+// Correct: optional argument can be omitted
+function createUser(id, isAdmin = false) {}
+createUser("tabby")
+
+// Incorrect: optional argument can **not** be omitted
+function createUser(isAdmin = false, id) {}
+createUser(undefined, "tabby")
+```
+
+## Rule Details
+
+This rule enforces default parameters to be the last of parameters.
+
+Examples of **incorrect** code for this rule:
+
+**Incorrect Example**
+
+> ```js
+> /* eslint default-param-last: ["error"] */
+>
+> function f(a = 0, b) {}
+>
+> function g(a, b = 0, c) {}
+> ```
+
+Examples of **correct** code for this rule:
+
+**Correct Example**
+
+> ```js
+> /* eslint default-param-last: ["error"] */
+>
+> function f(a, b = 0) {}
+>
+> function g(a, b = 0, c = 0) {}
+> ```
+
+This rule additionally supports TypeScript type syntax.
+
+Examples of **incorrect** TypeScript code for this rule:
+
+**Incorrect Example**
+
+> ```ts
+> /* eslint default-param-last: ["error"] */
+>
+> function h(a = 0, b: number) {}
+> ```
+
+Examples of **correct** TypeScript code for this rule:
+
+**Correct Example**
+
+> ```ts
+> /* eslint default-param-last: ["error"] */
+>
+> function h(a = 0, b?: number) {}
+> ```
+
+## Options
+
+This rule has no options.
+

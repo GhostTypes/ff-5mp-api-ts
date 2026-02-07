@@ -9,7 +9,7 @@
   ],
   "scripts": {
     "build": "tsc",
-    "prepare": "npm run build",
+    "prepare": "pnpm build",
     "test": "jest",
     "test:watch": "jest --watch",
     "test:coverage": "jest --coverage"
