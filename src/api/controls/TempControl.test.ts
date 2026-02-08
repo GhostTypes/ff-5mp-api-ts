@@ -2,10 +2,11 @@
  * @fileoverview Unit tests for TempControl module.
  * Tests temperature control operations including setting/canceling extruder and bed temperatures via mocked TCP client.
  */
+
+import type { FiveMClient } from '../../FiveMClient';
+import type { GCodeController } from '../../tcpapi/client/GCodeController';
+import type { FlashForgeClient } from '../../tcpapi/FlashForgeClient';
 import { TempControl } from './TempControl';
-import { FiveMClient } from '../../FiveMClient';
-import { FlashForgeClient } from '../../tcpapi/FlashForgeClient';
-import { GCodeController } from '../../tcpapi/client/GCodeController';
 
 // Mock the FlashForgeClient
 jest.mock('../../tcpapi/FlashForgeClient');
@@ -19,7 +20,7 @@ describe('TempControl', () => {
   beforeEach(() => {
     // Create mock GCodeController
     mockGCodeController = {
-      waitForBedTemp: jest.fn().mockResolvedValue(undefined)
+      waitForBedTemp: jest.fn().mockResolvedValue(undefined),
     } as any;
 
     // Create mock TCP client
@@ -28,12 +29,12 @@ describe('TempControl', () => {
       setBedTemp: jest.fn().mockResolvedValue(true),
       cancelExtruderTemp: jest.fn().mockResolvedValue(true),
       cancelBedTemp: jest.fn().mockResolvedValue(true),
-      gCode: jest.fn().mockReturnValue(mockGCodeController)
+      gCode: jest.fn().mockReturnValue(mockGCodeController),
     } as any;
 
     // Create mock FiveMClient
     mockFiveMClient = {
-      tcpClient: mockTcpClient
+      tcpClient: mockTcpClient,
     } as FiveMClient;
 
     tempControl = new TempControl(mockFiveMClient);

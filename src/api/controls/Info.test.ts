@@ -3,10 +3,10 @@
  * Tests printer information retrieval, status checking, and machine state transformation using mocked HTTP responses.
  */
 import axios from 'axios';
-import { Info } from './Info';
-import { FiveMClient } from '../../FiveMClient';
-import { MachineState, FFPrinterDetail } from '../../models/ff-models';
+import type { FiveMClient } from '../../FiveMClient';
+import { type FFPrinterDetail, MachineState } from '../../models/ff-models';
 import { Endpoints } from '../server/Endpoints';
+import { Info } from './Info';
 
 jest.mock('axios');
 const mockedAxios = axios as jest.Mocked<typeof axios>;
@@ -21,7 +21,7 @@ describe('Info', () => {
     mockClient = {
       getEndpoint: (endpoint: string) => `http://printer:8898${endpoint}`,
       serialNumber: 'SN123456',
-      checkCode: 'CC123456'
+      checkCode: 'CC123456',
     } as FiveMClient;
 
     info = new Info(mockClient);
@@ -35,13 +35,13 @@ describe('Info', () => {
         detail: {
           name: 'FlashForge 5M Pro',
           firmwareVersion: '1.0.0',
-          status: 'ready'
-        } as FFPrinterDetail
+          status: 'ready',
+        } as FFPrinterDetail,
       };
 
       mockedAxios.post.mockResolvedValue({
         status: 200,
-        data: mockDetailResponse
+        data: mockDetailResponse,
       });
 
       const result = await info.getDetailResponse();
@@ -53,12 +53,12 @@ describe('Info', () => {
         `http://printer:8898${Endpoints.Detail}`,
         {
           serialNumber: 'SN123456',
-          checkCode: 'CC123456'
+          checkCode: 'CC123456',
         },
         {
           headers: {
-            'Content-Type': 'application/json'
-          }
+            'Content-Type': 'application/json',
+          },
         }
       );
     });
@@ -66,7 +66,7 @@ describe('Info', () => {
     it('should return null for non-200 status', async () => {
       mockedAxios.post.mockResolvedValue({
         status: 500,
-        data: {}
+        data: {},
       });
 
       const result = await info.getDetailResponse();
@@ -93,13 +93,13 @@ describe('Info', () => {
           firmwareVersion: '1.0.0',
           status: 'ready',
           platTemp: 60,
-          rightTemp: 210
-        } as FFPrinterDetail
+          rightTemp: 210,
+        } as FFPrinterDetail,
       };
 
       mockedAxios.post.mockResolvedValue({
         status: 200,
-        data: mockDetailResponse
+        data: mockDetailResponse,
       });
 
       const result = await info.get();
@@ -125,13 +125,13 @@ describe('Info', () => {
         message: 'Success',
         detail: {
           name: 'FlashForge 5M Pro',
-          status: 'printing'
-        } as FFPrinterDetail
+          status: 'printing',
+        } as FFPrinterDetail,
       };
 
       mockedAxios.post.mockResolvedValue({
         status: 200,
-        data: mockDetailResponse
+        data: mockDetailResponse,
       });
 
       const result = await info.isPrinting();
@@ -145,13 +145,13 @@ describe('Info', () => {
         message: 'Success',
         detail: {
           name: 'FlashForge 5M Pro',
-          status: 'ready'
-        } as FFPrinterDetail
+          status: 'ready',
+        } as FFPrinterDetail,
       };
 
       mockedAxios.post.mockResolvedValue({
         status: 200,
-        data: mockDetailResponse
+        data: mockDetailResponse,
       });
 
       const result = await info.isPrinting();
@@ -175,13 +175,13 @@ describe('Info', () => {
         message: 'Success',
         detail: {
           name: 'FlashForge 5M Pro',
-          status: 'ready'
-        } as FFPrinterDetail
+          status: 'ready',
+        } as FFPrinterDetail,
       };
 
       mockedAxios.post.mockResolvedValue({
         status: 200,
-        data: mockDetailResponse
+        data: mockDetailResponse,
       });
 
       const result = await info.getStatus();
@@ -205,13 +205,13 @@ describe('Info', () => {
         message: 'Success',
         detail: {
           name: 'FlashForge 5M Pro',
-          status: 'ready'
-        } as FFPrinterDetail
+          status: 'ready',
+        } as FFPrinterDetail,
       };
 
       mockedAxios.post.mockResolvedValue({
         status: 200,
-        data: mockDetailResponse
+        data: mockDetailResponse,
       });
 
       const result = await info.getMachineState();

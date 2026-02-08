@@ -1,7 +1,7 @@
 /**
  * @fileoverview Tests for EndstopStatus parser including M119 response parsing and status checking methods.
  */
-import { EndstopStatus, Endstop, Status, MachineStatus, MoveMode } from './EndstopStatus';
+import { Endstop, EndstopStatus, MachineStatus, MoveMode, Status } from './EndstopStatus';
 
 describe('Endstop', () => {
   it('should parse endstop values correctly', () => {

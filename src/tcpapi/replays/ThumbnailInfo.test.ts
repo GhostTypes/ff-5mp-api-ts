@@ -1,8 +1,9 @@
 /**
  * @fileoverview Tests for ThumbnailInfo parser including M662 response parsing and PNG image extraction.
  */
+
+import * as fs from 'node:fs';
 import { ThumbnailInfo } from './ThumbnailInfo';
-import * as fs from 'fs';
 
 // Mock fs
 jest.mock('fs');
@@ -17,12 +18,25 @@ describe('ThumbnailInfo', () => {
     it('should parse valid PNG data from response', () => {
       // Create a minimal PNG signature
       const pngSignature = Buffer.from([
-        0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A, // PNG signature
-        0x00, 0x00, 0x00, 0x0D, // Chunk length
-        0x49, 0x48, 0x44, 0x52  // IHDR chunk type
+        0x89,
+        0x50,
+        0x4e,
+        0x47,
+        0x0d,
+        0x0a,
+        0x1a,
+        0x0a, // PNG signature
+        0x00,
+        0x00,
+        0x00,
+        0x0d, // Chunk length
+        0x49,
+        0x48,
+        0x44,
+        0x52, // IHDR chunk type
       ]);
 
-      const response = 'ok' + pngSignature.toString('binary');
+      const response = `ok${pngSignature.toString('binary')}`;
 
       const thumbnailInfo = new ThumbnailInfo();
       const result = thumbnailInfo.fromReplay(response, 'test.gcode');
@@ -57,13 +71,12 @@ describe('ThumbnailInfo', () => {
       // Simulate response with some bytes before PNG signature
       const precedingBytes = Buffer.from([0x00, 0x01, 0x02, 0x03]);
       const pngSignature = Buffer.from([
-        0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A,
-        0x00, 0x00, 0x00, 0x0D,
-        0x49, 0x48, 0x44, 0x52
+        0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0x00, 0x00, 0x00, 0x0d, 0x49, 0x48, 0x44,
+        0x52,
       ]);
 
       const combinedData = Buffer.concat([precedingBytes, pngSignature]);
-      const response = 'ok' + combinedData.toString('binary');
+      const response = `ok${combinedData.toString('binary')}`;
 
       const thumbnailInfo = new ThumbnailInfo();
       const result = thumbnailInfo.fromReplay(response, 'test.gcode');
@@ -76,11 +89,9 @@ describe('ThumbnailInfo', () => {
 
   describe('getImageData', () => {
     it('should return base64 encoded image data', () => {
-      const pngSignature = Buffer.from([
-        0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A
-      ]);
+      const pngSignature = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]);
 
-      const response = 'ok' + pngSignature.toString('binary');
+      const response = `ok${pngSignature.toString('binary')}`;
 
       const thumbnailInfo = new ThumbnailInfo();
       thumbnailInfo.fromReplay(response, 'test.gcode');
@@ -103,11 +114,9 @@ describe('ThumbnailInfo', () => {
 
   describe('toBase64DataUrl', () => {
     it('should return data URL with correct format', () => {
-      const pngSignature = Buffer.from([
-        0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A
-      ]);
+      const pngSignature = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]);
 
-      const response = 'ok' + pngSignature.toString('binary');
+      const response = `ok${pngSignature.toString('binary')}`;
 
       const thumbnailInfo = new ThumbnailInfo();
       thumbnailInfo.fromReplay(response, 'test.gcode');
@@ -127,11 +136,9 @@ describe('ThumbnailInfo', () => {
 
   describe('saveToFile', () => {
     it('should save image data to specified file path', async () => {
-      const pngSignature = Buffer.from([
-        0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A
-      ]);
+      const pngSignature = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]);
 
-      const response = 'ok' + pngSignature.toString('binary');
+      const response = `ok${pngSignature.toString('binary')}`;
 
       const thumbnailInfo = new ThumbnailInfo();
       thumbnailInfo.fromReplay(response, 'test.gcode');
@@ -148,11 +155,9 @@ describe('ThumbnailInfo', () => {
     });
 
     it('should generate filename from original filename when path not provided', async () => {
-      const pngSignature = Buffer.from([
-        0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A
-      ]);
+      const pngSignature = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]);
 
-      const response = 'ok' + pngSignature.toString('binary');
+      const response = `ok${pngSignature.toString('binary')}`;
 
       const thumbnailInfo = new ThumbnailInfo();
       thumbnailInfo.fromReplay(response, 'test.gcode');
@@ -162,10 +167,7 @@ describe('ThumbnailInfo', () => {
       const result = await thumbnailInfo.saveToFile();
 
       expect(result).toBe(true);
-      expect(mockedFs.writeFileSync).toHaveBeenCalledWith(
-        'test.png',
-        expect.any(Buffer)
-      );
+      expect(mockedFs.writeFileSync).toHaveBeenCalledWith('test.png', expect.any(Buffer));
     });
 
     it('should return false when no image data is available', async () => {
@@ -177,11 +179,9 @@ describe('ThumbnailInfo', () => {
     });
 
     it('should return false when writeFileSync throws error', async () => {
-      const pngSignature = Buffer.from([
-        0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A
-      ]);
+      const pngSignature = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]);
 
-      const response = 'ok' + pngSignature.toString('binary');
+      const response = `ok${pngSignature.toString('binary')}`;
 
       const thumbnailInfo = new ThumbnailInfo();
       thumbnailInfo.fromReplay(response, 'test.gcode');
@@ -196,11 +196,9 @@ describe('ThumbnailInfo', () => {
     });
 
     it('should return false when no filename and no path provided', async () => {
-      const pngSignature = Buffer.from([
-        0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A
-      ]);
+      const pngSignature = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]);
 
-      const response = 'ok' + pngSignature.toString('binary');
+      const response = `ok${pngSignature.toString('binary')}`;
 
       const thumbnailInfo = new ThumbnailInfo();
       // Don't provide filename in fromReplay
@@ -215,11 +213,9 @@ describe('ThumbnailInfo', () => {
 
   describe('getFileName', () => {
     it('should return the stored filename', () => {
-      const pngSignature = Buffer.from([
-        0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A
-      ]);
+      const pngSignature = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]);
 
-      const response = 'ok' + pngSignature.toString('binary');
+      const response = `ok${pngSignature.toString('binary')}`;
 
       const thumbnailInfo = new ThumbnailInfo();
       thumbnailInfo.fromReplay(response, 'myfile.3mf');

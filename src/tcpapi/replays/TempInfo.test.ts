@@ -1,7 +1,7 @@
 /**
  * @fileoverview Tests for TempInfo parser including M105 response parsing and temperature data extraction.
  */
-import { TempInfo, TempData } from './TempInfo';
+import { TempData, TempInfo } from './TempInfo';
 
 describe('TempData', () => {
   describe('constructor and parsing', () => {

@@ -3,11 +3,11 @@
  * Tests print job operations, file uploads with firmware-specific handling, and AD5X multi-color job validation using mocked HTTP clients.
  */
 import axios from 'axios';
-import { JobControl } from './JobControl';
-import { FiveMClient } from '../../FiveMClient';
-import { Control } from './Control';
+import type { FiveMClient } from '../../FiveMClient';
+import type { AD5XMaterialMapping } from '../../models/ff-models';
 import { Endpoints } from '../server/Endpoints';
-import { AD5XMaterialMapping } from '../../models/ff-models';
+import type { Control } from './Control';
+import { JobControl } from './JobControl';
 
 jest.mock('axios');
 const mockedAxios = axios as jest.Mocked<typeof axios>;
@@ -24,7 +24,7 @@ describe('JobControl', () => {
 
     mockControl = {
       sendJobControlCmd: jest.fn().mockResolvedValue(true),
-      sendControlCommand: jest.fn().mockResolvedValue(true)
+      sendControlCommand: jest.fn().mockResolvedValue(true),
     } as any;
 
     mockFiveMClient = {
@@ -33,7 +33,7 @@ describe('JobControl', () => {
       checkCode: 'CC123456',
       firmVer: '3.1.3',
       isAD5X: false,
-      getEndpoint: (endpoint: string) => `http://printer:8898${endpoint}`
+      getEndpoint: (endpoint: string) => `http://printer:8898${endpoint}`,
     } as FiveMClient;
 
     jobControl = new JobControl(mockFiveMClient);
@@ -95,10 +95,9 @@ describe('JobControl', () => {
       const result = await jobControl.clearPlatform();
 
       expect(result).toBe(true);
-      expect(mockControl.sendControlCommand).toHaveBeenCalledWith(
-        'stateCtrl_cmd',
-        { action: 'setClearPlatform' }
-      );
+      expect(mockControl.sendControlCommand).toHaveBeenCalledWith('stateCtrl_cmd', {
+        action: 'setClearPlatform',
+      });
     });
 
     it('should return false when control command fails', async () => {
@@ -116,7 +115,7 @@ describe('JobControl', () => {
 
       mockedAxios.post.mockResolvedValue({
         status: 200,
-        data: { code: 0, message: 'Success' }
+        data: { code: 0, message: 'Success' },
       });
 
       const result = await jobControl.printLocalFile('test.gcode', true);
@@ -132,12 +131,12 @@ describe('JobControl', () => {
           flowCalibration: false,
           useMatlStation: false,
           gcodeToolCnt: 0,
-          materialMappings: []
+          materialMappings: [],
         },
         {
           headers: {
-            'Content-Type': 'application/json'
-          }
+            'Content-Type': 'application/json',
+          },
         }
       );
     });
@@ -147,7 +146,7 @@ describe('JobControl', () => {
 
       mockedAxios.post.mockResolvedValue({
         status: 200,
-        data: { code: 0, message: 'Success' }
+        data: { code: 0, message: 'Success' },
       });
 
       const result = await jobControl.printLocalFile('test.gcode', false);
@@ -159,12 +158,12 @@ describe('JobControl', () => {
           serialNumber: 'SN123456',
           checkCode: 'CC123456',
           fileName: 'test.gcode',
-          levelingBeforePrint: false
+          levelingBeforePrint: false,
         },
         {
           headers: {
-            'Content-Type': 'application/json'
-          }
+            'Content-Type': 'application/json',
+          },
         }
       );
     });
@@ -172,7 +171,7 @@ describe('JobControl', () => {
     it('should return false for non-200 status', async () => {
       mockedAxios.post.mockResolvedValue({
         status: 500,
-        data: {}
+        data: {},
       });
 
       const result = await jobControl.printLocalFile('test.gcode', true);
@@ -183,7 +182,7 @@ describe('JobControl', () => {
     it('should return false for non-OK response', async () => {
       mockedAxios.post.mockResolvedValue({
         status: 200,
-        data: { code: 1, message: 'Error' }
+        data: { code: 1, message: 'Error' },
       });
 
       const result = await jobControl.printLocalFile('test.gcode', true);
@@ -194,8 +193,7 @@ describe('JobControl', () => {
     it('should throw error on network failure', async () => {
       mockedAxios.post.mockRejectedValue(new Error('Network error'));
 
-      await expect(jobControl.printLocalFile('test.gcode', true))
-        .rejects.toThrow('Network error');
+      await expect(jobControl.printLocalFile('test.gcode', true)).rejects.toThrow('Network error');
     });
   });
 
@@ -207,12 +205,12 @@ describe('JobControl', () => {
     it('should start single color job on AD5X printer', async () => {
       mockedAxios.post.mockResolvedValue({
         status: 200,
-        data: { code: 0, message: 'Success' }
+        data: { code: 0, message: 'Success' },
       });
 
       const result = await jobControl.startAD5XSingleColorJob({
         fileName: 'test.3mf',
-        levelingBeforePrint: true
+        levelingBeforePrint: true,
       });
 
       expect(result).toBe(true);
@@ -228,12 +226,12 @@ describe('JobControl', () => {
           timeLapseVideo: false,
           useMatlStation: false,
           gcodeToolCnt: 0,
-          materialMappings: []
+          materialMappings: [],
         },
         {
           headers: {
-            'Content-Type': 'application/json'
-          }
+            'Content-Type': 'application/json',
+          },
         }
       );
     });
@@ -243,7 +241,7 @@ describe('JobControl', () => {
 
       const result = await jobControl.startAD5XSingleColorJob({
         fileName: 'test.3mf',
-        levelingBeforePrint: true
+        levelingBeforePrint: true,
       });
 
       expect(result).toBe(false);
@@ -253,7 +251,7 @@ describe('JobControl', () => {
     it('should return false for empty file name', async () => {
       const result = await jobControl.startAD5XSingleColorJob({
         fileName: '',
-        levelingBeforePrint: true
+        levelingBeforePrint: true,
       });
 
       expect(result).toBe(false);
@@ -272,27 +270,27 @@ describe('JobControl', () => {
         slotId: 1,
         materialName: 'PLA',
         toolMaterialColor: '#FF0000',
-        slotMaterialColor: '#FF0000'
+        slotMaterialColor: '#FF0000',
       },
       {
         toolId: 1,
         slotId: 2,
         materialName: 'PLA',
         toolMaterialColor: '#00FF00',
-        slotMaterialColor: '#00FF00'
-      }
+        slotMaterialColor: '#00FF00',
+      },
     ];
 
     it('should start multi-color job on AD5X printer', async () => {
       mockedAxios.post.mockResolvedValue({
         status: 200,
-        data: { code: 0, message: 'Success' }
+        data: { code: 0, message: 'Success' },
       });
 
       const result = await jobControl.startAD5XMultiColorJob({
         fileName: 'multicolor.3mf',
         levelingBeforePrint: true,
-        materialMappings: validMaterialMappings
+        materialMappings: validMaterialMappings,
       });
 
       expect(result).toBe(true);
@@ -308,12 +306,12 @@ describe('JobControl', () => {
           timeLapseVideo: false,
           useMatlStation: true,
           gcodeToolCnt: 2,
-          materialMappings: validMaterialMappings
+          materialMappings: validMaterialMappings,
         },
         {
           headers: {
-            'Content-Type': 'application/json'
-          }
+            'Content-Type': 'application/json',
+          },
         }
       );
     });
@@ -324,7 +322,7 @@ describe('JobControl', () => {
       const result = await jobControl.startAD5XMultiColorJob({
         fileName: 'test.3mf',
         levelingBeforePrint: true,
-        materialMappings: validMaterialMappings
+        materialMappings: validMaterialMappings,
       });
 
       expect(result).toBe(false);
@@ -335,7 +333,7 @@ describe('JobControl', () => {
       const result = await jobControl.startAD5XMultiColorJob({
         fileName: 'test.3mf',
         levelingBeforePrint: true,
-        materialMappings: []
+        materialMappings: [],
       });
 
       expect(result).toBe(false);
@@ -349,14 +347,14 @@ describe('JobControl', () => {
           slotId: 1,
           materialName: 'PLA',
           toolMaterialColor: '#FF0000',
-          slotMaterialColor: '#FF0000'
-        }
+          slotMaterialColor: '#FF0000',
+        },
       ];
 
       const result = await jobControl.startAD5XMultiColorJob({
         fileName: 'test.3mf',
         levelingBeforePrint: true,
-        materialMappings: invalidMappings
+        materialMappings: invalidMappings,
       });
 
       expect(result).toBe(false);
@@ -369,14 +367,14 @@ describe('JobControl', () => {
           slotId: 5, // Invalid: must be 1-4
           materialName: 'PLA',
           toolMaterialColor: '#FF0000',
-          slotMaterialColor: '#FF0000'
-        }
+          slotMaterialColor: '#FF0000',
+        },
       ];
 
       const result = await jobControl.startAD5XMultiColorJob({
         fileName: 'test.3mf',
         levelingBeforePrint: true,
-        materialMappings: invalidMappings
+        materialMappings: invalidMappings,
       });
 
       expect(result).toBe(false);
@@ -389,14 +387,14 @@ describe('JobControl', () => {
           slotId: 1,
           materialName: 'PLA',
           toolMaterialColor: 'red', // Invalid: must be #RRGGBB
-          slotMaterialColor: '#FF0000'
-        }
+          slotMaterialColor: '#FF0000',
+        },
       ];
 
       const result = await jobControl.startAD5XMultiColorJob({
         fileName: 'test.3mf',
         levelingBeforePrint: true,
-        materialMappings: invalidMappings
+        materialMappings: invalidMappings,
       });
 
       expect(result).toBe(false);
@@ -404,17 +402,47 @@ describe('JobControl', () => {
 
     it('should return false for too many material mappings', async () => {
       const tooManyMappings: AD5XMaterialMapping[] = [
-        { toolId: 0, slotId: 1, materialName: 'PLA', toolMaterialColor: '#FF0000', slotMaterialColor: '#FF0000' },
-        { toolId: 1, slotId: 2, materialName: 'PLA', toolMaterialColor: '#00FF00', slotMaterialColor: '#00FF00' },
-        { toolId: 2, slotId: 3, materialName: 'PLA', toolMaterialColor: '#0000FF', slotMaterialColor: '#0000FF' },
-        { toolId: 3, slotId: 4, materialName: 'PLA', toolMaterialColor: '#FFFF00', slotMaterialColor: '#FFFF00' },
-        { toolId: 4, slotId: 1, materialName: 'PLA', toolMaterialColor: '#FF00FF', slotMaterialColor: '#FF00FF' } // 5th mapping - too many
+        {
+          toolId: 0,
+          slotId: 1,
+          materialName: 'PLA',
+          toolMaterialColor: '#FF0000',
+          slotMaterialColor: '#FF0000',
+        },
+        {
+          toolId: 1,
+          slotId: 2,
+          materialName: 'PLA',
+          toolMaterialColor: '#00FF00',
+          slotMaterialColor: '#00FF00',
+        },
+        {
+          toolId: 2,
+          slotId: 3,
+          materialName: 'PLA',
+          toolMaterialColor: '#0000FF',
+          slotMaterialColor: '#0000FF',
+        },
+        {
+          toolId: 3,
+          slotId: 4,
+          materialName: 'PLA',
+          toolMaterialColor: '#FFFF00',
+          slotMaterialColor: '#FFFF00',
+        },
+        {
+          toolId: 4,
+          slotId: 1,
+          materialName: 'PLA',
+          toolMaterialColor: '#FF00FF',
+          slotMaterialColor: '#FF00FF',
+        }, // 5th mapping - too many
       ];
 
       const result = await jobControl.startAD5XMultiColorJob({
         fileName: 'test.3mf',
         levelingBeforePrint: true,
-        materialMappings: tooManyMappings
+        materialMappings: tooManyMappings,
       });
 
       expect(result).toBe(false);
@@ -427,14 +455,14 @@ describe('JobControl', () => {
           slotId: 1,
           materialName: '', // Empty
           toolMaterialColor: '#FF0000',
-          slotMaterialColor: '#FF0000'
-        }
+          slotMaterialColor: '#FF0000',
+        },
       ];
 
       const result = await jobControl.startAD5XMultiColorJob({
         fileName: 'test.3mf',
         levelingBeforePrint: true,
-        materialMappings: invalidMappings
+        materialMappings: invalidMappings,
       });
 
       expect(result).toBe(false);
