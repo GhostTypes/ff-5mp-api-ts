@@ -1,3 +1,6 @@
+/**
+ * @fileoverview Tests for TempInfo parser including M105 response parsing and temperature data extraction.
+ */
 import { TempInfo, TempData } from './TempInfo';
 
 describe('TempData', () => {

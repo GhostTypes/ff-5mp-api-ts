@@ -1,3 +1,9 @@
+/**
+ * @fileoverview UDP broadcast discovery for FlashForge 3D printers on local network
+ *
+ * Sends structured UDP packets to port 48899 and parses binary responses to extract
+ * printer name, serial number, and IP address from fixed buffer offsets.
+ */
 // src/api/PrinterDiscovery.ts
 import * as dgram from 'dgram';
 import { networkInterfaces } from 'os';

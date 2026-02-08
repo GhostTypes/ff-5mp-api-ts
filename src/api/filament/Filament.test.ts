@@ -1,3 +1,8 @@
+/**
+ * @fileoverview Tests for Filament class
+ *
+ * Verifies filament type creation with custom and default loading temperatures.
+ */
 import { Filament } from './Filament';
 
 describe('Filament', () => {

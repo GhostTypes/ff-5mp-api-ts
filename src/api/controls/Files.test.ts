@@ -1,3 +1,7 @@
+/**
+ * @fileoverview Unit tests for Files module.
+ * Tests file listing and thumbnail retrieval with AD5X and legacy printer format support using mocked HTTP responses.
+ */
 import axios from 'axios';
 import { FiveMClient } from '../../FiveMClient';
 import { Files } from './Files';

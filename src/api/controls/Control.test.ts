@@ -1,3 +1,7 @@
+/**
+ * @fileoverview Unit tests for Control module.
+ * Tests HTTP API control operations including homing, filtration, camera, fans, LEDs, and filament operations using mocked clients.
+ */
 import axios from 'axios';
 import { Control } from './Control';
 import { FiveMClient } from '../../FiveMClient';

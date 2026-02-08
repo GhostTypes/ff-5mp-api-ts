@@ -1,4 +1,6 @@
-// src/api/models/MachineInfo.ts
+/**
+ * @fileoverview Transforms raw printer detail data from the API into structured machine info.
+ */
 import {FFMachineInfo, FFPrinterDetail, MachineState, MatlStationInfo, IndepMatlInfo} from './ff-models';
 
 /**

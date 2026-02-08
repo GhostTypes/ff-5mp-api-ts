@@ -12,7 +12,8 @@
     "prepare": "pnpm build",
     "test": "jest",
     "test:watch": "jest --watch",
-    "test:coverage": "jest --coverage"
+    "test:coverage": "jest --coverage",
+    "docs:check": "go run scripts/check-fileoverview.go"
   },
   "keywords": [
     "flashforge",

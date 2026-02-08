@@ -1,3 +1,7 @@
+/**
+ * @fileoverview High-level TCP client for FlashForge 3D printers, providing printer control
+ * workflows (LED, job management, homing, temperature, filament) via G-code commands.
+ */
 // src/tcpapi/FlashForgeClient.ts
 import { FlashForgeTcpClient } from './FlashForgeTcpClient';
 import { GCodes } from './client/GCodes';
@@ -10,17 +14,6 @@ import { LocationInfo } from './replays/LocationInfo';
 import { ThumbnailInfo } from './replays/ThumbnailInfo';
 import { Filament } from '../api/filament/Filament';
 import path from "node:path";
-
-/**
- * Provides a high-level client for interacting with FlashForge 3D printers via TCP/IP,
- * building upon the basic TCP communication provided by `FlashForgeTcpClient`.
- * This class implements specific G-code commands and workflows for printer control,
- * such as initialization, LED control, job management, homing, temperature settings,
- * filament operations, and retrieving various printer statuses.
- *
- * It uses a "legacy" API approach primarily based on sending G-code/M-code commands
- * and parsing text-based responses.
- */
 export class FlashForgeClient extends FlashForgeTcpClient {
     /** Controller for sending specific G-code commands. */
     private control: GCodeController;

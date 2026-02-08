@@ -1,13 +1,10 @@
+/**
+ * @fileoverview Abstraction layer for sending specific G-code commands to FlashForge printers,
+ * wrapping operations like LED control, job management, homing, and temperature control.
+ */
 // src/tcpapi/client/GCodeController.ts
 import { FlashForgeClient } from '../FlashForgeClient';
 import { GCodes } from './GCodes';
-
-/**
- * Provides a higher-level abstraction for sending specific G-code commands
- * to a FlashForge printer via an established `FlashForgeClient` (TCP client).
- * This class simplifies common printer operations by encapsulating the
- * corresponding G-code commands.
- */
 export class GCodeController {
     private tcpClient: FlashForgeClient;
 

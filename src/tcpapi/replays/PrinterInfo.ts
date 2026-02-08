@@ -1,3 +1,6 @@
+/**
+ * @fileoverview Parses M115 command responses to extract printer information including model, firmware, serial number, and dimensions.
+ */
 // src/tcpapi/replays/PrinterInfo.ts
 /**
  * Represents general information about the FlashForge 3D printer,

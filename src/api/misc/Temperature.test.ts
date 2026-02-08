@@ -1,3 +1,9 @@
+/**
+ * @fileoverview Tests for Temperature class
+ *
+ * Verifies temperature value storage, retrieval, and string conversion
+ * for positive, negative, zero, and decimal values.
+ */
 import { Temperature } from './Temperature';
 
 describe('Temperature', () => {

@@ -1,3 +1,9 @@
+/**
+ * @fileoverview Tests for scientific notation number formatting
+ *
+ * Verifies correct formatting behavior for small numbers, large numbers,
+ * and standard decimal numbers within normal range.
+ */
 import { formatScientificNotation } from './ScientificNotationFloatConverter';
 
 describe('formatScientificNotation', () => {

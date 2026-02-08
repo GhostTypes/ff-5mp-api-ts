@@ -1,3 +1,7 @@
+/**
+ * @fileoverview Tests for FlashForgeTcpClient file list parsing logic, validating extraction
+ * of filenames from M661 command responses across different printer models.
+ */
 import { FlashForgeTcpClient } from './FlashForgeTcpClient';
 
 // Suppress logs (from API files) during tests

@@ -1,3 +1,7 @@
+/**
+ * @fileoverview HTTP API information retrieval module for FlashForge 5M printers.
+ * Fetches printer status, machine state, and detailed information from the detail endpoint, transforming raw responses into structured machine info.
+ */
 // src/api/controls/Info.ts
 import { FiveMClient } from '../../FiveMClient';
 import { FFPrinterDetail, FFMachineInfo, MachineState } from '../../models/ff-models';

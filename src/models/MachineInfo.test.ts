@@ -1,3 +1,6 @@
+/**
+ * @fileoverview Unit tests for MachineInfo transformation logic.
+ */
 import { MachineInfo } from './MachineInfo';
 import { FFPrinterDetail, MachineState, SlotInfo, MatlStationInfo, IndepMatlInfo } from './ff-models';
 

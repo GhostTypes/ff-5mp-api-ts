@@ -1,17 +1,10 @@
+/**
+ * @fileoverview Low-level TCP socket client for FlashForge printers, managing connections,
+ * command serialization, multi-line response parsing, and keep-alive mechanisms.
+ */
 import * as net from 'net';
 import {setTimeout as sleep} from 'timers/promises';
 import {GCodes} from "./client/GCodes";
-
-/**
- * Provides the foundational TCP client for communicating with FlashForge 3D printers.
- * This class manages the socket connection, sending raw commands, handling responses,
- * and maintaining a keep-alive connection. It serves as the base class for
- * `FlashForgeClient`, which implements more specific G-code command logic.
- *
- * The communication protocol typically involves sending ASCII G-code/M-code commands
- * terminated by a newline character ('\n') and receiving text-based responses,
- * often ending with "ok" to indicate success.
- */
 export class FlashForgeTcpClient {
     /** The underlying network socket for TCP communication. Null if not connected. */
     protected socket: net.Socket | null = null;

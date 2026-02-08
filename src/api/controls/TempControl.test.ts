@@ -1,3 +1,7 @@
+/**
+ * @fileoverview Unit tests for TempControl module.
+ * Tests temperature control operations including setting/canceling extruder and bed temperatures via mocked TCP client.
+ */
 import { TempControl } from './TempControl';
 import { FiveMClient } from '../../FiveMClient';
 import { FlashForgeClient } from '../../tcpapi/FlashForgeClient';

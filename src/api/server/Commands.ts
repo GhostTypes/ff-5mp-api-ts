@@ -1,3 +1,9 @@
+/**
+ * @fileoverview Command string constants for printer API requests
+ *
+ * Defines command type identifiers sent in API payloads to control printer
+ * functions like lighting, print jobs, temperature, and camera.
+ */
 // src/api/server/Commands.ts
 /**
  * Defines a collection of command strings used for interacting with the printer's API.
