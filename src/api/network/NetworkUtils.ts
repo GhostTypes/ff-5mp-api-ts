@@ -1,3 +1,9 @@
+/**
+ * @fileoverview Network response validation utilities
+ *
+ * Provides helper functions for validating API responses, checking if
+ * GenericResponse objects indicate successful operations.
+ */
 // src/api/network/NetworkUtils.ts
 import { GenericResponse } from '../controls/Control';
 import { FNetCode } from './FNetCode';

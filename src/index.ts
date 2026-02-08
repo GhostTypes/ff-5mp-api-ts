@@ -1,3 +1,6 @@
+/**
+ * @fileoverview Public API entry point exporting all library modules for FlashForge printer control.
+ */
 // src/index.ts
 // Main client
 export { FiveMClient, Product } from './FiveMClient';

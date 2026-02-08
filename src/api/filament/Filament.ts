@@ -1,3 +1,9 @@
+/**
+ * @fileoverview Filament type model for 3D printing operations
+ *
+ * Represents filament materials with name and recommended loading temperature
+ * for use in printer operations like loading filament or preheating.
+ */
 // src/api/filament/Filament.ts
 /**
  * Represents a type of filament used in a 3D printer.

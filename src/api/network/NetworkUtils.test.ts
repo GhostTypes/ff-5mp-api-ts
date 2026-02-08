@@ -1,3 +1,8 @@
+/**
+ * @fileoverview Tests for NetworkUtils class
+ *
+ * Verifies response validation logic for successful and failed API responses.
+ */
 import { NetworkUtils } from './NetworkUtils';
 import { FNetCode } from './FNetCode';
 import { GenericResponse } from '../controls/Control';

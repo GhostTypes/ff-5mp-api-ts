@@ -1,4 +1,11 @@
 /**
+ * @fileoverview Number formatting utility for scientific notation
+ *
+ * Formats numbers using scientific notation when values are very small (< 0.001)
+ * or very large (>= 10000), otherwise returns standard decimal representation.
+ */
+
+/**
  * Formats a number into a string, using scientific notation if the number is
  * very small (absolute value < 0.001) or very large (absolute value >= 10000).
  * Otherwise, it returns the standard string representation of the number.

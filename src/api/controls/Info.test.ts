@@ -1,3 +1,7 @@
+/**
+ * @fileoverview Unit tests for Info module.
+ * Tests printer information retrieval, status checking, and machine state transformation using mocked HTTP responses.
+ */
 import axios from 'axios';
 import { Info } from './Info';
 import { FiveMClient } from '../../FiveMClient';

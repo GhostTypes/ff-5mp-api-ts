@@ -1,3 +1,6 @@
+/**
+ * @fileoverview Tests for ThumbnailInfo parser including M662 response parsing and PNG image extraction.
+ */
 import { ThumbnailInfo } from './ThumbnailInfo';
 import * as fs from 'fs';
 

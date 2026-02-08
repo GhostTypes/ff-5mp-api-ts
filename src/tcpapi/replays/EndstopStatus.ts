@@ -1,3 +1,6 @@
+/**
+ * @fileoverview Parses M119 command responses to extract endstop states, machine status, movement mode, and LED state.
+ */
 // src/tcpapi/replays/EndstopStatus.ts
 /**
  * Represents the status of the printer's endstops and various other machine states.

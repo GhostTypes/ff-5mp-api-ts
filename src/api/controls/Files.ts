@@ -1,3 +1,7 @@
+/**
+ * @fileoverview HTTP API file management module for FlashForge 5M printers.
+ * Handles file operations including listing local and recent print files, and retrieving G-code thumbnails via HTTP endpoints.
+ */
 // src/api/controls/Files.ts
 import { FiveMClient } from '../../FiveMClient';
 import { FFGcodeFileEntry } from '../../models/ff-models'; // Import the new model

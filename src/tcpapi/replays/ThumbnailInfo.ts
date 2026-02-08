@@ -1,3 +1,6 @@
+/**
+ * @fileoverview Parses M662 command responses to extract PNG thumbnail images from printer files.
+ */
 // src/tcpapi/replays/ThumbnailInfo.ts
 import * as fs from 'fs';
 import * as path from 'path';

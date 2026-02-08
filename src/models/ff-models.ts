@@ -1,4 +1,6 @@
-// src/models/ff-models.ts
+/**
+ * @fileoverview TypeScript interfaces and enums for FlashForge printer data models and API responses.
+ */
 /**
  * Represents the raw detailed information about a FlashForge 3D printer as obtained from its API.
  * Properties are often in the printer's native naming format (e.g., camelCase or with underscores)

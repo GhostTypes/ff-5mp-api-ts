@@ -1,11 +1,8 @@
-// src/tcpapi/client/GCodes.ts
 /**
- * Defines a collection of common G-code and M-code command strings used for
- * communicating with FlashForge 3D printers via TCP.
- * The `~` prefix is often used by FlashForge for commands sent over TCP.
- * Placeholders like `%%filename%%` are intended to be replaced with actual values
- * before sending the command.
+ * @fileoverview G-code and M-code command constants for FlashForge TCP communication,
+ * providing prefixed command strings for printer operations.
  */
+// src/tcpapi/client/GCodes.ts
 export class GCodes {
     /** Command to initiate a control session with the printer (login). */
     public static readonly CmdLogin = "~M601 S1";

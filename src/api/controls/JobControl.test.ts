@@ -1,3 +1,7 @@
+/**
+ * @fileoverview Unit tests for JobControl module.
+ * Tests print job operations, file uploads with firmware-specific handling, and AD5X multi-color job validation using mocked HTTP clients.
+ */
 import axios from 'axios';
 import { JobControl } from './JobControl';
 import { FiveMClient } from '../../FiveMClient';

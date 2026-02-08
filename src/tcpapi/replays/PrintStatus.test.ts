@@ -1,3 +1,6 @@
+/**
+ * @fileoverview Tests for PrintStatus parser including M27 response parsing and progress calculation.
+ */
 import { PrintStatus } from './PrintStatus';
 
 describe('PrintStatus', () => {

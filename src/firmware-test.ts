@@ -1,3 +1,6 @@
+/**
+ * @fileoverview Standalone test script for verifying printer firmware version via HTTP and TCP APIs.
+ */
 // src/firmware-test.ts
 import { FiveMClient } from './index';
 

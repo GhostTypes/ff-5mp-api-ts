@@ -1,3 +1,6 @@
+/**
+ * @fileoverview Main client for controlling FlashForge 5M/5M Pro/AD5X printers via dual HTTP/TCP protocols.
+ */
 // src/FiveMClient.ts
 import axios from 'axios';
 import { FFPrinterDetail, FFMachineInfo, MachineState, Temperature } from './models/ff-models';

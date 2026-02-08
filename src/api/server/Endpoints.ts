@@ -1,3 +1,9 @@
+/**
+ * @fileoverview HTTP API endpoint paths for FlashForge 5M printers
+ *
+ * Defines URL paths for printer control operations including status queries,
+ * file management, print job control, and authentication.
+ */
 // src/api/server/Endpoints.ts
 /**
  * Defines a collection of API endpoint paths for interacting with the FlashForge 3D printer.

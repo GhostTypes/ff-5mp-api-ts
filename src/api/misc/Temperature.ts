@@ -1,3 +1,9 @@
+/**
+ * @fileoverview Temperature value wrapper class
+ *
+ * Simple immutable container for numeric temperature values (typically Celsius)
+ * with getValue() and toString() accessors.
+ */
 // src/api/misc/Temperature.ts
 /**
  * Represents a temperature value.

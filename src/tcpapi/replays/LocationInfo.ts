@@ -1,3 +1,6 @@
+/**
+ * @fileoverview Parses M114 command responses to extract current print head X, Y, Z coordinates.
+ */
 // src/tcpapi/replays/LocationInfo.ts
 /**
  * Represents the current X, Y, and Z coordinates of the printer's print head.

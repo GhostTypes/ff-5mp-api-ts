@@ -1,3 +1,7 @@
+/**
+ * @fileoverview Temperature control module for FlashForge 5M printers.
+ * Provides methods for setting and canceling extruder and bed temperatures via TCP G-code commands, with cooldown waiting functionality.
+ */
 // src/api/controls/TempControl.ts
 import { FiveMClient } from '../../FiveMClient';
 import { FlashForgeClient } from '../../tcpapi/FlashForgeClient';
