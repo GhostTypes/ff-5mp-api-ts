@@ -93,7 +93,8 @@ export class Info {
       const err = error as Error;
       console.log(`GetDetailResponse Request error: ${err.message}`);
       if ('cause' in err) {
-        console.log(`GetDetailResponse Inner exception: ${(err as any).cause}`);
+        const errorWithCause = err as Error & { cause?: unknown };
+        console.log(`GetDetailResponse Inner exception: ${errorWithCause.cause}`);
       }
       return null;
     }

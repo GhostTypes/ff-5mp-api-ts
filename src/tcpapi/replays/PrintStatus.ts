@@ -41,7 +41,7 @@ export class PrintStatus {
       this._sdCurrent = sdProgressData[0].trim();
       this._sdTotal = sdProgressData[1].trim();
 
-      let layerProgress;
+      let layerProgress: string;
       try {
         // Example: "Layer: 10/250"
         layerProgress = data[2].replace('Layer: ', '').trim();

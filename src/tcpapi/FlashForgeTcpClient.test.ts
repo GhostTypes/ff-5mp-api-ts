@@ -37,7 +37,7 @@ const parseFileListResponse = (response: string): string[] => {
 describe('FlashForgeTcpClient', () => {
   // Mock socket methods
   beforeAll(() => {
-    vi.spyOn(FlashForgeTcpClient.prototype, 'dispose').mockImplementation(() => {});
+    vi.spyOn(FlashForgeTcpClient.prototype, 'dispose').mockImplementation(vi.fn());
   });
 
   afterAll(() => {

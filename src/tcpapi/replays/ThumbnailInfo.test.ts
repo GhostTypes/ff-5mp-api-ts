@@ -104,7 +104,9 @@ describe('ThumbnailInfo', () => {
       expect(typeof imageData).toBe('string');
 
       // Verify it's valid base64
-      expect(() => Buffer.from(imageData!, 'base64')).not.toThrow();
+      if (imageData !== null) {
+        expect(() => Buffer.from(imageData, 'base64')).not.toThrow();
+      }
     });
 
     it('should return null when no image data is available', () => {
@@ -146,7 +148,7 @@ describe('ThumbnailInfo', () => {
       const thumbnailInfo = new ThumbnailInfo();
       thumbnailInfo.fromReplay(response, 'test.gcode');
 
-      mockedFs.writeFileSync.mockImplementation(() => {});
+      mockedFs.writeFileSync.mockImplementation(vi.fn());
 
       const result = await thumbnailInfo.saveToFile('/path/to/output.png');
 
@@ -165,7 +167,7 @@ describe('ThumbnailInfo', () => {
       const thumbnailInfo = new ThumbnailInfo();
       thumbnailInfo.fromReplay(response, 'test.gcode');
 
-      mockedFs.writeFileSync.mockImplementation(() => {});
+      mockedFs.writeFileSync.mockImplementation(vi.fn());
 
       const result = await thumbnailInfo.saveToFile();
 

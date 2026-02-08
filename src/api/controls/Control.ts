@@ -7,9 +7,19 @@
 import axios from 'axios';
 import type { FiveMClient } from '../../FiveMClient';
 import type { FlashForgeClient } from '../../tcpapi/FlashForgeClient';
+import type { Filament } from '../filament/Filament';
 import { NetworkUtils } from '../network/NetworkUtils';
 import { Commands } from '../server/Commands';
 import { Endpoints } from '../server/Endpoints';
+
+/**
+ * Represents printer status information.
+ * Used to check the current state of the printer.
+ */
+interface PrinterStatusInfo {
+  /** The current status of the printer (e.g., "printing", "idle"). */
+  Status: string;
+}
 
 /**
  * Provides methods for controlling various aspects of the FlashForge 3D printer.
@@ -187,10 +197,9 @@ export class Control {
   /**
    * Prepares the printer for filament loading.
    * @param filament Information about the filament being loaded (type, temperature, etc.).
-   *                 The exact structure of this parameter depends on the `FlashForgeClient` implementation.
    * @returns A Promise that resolves to true if the command is successful, false otherwise.
    */
-  public async prepareFilamentLoad(filament: any): Promise<boolean> {
+  public async prepareFilamentLoad(filament: Filament): Promise<boolean> {
     return await this.tcpClient.prepareFilamentLoad(filament);
   }
 
@@ -221,7 +230,10 @@ export class Control {
    * @param args The arguments or payload specific to the command.
    * @returns A Promise that resolves to true if the command is acknowledged with a success code, false otherwise or if an error occurs.
    */
-  public async sendControlCommand(command: string, args: any): Promise<boolean> {
+  public async sendControlCommand(
+    command: string,
+    args: object | boolean | number | string | undefined
+  ): Promise<boolean> {
     const payload = {
       serialNumber: this.client.serialNumber,
       checkCode: this.client.checkCode,
@@ -281,7 +293,10 @@ export class Control {
   }): Promise<boolean> {
     const info = await this.client.info.get();
 
-    // @ts-expect-error
+    if (!info) {
+      throw new Error('Unable to retrieve printer information');
+    }
+
     if (info.CurrentPrintLayer < 2) {
       // Don't accidentally turn on the fans in the initial layers
       chamberFanSpeed = 0;
@@ -339,7 +354,7 @@ export class Control {
    * @returns True if the printer status is "printing", false otherwise.
    * @private
    */
-  private isPrinting(info: any): boolean {
+  private isPrinting(info: PrinterStatusInfo): boolean {
     return info.Status === 'printing';
   }
 

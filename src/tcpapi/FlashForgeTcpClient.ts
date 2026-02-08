@@ -79,7 +79,9 @@ export class FlashForgeTcpClient {
    */
   public stopKeepAlive(logout: boolean = false): void {
     if (logout) {
-      this.sendCommandAsync(GCodes.CmdLogout).then(() => {});
+      this.sendCommandAsync(GCodes.CmdLogout).then(() => {
+        // Ignore: Logout errors during disposal are acceptable
+      });
     } // release control
     this.keepAliveCancellationToken = true;
     console.log('Keep-alive stopped.');
@@ -437,8 +439,7 @@ export class FlashForgeTcpClient {
         try {
           await this.sendCommandAsync(GCodes.CmdLogout);
         } catch (_error) {
-          // Ignore logout errors during disposal
-          console.log('Logout command failed during disposal (expected)');
+          // Logout errors during disposal are acceptable - the socket cleanup must complete regardless
         }
       }
 

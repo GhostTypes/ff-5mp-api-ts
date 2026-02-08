@@ -168,8 +168,7 @@ export class JobControl {
       console.log('Upload Request Headers:', requestHeaders);
 
       // Configure Axios request
-      // @ts-expect-error
-      const config: AxiosRequestConfig = {
+      const config = {
         headers: requestHeaders,
       };
 
@@ -189,7 +188,7 @@ export class JobControl {
       }
 
       // Assuming response.data is already parsed JSON by axios
-      const result = response.data as any;
+      const result = response.data as GenericResponse;
       if (NetworkUtils.isOk(result)) {
         console.log('Upload successful according to printer response.');
         return true;
@@ -199,17 +198,21 @@ export class JobControl {
         );
         return false;
       }
-    } catch (e: any) {
-      console.error(`UploadFile error: ${e.message}`);
-      if (e.response) {
-        console.error(`Error Status: ${e.response.status}`);
-        console.error('Error Response Data:', e.response.data);
-      } else if (e.request) {
-        console.error('Error Request:', e.request);
+    } catch (error) {
+      const err = error as Error & {
+        response?: { status: number; data: GenericResponse };
+        request?: unknown;
+      };
+      console.error(`UploadFile error: ${err.message}`);
+      if (err.response) {
+        console.error(`Error Status: ${err.response.status}`);
+        console.error('Error Response Data:', err.response.data);
+      } else if (err.request) {
+        console.error('Error Request:', err.request);
       } else {
-        console.error('Error', e.message);
+        console.error('Error', err.message);
       }
-      console.error(e.stack);
+      console.error(err.stack);
       return false;
     }
   }
@@ -286,8 +289,7 @@ export class JobControl {
       console.log('AD5X Upload Request Headers:', requestHeaders);
 
       // Configure Axios request
-      // @ts-expect-error
-      const config: AxiosRequestConfig = {
+      const config = {
         headers: requestHeaders,
       };
 
@@ -307,7 +309,7 @@ export class JobControl {
       }
 
       // Assuming response.data is already parsed JSON by axios
-      const result = response.data as any;
+      const result = response.data as GenericResponse;
       if (NetworkUtils.isOk(result)) {
         console.log('AD5X Upload successful according to printer response.');
         return true;
@@ -317,17 +319,21 @@ export class JobControl {
         );
         return false;
       }
-    } catch (e: any) {
-      console.error(`UploadFileAD5X error: ${e.message}`);
-      if (e.response) {
-        console.error(`Error Status: ${e.response.status}`);
-        console.error('Error Response Data:', e.response.data);
-      } else if (e.request) {
-        console.error('Error Request:', e.request);
+    } catch (error) {
+      const err = error as Error & {
+        response?: { status: number; data: GenericResponse };
+        request?: unknown;
+      };
+      console.error(`UploadFileAD5X error: ${err.message}`);
+      if (err.response) {
+        console.error(`Error Status: ${err.response.status}`);
+        console.error('Error Response Data:', err.response.data);
+      } else if (err.request) {
+        console.error('Error Request:', err.request);
       } else {
-        console.error('Error', e.message);
+        console.error('Error', err.message);
       }
-      console.error(e.stack);
+      console.error(err.stack);
       return false;
     }
   }
@@ -342,7 +348,7 @@ export class JobControl {
    * @throws Error if there's an issue sending the command (e.g., network error).
    */
   public async printLocalFile(fileName: string, levelingBeforePrint: boolean): Promise<boolean> {
-    let payload: any;
+    let payload: Record<string, unknown>;
 
     if (this.isNewFirmwareVersion()) {
       // New format for firmware >= 3.1.3

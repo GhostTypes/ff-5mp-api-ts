@@ -561,7 +561,7 @@ function detectModernModel(
     printerName: string,
     productType: number
 ): PrinterModel {
-    if (printerName === 'AD5X') return PrinterModel.ADX;
+    if (printerName === 'AD5X') return PrinterModel.AD5X;
 
     if (productType === 0x5A02) {
         // Adventurer 5M series
@@ -798,7 +798,7 @@ export class PrinterDiscovery extends EventEmitter {
         for (const name of Object.keys(interfaces)) {
             for (const iface of interfaces[name]) {
                 // Skip internal and loopback
-                if (iface.internal || !iface.family === 'IPv4') continue;
+                if (iface.internal || iface.family !== 'IPv4') continue;
 
                 if (iface.broadcast) {
                     addresses.push(iface.broadcast);
@@ -924,7 +924,7 @@ describe('PrinterDiscovery', () => {
 
             const result = parseModernProtocol(buffer, { address: '192.168.1.100' });
 
-            expect(result.model).toBe(PrinterModel.ADX);
+            expect(result.model).toBe(PrinterModel.AD5X);
         });
     });
 
@@ -1039,7 +1039,7 @@ const discovery = new PrinterDiscovery();
 const printers = await discovery.discover();
 
 // Filter by model
-const ad5xPrinters = printers.filter(p => p.model === PrinterModel.ADX);
+const ad5xPrinters = printers.filter(p => p.model === PrinterModel.AD5X);
 const adventurer5mPrinters = printers.filter(p =>
     p.model === PrinterModel.Adventurer5M ||
     p.model === PrinterModel.Adventurer5MPro
@@ -1061,7 +1061,7 @@ monitor.on('discovered', (printer) => {
     console.log(`✓ Discovered: ${printer.model} - ${printer.name}`);
     console.log(`  IP: ${printer.ipAddress}:${printer.commandPort}`);
 
-    if (printer.model === PrinterModel.ADX && printer.serialNumber) {
+    if (printer.model === PrinterModel.AD5X && printer.serialNumber) {
         console.log(`  Serial: ${printer.serialNumber}`);
     }
 });
@@ -1220,7 +1220,7 @@ export class FlashForgePrinterDiscovery extends PrinterDiscovery {
         });
 
         // Convert to old format
-        return printers.map(toLegacyFormat);
+        return printers.map(toLegacyPrinter);
     }
 }
 
@@ -1239,7 +1239,7 @@ function toLegacyPrinter(printer: DiscoveredPrinter): FlashForgePrinter {
     legacy.name = printer.name;
     legacy.serialNumber = printer.serialNumber || '';
     legacy.ipAddress = printer.ipAddress;
-    legacy.isAD5X = printer.model === PrinterModel.ADX;
+    legacy.isAD5X = printer.model === PrinterModel.AD5X;
     return legacy;
 }
 ```
