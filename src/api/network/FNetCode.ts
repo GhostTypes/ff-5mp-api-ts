@@ -9,8 +9,8 @@
  * to indicate the success or failure of a requested operation.
  */
 export enum FNetCode {
-    /** Indicates that the network operation was successful (Code: 0). */
-    Ok = 0,
-    /** Indicates that an error occurred during the network operation (Code: 1). */
-    Error = 1
+  /** Indicates that the network operation was successful (Code: 0). */
+  Ok = 0,
+  /** Indicates that an error occurred during the network operation (Code: 1). */
+  Error = 1,
 }

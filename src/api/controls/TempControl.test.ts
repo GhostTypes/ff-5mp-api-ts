@@ -2,38 +2,47 @@
  * @fileoverview Unit tests for TempControl module.
  * Tests temperature control operations including setting/canceling extruder and bed temperatures via mocked TCP client.
  */
+import { beforeEach, describe, expect, it, vi } from 'vitest';
+import type { FiveMClient } from '../../FiveMClient';
+import type { GCodeController } from '../../tcpapi/client/GCodeController';
+import type { FlashForgeClient } from '../../tcpapi/FlashForgeClient';
 import { TempControl } from './TempControl';
-import { FiveMClient } from '../../FiveMClient';
-import { FlashForgeClient } from '../../tcpapi/FlashForgeClient';
-import { GCodeController } from '../../tcpapi/client/GCodeController';
 
 // Mock the FlashForgeClient
-jest.mock('../../tcpapi/FlashForgeClient');
+vi.mock('../../tcpapi/FlashForgeClient');
 
 describe('TempControl', () => {
   let mockFiveMClient: FiveMClient;
-  let mockTcpClient: jest.Mocked<FlashForgeClient>;
-  let mockGCodeController: jest.Mocked<GCodeController>;
+  let mockTcpClient: FlashForgeClient & {
+    setExtruderTemp: ReturnType<typeof vi.fn>;
+    setBedTemp: ReturnType<typeof vi.fn>;
+    cancelExtruderTemp: ReturnType<typeof vi.fn>;
+    cancelBedTemp: ReturnType<typeof vi.fn>;
+    gCode: ReturnType<typeof vi.fn>;
+  };
+  let mockGCodeController: GCodeController & {
+    waitForBedTemp: ReturnType<typeof vi.fn>;
+  };
   let tempControl: TempControl;
 
   beforeEach(() => {
     // Create mock GCodeController
     mockGCodeController = {
-      waitForBedTemp: jest.fn().mockResolvedValue(undefined)
+      waitForBedTemp: vi.fn().mockResolvedValue(undefined),
     } as any;
 
     // Create mock TCP client
     mockTcpClient = {
-      setExtruderTemp: jest.fn().mockResolvedValue(true),
-      setBedTemp: jest.fn().mockResolvedValue(true),
-      cancelExtruderTemp: jest.fn().mockResolvedValue(true),
-      cancelBedTemp: jest.fn().mockResolvedValue(true),
-      gCode: jest.fn().mockReturnValue(mockGCodeController)
+      setExtruderTemp: vi.fn().mockResolvedValue(true),
+      setBedTemp: vi.fn().mockResolvedValue(true),
+      cancelExtruderTemp: vi.fn().mockResolvedValue(true),
+      cancelBedTemp: vi.fn().mockResolvedValue(true),
+      gCode: vi.fn().mockReturnValue(mockGCodeController),
     } as any;
 
     // Create mock FiveMClient
     mockFiveMClient = {
-      tcpClient: mockTcpClient
+      tcpClient: mockTcpClient,
     } as FiveMClient;
 
     tempControl = new TempControl(mockFiveMClient);

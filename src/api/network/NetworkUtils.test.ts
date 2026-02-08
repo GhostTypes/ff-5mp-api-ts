@@ -3,16 +3,17 @@
  *
  * Verifies response validation logic for successful and failed API responses.
  */
-import { NetworkUtils } from './NetworkUtils';
+import { describe, expect, it } from 'vitest';
+import type { GenericResponse } from '../controls/Control';
 import { FNetCode } from './FNetCode';
-import { GenericResponse } from '../controls/Control';
+import { NetworkUtils } from './NetworkUtils';
 
 describe('NetworkUtils', () => {
   describe('isOk', () => {
     it('should return true for a successful response', () => {
       const response: GenericResponse = {
         code: FNetCode.Ok,
-        message: 'Success'
+        message: 'Success',
       };
 
       expect(NetworkUtils.isOk(response)).toBe(true);
@@ -21,7 +22,7 @@ describe('NetworkUtils', () => {
     it('should return false if code is not Ok', () => {
       const response: GenericResponse = {
         code: 1,
-        message: 'Success'
+        message: 'Success',
       };
 
       expect(NetworkUtils.isOk(response)).toBe(false);
@@ -30,7 +31,7 @@ describe('NetworkUtils', () => {
     it('should return false if message is not "Success"', () => {
       const response: GenericResponse = {
         code: FNetCode.Ok,
-        message: 'Failed'
+        message: 'Failed',
       };
 
       expect(NetworkUtils.isOk(response)).toBe(false);
@@ -39,7 +40,7 @@ describe('NetworkUtils', () => {
     it('should return false if both code and message are incorrect', () => {
       const response: GenericResponse = {
         code: 1,
-        message: 'Error'
+        message: 'Error',
       };
 
       expect(NetworkUtils.isOk(response)).toBe(false);
@@ -48,7 +49,7 @@ describe('NetworkUtils', () => {
     it('should return false for error responses', () => {
       const response: GenericResponse = {
         code: -1,
-        message: 'Network error'
+        message: 'Network error',
       };
 
       expect(NetworkUtils.isOk(response)).toBe(false);

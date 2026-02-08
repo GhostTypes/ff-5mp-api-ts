@@ -4,6 +4,7 @@
  * Verifies correct formatting behavior for small numbers, large numbers,
  * and standard decimal numbers within normal range.
  */
+import { describe, expect, it } from 'vitest';
 import { formatScientificNotation } from './ScientificNotationFloatConverter';
 
 describe('formatScientificNotation', () => {
