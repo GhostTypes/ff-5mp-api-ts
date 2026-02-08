@@ -11,6 +11,7 @@ import type { FlashForgeClient } from '../../tcpapi/FlashForgeClient';
  * such as the extruder and the print bed. It relies on the TCP client for direct G-code/M-code commands.
  */
 export class TempControl {
+  private client: FiveMClient;
   private tcpClient: FlashForgeClient;
 
   /**
@@ -18,7 +19,7 @@ export class TempControl {
    * @param printerClient The FiveMClient instance used for communication with the printer.
    */
   constructor(printerClient: FiveMClient) {
-    this.printerClient = printerClient;
+    this.client = printerClient;
     this.tcpClient = printerClient.tcpClient;
   }
 
