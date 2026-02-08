@@ -12,18 +12,18 @@
  * like loading or preheating.
  */
 export class Filament {
-    /** The recommended loading temperature for this filament in Celsius. */
-    public readonly loadTemp: number;
-    /** The name of the filament type (e.g., "PLA", "ABS", "PETG"). */
-    public readonly name: string;
+  /** The recommended loading temperature for this filament in Celsius. */
+  public readonly loadTemp: number;
+  /** The name of the filament type (e.g., "PLA", "ABS", "PETG"). */
+  public readonly name: string;
 
-    /**
-     * Creates an instance of the Filament class.
-     * @param name The name of the filament type.
-     * @param loadTemp The recommended loading temperature for the filament in Celsius. Defaults to 220°C.
-     */
-    constructor(name: string, loadTemp: number = 220) {
-        this.name = name;
-        this.loadTemp = loadTemp;
-    }
+  /**
+   * Creates an instance of the Filament class.
+   * @param name The name of the filament type.
+   * @param loadTemp The recommended loading temperature for the filament in Celsius. Defaults to 220°C.
+   */
+  constructor(name: string, loadTemp: number = 220) {
+    this.name = name;
+    this.loadTemp = loadTemp;
+  }
 }

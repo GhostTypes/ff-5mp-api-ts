@@ -2,14 +2,15 @@
  * @fileoverview Unit tests for Control module.
  * Tests HTTP API control operations including homing, filtration, camera, fans, LEDs, and filament operations using mocked clients.
  */
-import { describe, it, expect, beforeEach, vi } from 'vitest';
+
 import axios from 'axios';
-import { Control } from './Control';
-import { FiveMClient } from '../../FiveMClient';
-import { FlashForgeClient } from '../../tcpapi/FlashForgeClient';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
+import type { FiveMClient } from '../../FiveMClient';
+import type { FlashForgeClient } from '../../tcpapi/FlashForgeClient';
 import { Commands } from '../server/Commands';
 import { Endpoints } from '../server/Endpoints';
-import { Info } from './Info';
+import { Control } from './Control';
+import type { Info } from './Info';
 
 vi.mock('axios');
 const mockedAxios = axios as typeof axios & {
@@ -44,14 +45,14 @@ describe('Control', () => {
       turnRunoutSensorOff: vi.fn().mockResolvedValue(true),
       prepareFilamentLoad: vi.fn().mockResolvedValue(true),
       loadFilament: vi.fn().mockResolvedValue(true),
-      finishFilamentLoad: vi.fn().mockResolvedValue(true)
+      finishFilamentLoad: vi.fn().mockResolvedValue(true),
     } as any;
 
     mockInfo = {
       get: vi.fn().mockResolvedValue({
         Status: 'ready',
-        CurrentPrintLayer: 5
-      })
+        CurrentPrintLayer: 5,
+      }),
     } as any;
 
     mockFiveMClient = {
@@ -64,7 +65,7 @@ describe('Control', () => {
       isPro: true,
       isHttpClientBusy: vi.fn().mockResolvedValue(undefined),
       releaseHttpClient: vi.fn(),
-      getEndpoint: (endpoint: string) => `http://printer:8898${endpoint}`
+      getEndpoint: (endpoint: string) => `http://printer:8898${endpoint}`,
     } as any;
 
     control = new Control(mockFiveMClient);
@@ -100,7 +101,7 @@ describe('Control', () => {
     beforeEach(() => {
       mockedAxios.post.mockResolvedValue({
         status: 200,
-        data: { code: 0, message: 'Success' }
+        data: { code: 0, message: 'Success' },
       });
     });
 
@@ -115,9 +116,9 @@ describe('Control', () => {
             cmd: Commands.CirculationControlCmd,
             args: {
               internal: 'close',
-              external: 'open'
-            }
-          }
+              external: 'open',
+            },
+          },
         }),
         expect.any(Object)
       );
@@ -134,9 +135,9 @@ describe('Control', () => {
             cmd: Commands.CirculationControlCmd,
             args: {
               internal: 'open',
-              external: 'close'
-            }
-          }
+              external: 'close',
+            },
+          },
         }),
         expect.any(Object)
       );
@@ -153,9 +154,9 @@ describe('Control', () => {
             cmd: Commands.CirculationControlCmd,
             args: {
               internal: 'close',
-              external: 'close'
-            }
-          }
+              external: 'close',
+            },
+          },
         }),
         expect.any(Object)
       );
@@ -175,7 +176,7 @@ describe('Control', () => {
     beforeEach(() => {
       mockedAxios.post.mockResolvedValue({
         status: 200,
-        data: { code: 0, message: 'Success' }
+        data: { code: 0, message: 'Success' },
       });
     });
 
@@ -188,8 +189,8 @@ describe('Control', () => {
         expect.objectContaining({
           payload: {
             cmd: Commands.CameraControlCmd,
-            args: { action: 'open' }
-          }
+            args: { action: 'open' },
+          },
         }),
         expect.any(Object)
       );
@@ -204,8 +205,8 @@ describe('Control', () => {
         expect.objectContaining({
           payload: {
             cmd: Commands.CameraControlCmd,
-            args: { action: 'close' }
-          }
+            args: { action: 'close' },
+          },
         }),
         expect.any(Object)
       );
@@ -227,11 +228,11 @@ describe('Control', () => {
     beforeEach(() => {
       mockedAxios.post.mockResolvedValue({
         status: 200,
-        data: { code: 0, message: 'Success' }
+        data: { code: 0, message: 'Success' },
       });
       mockInfo.get.mockResolvedValue({
         Status: 'printing',
-        CurrentPrintLayer: 10
+        CurrentPrintLayer: 10,
       });
     });
 
@@ -245,9 +246,9 @@ describe('Control', () => {
           payload: {
             cmd: Commands.PrinterControlCmd,
             args: expect.objectContaining({
-              speed: 150
-            })
-          }
+              speed: 150,
+            }),
+          },
         }),
         expect.any(Object)
       );
@@ -263,9 +264,9 @@ describe('Control', () => {
           payload: {
             cmd: Commands.PrinterControlCmd,
             args: expect.objectContaining({
-              zAxisCompensation: 0.2
-            })
-          }
+              zAxisCompensation: 0.2,
+            }),
+          },
         }),
         expect.any(Object)
       );
@@ -276,11 +277,11 @@ describe('Control', () => {
     beforeEach(() => {
       mockedAxios.post.mockResolvedValue({
         status: 200,
-        data: { code: 0, message: 'Success' }
+        data: { code: 0, message: 'Success' },
       });
       mockInfo.get.mockResolvedValue({
         Status: 'printing',
-        CurrentPrintLayer: 10
+        CurrentPrintLayer: 10,
       });
     });
 
@@ -294,9 +295,9 @@ describe('Control', () => {
           payload: {
             cmd: Commands.PrinterControlCmd,
             args: expect.objectContaining({
-              chamberFan: 75
-            })
-          }
+              chamberFan: 75,
+            }),
+          },
         }),
         expect.any(Object)
       );
@@ -312,9 +313,9 @@ describe('Control', () => {
           payload: {
             cmd: Commands.PrinterControlCmd,
             args: expect.objectContaining({
-              coolingFan: 80
-            })
-          }
+              coolingFan: 80,
+            }),
+          },
         }),
         expect.any(Object)
       );
@@ -323,7 +324,7 @@ describe('Control', () => {
     it('should set fan speeds to 0 for initial layers', async () => {
       mockInfo.get.mockResolvedValue({
         Status: 'printing',
-        CurrentPrintLayer: 1
+        CurrentPrintLayer: 1,
       });
 
       await control.setChamberFanSpeed(100);
@@ -335,9 +336,9 @@ describe('Control', () => {
             cmd: Commands.PrinterControlCmd,
             args: expect.objectContaining({
               chamberFan: 0,
-              coolingFan: 0
-            })
-          }
+              coolingFan: 0,
+            }),
+          },
         }),
         expect.any(Object)
       );
@@ -348,7 +349,7 @@ describe('Control', () => {
     beforeEach(() => {
       mockedAxios.post.mockResolvedValue({
         status: 200,
-        data: { code: 0, message: 'Success' }
+        data: { code: 0, message: 'Success' },
       });
     });
 
@@ -361,8 +362,8 @@ describe('Control', () => {
         expect.objectContaining({
           payload: {
             cmd: Commands.LightControlCmd,
-            args: { status: 'open' }
-          }
+            args: { status: 'open' },
+          },
         }),
         expect.any(Object)
       );
@@ -377,8 +378,8 @@ describe('Control', () => {
         expect.objectContaining({
           payload: {
             cmd: Commands.LightControlCmd,
-            args: { status: 'close' }
-          }
+            args: { status: 'close' },
+          },
         }),
         expect.any(Object)
       );
@@ -440,7 +441,7 @@ describe('Control', () => {
     it('should send control command successfully', async () => {
       mockedAxios.post.mockResolvedValue({
         status: 200,
-        data: { code: 0, message: 'Success' }
+        data: { code: 0, message: 'Success' },
       });
 
       const result = await control.sendControlCommand('test_cmd', { test: 'value' });
@@ -454,13 +455,13 @@ describe('Control', () => {
           checkCode: 'CC123456',
           payload: {
             cmd: 'test_cmd',
-            args: { test: 'value' }
-          }
+            args: { test: 'value' },
+          },
         },
         {
           headers: {
-            'Content-Type': 'application/json'
-          }
+            'Content-Type': 'application/json',
+          },
         }
       );
       expect(mockFiveMClient.releaseHttpClient).toHaveBeenCalled();
@@ -469,7 +470,7 @@ describe('Control', () => {
     it('should return false for non-OK response', async () => {
       mockedAxios.post.mockResolvedValue({
         status: 200,
-        data: { code: 1, message: 'Error' }
+        data: { code: 1, message: 'Error' },
       });
 
       const result = await control.sendControlCommand('test_cmd', {});
@@ -498,7 +499,7 @@ describe('Control', () => {
     it('should send job control command', async () => {
       mockedAxios.post.mockResolvedValue({
         status: 200,
-        data: { code: 0, message: 'Success' }
+        data: { code: 0, message: 'Success' },
       });
 
       const result = await control.sendJobControlCmd('pause');
@@ -511,9 +512,9 @@ describe('Control', () => {
             cmd: Commands.JobControlCmd,
             args: {
               jobID: '',
-              action: 'pause'
-            }
-          }
+              action: 'pause',
+            },
+          },
         }),
         expect.any(Object)
       );

@@ -2,11 +2,11 @@
  * @fileoverview Unit tests for TempControl module.
  * Tests temperature control operations including setting/canceling extruder and bed temperatures via mocked TCP client.
  */
-import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
+import type { FiveMClient } from '../../FiveMClient';
+import type { GCodeController } from '../../tcpapi/client/GCodeController';
+import type { FlashForgeClient } from '../../tcpapi/FlashForgeClient';
 import { TempControl } from './TempControl';
-import { FiveMClient } from '../../FiveMClient';
-import { FlashForgeClient } from '../../tcpapi/FlashForgeClient';
-import { GCodeController } from '../../tcpapi/client/GCodeController';
 
 // Mock the FlashForgeClient
 vi.mock('../../tcpapi/FlashForgeClient');
@@ -28,7 +28,7 @@ describe('TempControl', () => {
   beforeEach(() => {
     // Create mock GCodeController
     mockGCodeController = {
-      waitForBedTemp: vi.fn().mockResolvedValue(undefined)
+      waitForBedTemp: vi.fn().mockResolvedValue(undefined),
     } as any;
 
     // Create mock TCP client
@@ -37,12 +37,12 @@ describe('TempControl', () => {
       setBedTemp: vi.fn().mockResolvedValue(true),
       cancelExtruderTemp: vi.fn().mockResolvedValue(true),
       cancelBedTemp: vi.fn().mockResolvedValue(true),
-      gCode: vi.fn().mockReturnValue(mockGCodeController)
+      gCode: vi.fn().mockReturnValue(mockGCodeController),
     } as any;
 
     // Create mock FiveMClient
     mockFiveMClient = {
-      tcpClient: mockTcpClient
+      tcpClient: mockTcpClient,
     } as FiveMClient;
 
     tempControl = new TempControl(mockFiveMClient);

@@ -4,7 +4,7 @@
  * Verifies temperature value storage, retrieval, and string conversion
  * for positive, negative, zero, and decimal values.
  */
-import { describe, it, expect } from 'vitest';
+import { describe, expect, it } from 'vitest';
 import { Temperature } from './Temperature';
 
 describe('Temperature', () => {
