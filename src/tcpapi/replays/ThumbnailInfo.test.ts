@@ -1,16 +1,19 @@
 /**
  * @fileoverview Tests for ThumbnailInfo parser including M662 response parsing and PNG image extraction.
  */
+import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { ThumbnailInfo } from './ThumbnailInfo';
 import * as fs from 'fs';
 
 // Mock fs
-jest.mock('fs');
-const mockedFs = fs as jest.Mocked<typeof fs>;
+vi.mock('fs');
+const mockedFs = fs as typeof fs & {
+  writeFileSync: ReturnType<typeof vi.fn>;
+};
 
 describe('ThumbnailInfo', () => {
   beforeEach(() => {
-    jest.clearAllMocks();
+    vi.clearAllMocks();
   });
 
   describe('fromReplay', () => {

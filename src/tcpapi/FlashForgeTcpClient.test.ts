@@ -2,14 +2,15 @@
  * @fileoverview Tests for FlashForgeTcpClient file list parsing logic, validating extraction
  * of filenames from M661 command responses across different printer models.
  */
+import { describe, it, expect, beforeAll, afterAll, vi } from 'vitest';
 import { FlashForgeTcpClient } from './FlashForgeTcpClient';
 
 // Suppress logs (from API files) during tests
 const originalConsole = { ...console };
 beforeAll(() => {
-  console.log = jest.fn();
-  console.warn = jest.fn();
-  console.error = jest.fn();
+  console.log = vi.fn();
+  console.warn = vi.fn();
+  console.error = vi.fn();
 });
 
 afterAll(() => {
@@ -24,7 +25,7 @@ const parseFileListResponse = (response: string): string[] => {
     // @ts-ignore
     const originalConnect = FlashForgeTcpClient.prototype.connect;
     // @ts-ignore
-    FlashForgeTcpClient.prototype.connect = jest.fn();
+    FlashForgeTcpClient.prototype.connect = vi.fn();
     const client = new FlashForgeTcpClient('localhost');
     // @ts-ignore
     const result = client.parseFileListResponse(response);
@@ -36,13 +37,13 @@ const parseFileListResponse = (response: string): string[] => {
 describe('FlashForgeTcpClient', () => {
     // Mock socket methods
     beforeAll(() => {
-        jest.spyOn(FlashForgeTcpClient.prototype, 'dispose').mockImplementation(() => {});
+        vi.spyOn(FlashForgeTcpClient.prototype, 'dispose').mockImplementation(() => {});
     });
-    
+
     afterAll(() => {
-        jest.restoreAllMocks();
+        vi.restoreAllMocks();
     });
-    
+
     describe('parseFileListResponse', () => {
         it('should parse Pro model response correctly', () => {
             // Sample response from 5M Pro

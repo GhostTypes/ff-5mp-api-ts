@@ -1,6 +1,7 @@
 /**
  * @fileoverview Tests for LocationInfo parser including M114 response parsing and coordinate extraction.
  */
+import { describe, it, expect } from 'vitest';
 import { LocationInfo } from './LocationInfo';
 
 describe('LocationInfo', () => {

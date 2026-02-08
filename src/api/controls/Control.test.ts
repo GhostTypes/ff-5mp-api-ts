@@ -2,6 +2,7 @@
  * @fileoverview Unit tests for Control module.
  * Tests HTTP API control operations including homing, filtration, camera, fans, LEDs, and filament operations using mocked clients.
  */
+import { describe, it, expect, beforeEach, vi } from 'vitest';
 import axios from 'axios';
 import { Control } from './Control';
 import { FiveMClient } from '../../FiveMClient';
@@ -10,32 +11,44 @@ import { Commands } from '../server/Commands';
 import { Endpoints } from '../server/Endpoints';
 import { Info } from './Info';
 
-jest.mock('axios');
-const mockedAxios = axios as jest.Mocked<typeof axios>;
+vi.mock('axios');
+const mockedAxios = axios as typeof axios & {
+  post: ReturnType<typeof vi.fn>;
+};
 
-jest.mock('../../tcpapi/FlashForgeClient');
+vi.mock('../../tcpapi/FlashForgeClient');
 
 describe('Control', () => {
   let mockFiveMClient: FiveMClient;
-  let mockTcpClient: jest.Mocked<FlashForgeClient>;
-  let mockInfo: jest.Mocked<Info>;
+  let mockTcpClient: FlashForgeClient & {
+    homeAxes: ReturnType<typeof vi.fn>;
+    rapidHome: ReturnType<typeof vi.fn>;
+    turnRunoutSensorOn: ReturnType<typeof vi.fn>;
+    turnRunoutSensorOff: ReturnType<typeof vi.fn>;
+    prepareFilamentLoad: ReturnType<typeof vi.fn>;
+    loadFilament: ReturnType<typeof vi.fn>;
+    finishFilamentLoad: ReturnType<typeof vi.fn>;
+  };
+  let mockInfo: Info & {
+    get: ReturnType<typeof vi.fn>;
+  };
   let control: Control;
 
   beforeEach(() => {
     mockedAxios.post.mockReset();
 
     mockTcpClient = {
-      homeAxes: jest.fn().mockResolvedValue(true),
-      rapidHome: jest.fn().mockResolvedValue(true),
-      turnRunoutSensorOn: jest.fn().mockResolvedValue(true),
-      turnRunoutSensorOff: jest.fn().mockResolvedValue(true),
-      prepareFilamentLoad: jest.fn().mockResolvedValue(true),
-      loadFilament: jest.fn().mockResolvedValue(true),
-      finishFilamentLoad: jest.fn().mockResolvedValue(true)
+      homeAxes: vi.fn().mockResolvedValue(true),
+      rapidHome: vi.fn().mockResolvedValue(true),
+      turnRunoutSensorOn: vi.fn().mockResolvedValue(true),
+      turnRunoutSensorOff: vi.fn().mockResolvedValue(true),
+      prepareFilamentLoad: vi.fn().mockResolvedValue(true),
+      loadFilament: vi.fn().mockResolvedValue(true),
+      finishFilamentLoad: vi.fn().mockResolvedValue(true)
     } as any;
 
     mockInfo = {
-      get: jest.fn().mockResolvedValue({
+      get: vi.fn().mockResolvedValue({
         Status: 'ready',
         CurrentPrintLayer: 5
       })
@@ -49,8 +62,8 @@ describe('Control', () => {
       filtrationControl: true,
       ledControl: true,
       isPro: true,
-      isHttpClientBusy: jest.fn().mockResolvedValue(undefined),
-      releaseHttpClient: jest.fn(),
+      isHttpClientBusy: vi.fn().mockResolvedValue(undefined),
+      releaseHttpClient: vi.fn(),
       getEndpoint: (endpoint: string) => `http://printer:8898${endpoint}`
     } as any;
 

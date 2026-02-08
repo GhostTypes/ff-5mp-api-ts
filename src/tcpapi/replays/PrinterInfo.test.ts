@@ -1,6 +1,7 @@
 /**
  * @fileoverview Tests for PrinterInfo parser including M115 response parsing and printer metadata extraction.
  */
+import { describe, it, expect } from 'vitest';
 import { PrinterInfo } from './PrinterInfo';
 
 describe('PrinterInfo', () => {

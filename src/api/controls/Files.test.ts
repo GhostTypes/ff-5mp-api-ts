@@ -2,6 +2,7 @@
  * @fileoverview Unit tests for Files module.
  * Tests file listing and thumbnail retrieval with AD5X and legacy printer format support using mocked HTTP responses.
  */
+import { describe, it, expect, beforeEach, vi } from 'vitest';
 import axios from 'axios';
 import { FiveMClient } from '../../FiveMClient';
 import { Files } from './Files';
@@ -10,16 +11,20 @@ import { FFGcodeFileEntry, FFGcodeToolData } from '../../models/ff-models';
 import { NetworkUtils } from '../network/NetworkUtils';
 
 // Mock FiveMClient and its dependencies as needed
-jest.mock('axios');
-const mockedAxios = axios as jest.Mocked<typeof axios>;
+vi.mock('axios');
+const mockedAxios = axios as typeof axios & {
+  post: ReturnType<typeof vi.fn>;
+};
 
 // Mock NetworkUtils.isOk
-jest.mock('../network/NetworkUtils', () => ({
+vi.mock('../network/NetworkUtils', () => ({
     NetworkUtils: {
-        isOk: jest.fn(),
+        isOk: vi.fn(),
     },
 }));
-const mockedNetworkUtils = NetworkUtils as jest.Mocked<typeof NetworkUtils>;
+const mockedNetworkUtils = NetworkUtils as typeof NetworkUtils & {
+    isOk: ReturnType<typeof vi.fn>;
+};
 
 
 describe('Files Control', () => {

@@ -2,14 +2,17 @@
  * @fileoverview Unit tests for Info module.
  * Tests printer information retrieval, status checking, and machine state transformation using mocked HTTP responses.
  */
+import { describe, it, expect, beforeEach, vi } from 'vitest';
 import axios from 'axios';
 import { Info } from './Info';
 import { FiveMClient } from '../../FiveMClient';
 import { MachineState, FFPrinterDetail } from '../../models/ff-models';
 import { Endpoints } from '../server/Endpoints';
 
-jest.mock('axios');
-const mockedAxios = axios as jest.Mocked<typeof axios>;
+vi.mock('axios');
+const mockedAxios = axios as typeof axios & {
+  post: ReturnType<typeof vi.fn>;
+};
 
 describe('Info', () => {
   let mockClient: FiveMClient;

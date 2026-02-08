@@ -2,6 +2,7 @@
  * @fileoverview Unit tests for JobControl module.
  * Tests print job operations, file uploads with firmware-specific handling, and AD5X multi-color job validation using mocked HTTP clients.
  */
+import { describe, it, expect, beforeEach, vi } from 'vitest';
 import axios from 'axios';
 import { JobControl } from './JobControl';
 import { FiveMClient } from '../../FiveMClient';
@@ -9,22 +10,27 @@ import { Control } from './Control';
 import { Endpoints } from '../server/Endpoints';
 import { AD5XMaterialMapping } from '../../models/ff-models';
 
-jest.mock('axios');
-const mockedAxios = axios as jest.Mocked<typeof axios>;
+vi.mock('axios');
+const mockedAxios = axios as typeof axios & {
+  post: ReturnType<typeof vi.fn>;
+};
 
-jest.mock('./Control');
+vi.mock('./Control');
 
 describe('JobControl', () => {
   let mockFiveMClient: FiveMClient;
-  let mockControl: jest.Mocked<Control>;
+  let mockControl: Control & {
+    sendJobControlCmd: ReturnType<typeof vi.fn>;
+    sendControlCommand: ReturnType<typeof vi.fn>;
+  };
   let jobControl: JobControl;
 
   beforeEach(() => {
     mockedAxios.post.mockReset();
 
     mockControl = {
-      sendJobControlCmd: jest.fn().mockResolvedValue(true),
-      sendControlCommand: jest.fn().mockResolvedValue(true)
+      sendJobControlCmd: vi.fn().mockResolvedValue(true),
+      sendControlCommand: vi.fn().mockResolvedValue(true)
     } as any;
 
     mockFiveMClient = {

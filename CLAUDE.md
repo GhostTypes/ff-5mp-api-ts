@@ -9,8 +9,8 @@ A TypeScript API library (`@ghosttypes/ff-api`) for controlling FlashForge 3D pr
 ## Build & Test Commands
 
 - **Build:** `pnpm build` (runs `tsc`, outputs to `dist/`)
-- **Test all:** `pnpm test` (Jest with ts-jest)
-- **Test single file:** `pnpm exec jest path/to/file.test.ts`
+- **Test all:** `pnpm test` (Vitest)
+- **Test single file:** `pnpm exec vitest run path/to/file.test.ts`
 - **Test watch:** `pnpm test:watch`
 - **Test coverage:** `pnpm test:coverage`
 

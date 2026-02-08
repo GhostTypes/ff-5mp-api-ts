@@ -3,6 +3,7 @@
  *
  * Verifies response validation logic for successful and failed API responses.
  */
+import { describe, it, expect } from 'vitest';
 import { NetworkUtils } from './NetworkUtils';
 import { FNetCode } from './FNetCode';
 import { GenericResponse } from '../controls/Control';

@@ -3,6 +3,7 @@
  *
  * Verifies filament type creation with custom and default loading temperatures.
  */
+import { describe, it, expect } from 'vitest';
 import { Filament } from './Filament';
 
 describe('Filament', () => {
