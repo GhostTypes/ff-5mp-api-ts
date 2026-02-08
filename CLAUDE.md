@@ -46,7 +46,7 @@ Raw API responses (`FFPrinterDetail` in `src/models/ff-models.ts`) are transform
 
 - `NetworkUtils` (`src/api/network/NetworkUtils.ts`) — Response validation helpers; checks `GenericResponse.code` for success.
 - `FNetCode` (`src/api/network/FNetCode.ts`) — Network code constants.
-- `FlashForgePrinterDiscovery` (`src/api/PrinterDiscovery.ts`) — UDP broadcast discovery on port 48899, parses binary response buffers at fixed offsets for printer name and serial number.
+- `PrinterDiscovery` (`src/api/PrinterDiscovery.ts`) — Universal UDP multicast/broadcast discovery supporting all FlashForge models (AD5X, 5M, 5M Pro, Adventurer 4, Adventurer 3) with multi-protocol response parsing (276-byte modern, 140-byte legacy).
 
 ### TCP Response Parsers
 

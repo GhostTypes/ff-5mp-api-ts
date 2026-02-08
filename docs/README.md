@@ -30,13 +30,16 @@ pnpm add @ghosttypes/ff-api
 To start interacting with a printer, you first need to discover it on your local network.
 
 ```typescript
-import { FlashForgePrinterDiscovery } from '@ghosttypes/ff-api';
+import { PrinterDiscovery } from '@ghosttypes/ff-api';
 
-const discovery = new FlashForgePrinterDiscovery();
-const printers = await discovery.discoverPrintersAsync();
+const discovery = new PrinterDiscovery();
+const printers = await discovery.discover();
 
 printers.forEach(printer => {
-    console.log(`Found printer: ${printer.name} at ${printer.ipAddress}`);
+    console.log(`Found ${printer.model}: ${printer.name} at ${printer.ipAddress}`);
+    if (printer.serialNumber) {
+        console.log(`  Serial: ${printer.serialNumber}`);
+    }
 });
 ```
 

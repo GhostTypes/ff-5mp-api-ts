@@ -454,11 +454,6 @@ export class PrinterDiscovery extends EventEmitter {
      * ```
      */
     public monitor(options?: DiscoveryOptions): EventEmitter;
-
-    /**
-     * Stop active discovery monitoring.
-     */
-    public stop(): void;
 }
 ```
 
@@ -640,7 +635,6 @@ const DEFAULT_OPTIONS: Required<DiscoveryOptions> = {
  */
 export class PrinterDiscovery extends EventEmitter {
     private socket?: dgram.Socket;
-    private active = false;
 
     /**
      * Discover printers once (one-shot discovery).
@@ -711,14 +705,6 @@ export class PrinterDiscovery extends EventEmitter {
         // Implementation for continuous monitoring
         // Returns this emitter for 'discovered' events
         return this;
-    }
-
-    /**
-     * Stop active discovery.
-     */
-    public stop(): void {
-        this.active = false;
-        this.cleanup();
     }
 
     /**
@@ -980,10 +966,6 @@ describe('PrinterDiscovery Integration Tests', () => {
         discovery = new PrinterDiscovery();
     });
 
-    afterEach(() => {
-        discovery.stop();
-    });
-
     it('should discover printers on local network (requires physical printer)', async () => {
         // This test requires a real printer on the network
         // Skip in CI/CD environments
@@ -1076,7 +1058,7 @@ monitor.on('error', (error) => {
 
 // Stop after 1 minute
 setTimeout(() => {
-    discovery.stop();
+    monitor.stop();
     console.log('Monitoring stopped');
 }, 60000);
 ```
