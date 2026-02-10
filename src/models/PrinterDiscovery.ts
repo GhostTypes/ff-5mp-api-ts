@@ -97,7 +97,7 @@ export interface DiscoveryOptions {
     maxRetries?: number;
     /** Whether to use multicast discovery on ports 8899 and 19000 (default: true) */
     useMulticast?: boolean;
-    /** Whether to use broadcast discovery on port 48899 (default: true) */
+    /** Whether to use broadcast discovery on local subnet addresses (default: true) */
     useBroadcast?: boolean;
     /** Specific ports to use for discovery (default: [8899, 19000, 48899]) */
     ports?: number[];

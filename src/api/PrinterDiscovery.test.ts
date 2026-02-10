@@ -3,10 +3,10 @@
  *
  * Tests protocol parsers (modern 276-byte, legacy 140-byte), model detection,
  * status mapping, multi-port discovery, timeout handling, deduplication,
- * and backward compatibility with legacy API.
+ * and monitor/event behavior.
  */
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
-import * as dgram from 'node:dgram';
+import type * as dgram from 'node:dgram';
 import { EventEmitter } from 'node:events';
 import { PrinterDiscovery } from './PrinterDiscovery';
 import {
@@ -16,7 +16,7 @@ import {
     type DiscoveredPrinter,
     type DiscoveryOptions,
 } from '../models/PrinterDiscovery';
-import { InvalidResponseError, SocketCreationError } from './network/DiscoveryErrors';
+import { InvalidResponseError } from './network/DiscoveryErrors';
 
 // Suppress logs during tests
 const originalConsole = { ...console };
@@ -444,7 +444,7 @@ describe('PrinterDiscovery', () => {
 
                 protected async createDiscoverySocket(): Promise<dgram.Socket> {
                     const mockSocket = new EventEmitter() as dgram.Socket;
-                    mockSocket.bind = vi.fn((port, callback) => {
+                    mockSocket.bind = vi.fn((_port, callback) => {
                         if (callback) callback();
                     });
                     mockSocket.setBroadcast = vi.fn();
@@ -489,7 +489,7 @@ describe('PrinterDiscovery', () => {
 
                 protected async createDiscoverySocket(): Promise<dgram.Socket> {
                     const mockSocket = new EventEmitter() as dgram.Socket;
-                    mockSocket.bind = vi.fn((port, callback) => {
+                    mockSocket.bind = vi.fn((_port, callback) => {
                         if (callback) callback();
                     });
                     mockSocket.setBroadcast = vi.fn();
@@ -540,7 +540,7 @@ describe('PrinterDiscovery', () => {
             class TestPrinterDiscovery extends PrinterDiscovery {
                 protected async createDiscoverySocket(): Promise<dgram.Socket> {
                     const mockSocket = new EventEmitter() as dgram.Socket;
-                    mockSocket.bind = vi.fn((port, callback) => {
+                    mockSocket.bind = vi.fn((_port, callback) => {
                         if (callback) callback();
                     });
                     mockSocket.setBroadcast = vi.fn();
@@ -567,7 +567,7 @@ describe('PrinterDiscovery', () => {
 
                 protected async createDiscoverySocket(): Promise<dgram.Socket> {
                     const mockSocket = new EventEmitter() as dgram.Socket;
-                    mockSocket.bind = vi.fn((port, callback) => {
+                    mockSocket.bind = vi.fn((_port, callback) => {
                         if (callback) callback();
                     });
                     mockSocket.setBroadcast = vi.fn();
@@ -612,6 +612,96 @@ describe('PrinterDiscovery', () => {
 
             await endPromise;
         });
+
+        it('should emit end when stopped manually', async () => {
+            class TestPrinterDiscovery extends PrinterDiscovery {
+                protected async createDiscoverySocket(): Promise<dgram.Socket> {
+                    const mockSocket = new EventEmitter() as dgram.Socket;
+                    mockSocket.bind = vi.fn((_port, callback) => {
+                        if (callback) callback();
+                    });
+                    mockSocket.setBroadcast = vi.fn();
+                    mockSocket.send = vi.fn();
+                    mockSocket.close = vi.fn();
+                    mockSocket.addMembership = vi.fn();
+                    return mockSocket;
+                }
+            }
+
+            const discovery = new TestPrinterDiscovery();
+            const monitor = discovery.monitor({ timeout: 1000, maxRetries: 10 });
+
+            const endPromise = new Promise<void>((resolve, reject) => {
+                const timeoutHandle = setTimeout(() => {
+                    reject(new Error('Timed out waiting for end event'));
+                }, 500);
+
+                monitor.on('error', reject);
+                monitor.on('end', () => {
+                    clearTimeout(timeoutHandle);
+                    resolve();
+                });
+            });
+
+            setTimeout(() => {
+                monitor.stop();
+            }, 50);
+
+            await endPromise;
+        });
+
+        it('should honor idleTimeout after first discovery response', async () => {
+            class TestPrinterDiscovery extends PrinterDiscovery {
+                public mockSocket: dgram.Socket | null = null;
+
+                protected async createDiscoverySocket(): Promise<dgram.Socket> {
+                    const mockSocket = new EventEmitter() as dgram.Socket;
+                    mockSocket.bind = vi.fn((_port, callback) => {
+                        if (callback) callback();
+                    });
+                    mockSocket.setBroadcast = vi.fn();
+                    mockSocket.send = vi.fn();
+                    mockSocket.close = vi.fn();
+                    mockSocket.addMembership = vi.fn();
+                    this.mockSocket = mockSocket;
+                    return mockSocket;
+                }
+            }
+
+            const discovery = new TestPrinterDiscovery();
+            const start = Date.now();
+            const monitor = discovery.monitor({ timeout: 1000, idleTimeout: 100, maxRetries: 10 });
+
+            const endPromise = new Promise<void>((resolve, reject) => {
+                const timeoutHandle = setTimeout(() => {
+                    reject(new Error('Timed out waiting for idleTimeout end event'));
+                }, 1000);
+
+                monitor.on('error', reject);
+                monitor.on('end', () => {
+                    clearTimeout(timeoutHandle);
+                    resolve();
+                });
+            });
+
+            setTimeout(() => {
+                const mockSocket = discovery.mockSocket;
+                if (mockSocket) {
+                    const buffer = createModernBuffer({ name: 'Idle Timeout Test' });
+                    mockSocket.emit('message', buffer, {
+                        address: '192.168.1.160',
+                        port: 8899,
+                        family: 'IPv4',
+                        size: 276,
+                    });
+                }
+            }, 50);
+
+            await endPromise;
+            const elapsedMs = Date.now() - start;
+
+            expect(elapsedMs).toBeLessThan(500);
+        });
     });
 
     describe('Broadcast Address Calculation', () => {
@@ -637,15 +727,18 @@ describe('PrinterDiscovery', () => {
 describe('DiscoveryOptions', () => {
     // Test discovery class with mocked socket
     class TestPrinterDiscovery extends PrinterDiscovery {
+        public mockSocket: dgram.Socket | null = null;
+
         protected async createDiscoverySocket(): Promise<dgram.Socket> {
             const mockSocket = new EventEmitter() as dgram.Socket;
-            mockSocket.bind = vi.fn((port, callback) => {
+            mockSocket.bind = vi.fn((_port, callback) => {
                 if (callback) callback();
             });
             mockSocket.setBroadcast = vi.fn();
             mockSocket.send = vi.fn();
             mockSocket.close = vi.fn();
             mockSocket.addMembership = vi.fn();
+            this.mockSocket = mockSocket;
             return mockSocket;
         }
     }
@@ -691,5 +784,23 @@ describe('DiscoveryOptions', () => {
 
         const printers = await discovery.discover(options);
         expect(printers).toHaveLength(0);
+    });
+
+    it('should not send packets when multicast and broadcast are both disabled', async () => {
+        const discovery = new TestPrinterDiscovery();
+
+        const options: DiscoveryOptions = {
+            timeout: 50,
+            idleTimeout: 25,
+            maxRetries: 1,
+            useMulticast: false,
+            useBroadcast: false,
+            ports: [8899, 19000, 48899],
+        };
+
+        const printers = await discovery.discover(options);
+        expect(printers).toHaveLength(0);
+        expect(discovery.mockSocket).not.toBeNull();
+        expect((discovery.mockSocket?.send as ReturnType<typeof vi.fn>)).not.toHaveBeenCalled();
     });
 });

@@ -1178,53 +1178,14 @@ printers.forEach(printer => {
 | N/A | `eventPort` | New field |
 | N/A | `statusCode` | New field |
 
-### Backward Compatibility Layer
+### Backward Compatibility
 
-**File:** `src/api/PrinterDiscovery.legacy.ts` (NEW)
+No compatibility shim is provided in this implementation.
 
-```typescript
-/**
- * @deprecated Use PrinterDiscovery instead
- */
-export class FlashForgePrinterDiscovery extends PrinterDiscovery {
-    /**
-     * @deprecated Use discover() instead
-     */
-    public async discoverPrintersAsync(
-        timeoutMs = 10000,
-        idleTimeoutMs = 1500,
-        maxRetries = 3
-    ): Promise<FlashForgePrinter[]> {
-        const printers = await this.discover({
-            timeout: timeoutMs,
-            idleTimeout: idleTimeoutMs,
-            maxRetries
-        });
-
-        // Convert to old format
-        return printers.map(toLegacyPrinter);
-    }
-}
-
-/**
- * @deprecated Use DiscoveredPrinter instead
- */
-export class FlashForgePrinter {
-    public name: string = '';
-    public serialNumber: string = '';
-    public ipAddress: string = '';
-    public isAD5X?: boolean;
-}
-
-function toLegacyPrinter(printer: DiscoveredPrinter): FlashForgePrinter {
-    const legacy = new FlashForgePrinter();
-    legacy.name = printer.name;
-    legacy.serialNumber = printer.serialNumber || '';
-    legacy.ipAddress = printer.ipAddress;
-    legacy.isAD5X = printer.model === PrinterModel.AD5X;
-    return legacy;
-}
-```
+This is an intentional breaking change. Consumers must migrate from:
+- `FlashForgePrinterDiscovery` -> `PrinterDiscovery`
+- `FlashForgePrinter` -> `DiscoveredPrinter`
+- `discoverPrintersAsync(timeout, idleTimeout, maxRetries)` -> `discover({ timeout, idleTimeout, maxRetries })`
 
 ---
 

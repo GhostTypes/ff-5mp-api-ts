@@ -4,9 +4,6 @@
  * Implements multi-port, multi-format UDP discovery supporting all FlashForge models:
  * - AD5X, 5M, 5M Pro (276-byte modern protocol)
  * - Adventurer 4, Adventurer 3 (140-byte legacy protocol)
- *
- * Provides both modern PrinterDiscovery API and legacy FlashForgePrinterDiscovery API
- * for backward compatibility.
  */
 import * as dgram from 'node:dgram';
 import { EventEmitter } from 'node:events';
@@ -56,14 +53,33 @@ class DiscoveryMonitor extends EventEmitter {
     private socket: dgram.Socket | null = null;
     private intervalHandle: NodeJS.Timeout | null = null;
     private timeoutHandle: NodeJS.Timeout | null = null;
+    private idleTimeoutHandle: NodeJS.Timeout | null = null;
     private discovered: Set<string> = new Set();
     private stopped = false;
+    private endEmitted = false;
 
     constructor(
         private readonly discovery: PrinterDiscovery,
         private readonly config: Required<DiscoveryOptions>
     ) {
         super();
+    }
+
+    private emitEndIfNeeded(): void {
+        if (!this.endEmitted) {
+            this.endEmitted = true;
+            this.emit('end');
+        }
+    }
+
+    private resetIdleTimeout(): void {
+        if (this.idleTimeoutHandle) {
+            clearTimeout(this.idleTimeoutHandle);
+        }
+
+        this.idleTimeoutHandle = setTimeout(() => {
+            this.stop();
+        }, this.config.idleTimeout);
     }
 
     /**
@@ -81,6 +97,8 @@ class DiscoveryMonitor extends EventEmitter {
             this.socket.on('message', (buffer: Buffer, rinfo: dgram.RemoteInfo) => {
                 const printer = this.discovery.parseDiscoveryResponse(buffer, rinfo);
                 if (printer) {
+                    this.resetIdleTimeout();
+
                     const key = `${printer.ipAddress}:${printer.commandPort}`;
                     if (!this.discovered.has(key)) {
                         this.discovered.add(key);
@@ -102,10 +120,13 @@ class DiscoveryMonitor extends EventEmitter {
             // Auto-stop after specified timeout
             this.timeoutHandle = setTimeout(() => {
                 this.stop();
-                this.emit('end');
             }, this.config.timeout * this.config.maxRetries);
         } catch (error) {
-            this.emit('error', error);
+            if (this.listenerCount('error') > 0) {
+                this.emit('error', error);
+            } else {
+                console.error('Discovery monitor error:', error);
+            }
             this.stop();
         }
     }
@@ -130,10 +151,17 @@ class DiscoveryMonitor extends EventEmitter {
             this.timeoutHandle = null;
         }
 
+        if (this.idleTimeoutHandle) {
+            clearTimeout(this.idleTimeoutHandle);
+            this.idleTimeoutHandle = null;
+        }
+
         if (this.socket) {
             this.socket.close();
             this.socket = null;
         }
+
+        this.emitEndIfNeeded();
     }
 }
 
@@ -215,6 +243,8 @@ export class PrinterDiscovery {
      *
      * Returns a DiscoveryMonitor that emits 'discovered' events for each printer found.
      * Monitoring continues until stop() is called or the timeout expires.
+     * If one or more printers have been discovered, idleTimeout will stop monitoring
+     * early after the configured period of inactivity.
      *
      * @param options Optional configuration for monitoring behavior
      * @returns DiscoveryMonitor that emits 'discovered' events
@@ -223,10 +253,9 @@ export class PrinterDiscovery {
         const config: Required<DiscoveryOptions> = { ...DEFAULT_DISCOVERY_OPTIONS, ...options };
         const monitor = new DiscoveryMonitor(this, config);
 
-        // Start monitoring asynchronously
-        monitor.start().catch((error) => {
-            // Error will be emitted by DiscoveryMonitor
-            console.error('Failed to start discovery monitoring:', error);
+        // Start on next tick so callers can attach listeners before events are emitted
+        queueMicrotask(() => {
+            void monitor.start();
         });
 
         return monitor;
@@ -318,12 +347,14 @@ export class PrinterDiscovery {
             }
         }
 
-        // Direct port discovery (for printers on local subnet)
-        for (const port of options.ports) {
-            try {
-                socket.send(emptyPacket, 0, 0, port, '255.255.255.255');
-            } catch (error) {
-                console.warn(`Discovery: Failed to send to broadcast 255.255.255.255:${port} - ${(error as Error).message}`);
+        // Direct broadcast fallback probes
+        if (options.useBroadcast) {
+            for (const port of options.ports) {
+                try {
+                    socket.send(emptyPacket, 0, 0, port, '255.255.255.255');
+                } catch (error) {
+                    console.warn(`Discovery: Failed to send to broadcast 255.255.255.255:${port} - ${(error as Error).message}`);
+                }
             }
         }
     }
@@ -678,7 +709,7 @@ export class PrinterDiscovery {
             // Calculate broadcast: IP | (~MASK)
             const broadcast = ip.map((octet, index) => octet | (~mask[index] & 255));
             return broadcast.join('.');
-        } catch (error) {
+        } catch {
             return null;
         }
     }

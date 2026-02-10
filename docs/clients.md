@@ -148,7 +148,7 @@ Discovers printers on the local network using UDP multicast and broadcast.
 - **`idleTimeout`** (number): Time to wait after last response (default: 1500ms)
 - **`maxRetries`** (number): Maximum retry attempts (default: 3)
 - **`useMulticast`** (boolean): Use multicast discovery (default: true)
-- **`useBroadcast`** (boolean): Use broadcast discovery (default: true)
+- **`useBroadcast`** (boolean): Use subnet broadcast discovery (default: true)
 - **`ports`** (number[]): Specific ports to scan (default: [8899, 19000, 48899])
 
 **Returns:** An array of `DiscoveredPrinter` objects with comprehensive printer information.
