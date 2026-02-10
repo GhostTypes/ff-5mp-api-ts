@@ -453,7 +453,7 @@ export class PrinterDiscovery extends EventEmitter {
      * });
      * ```
      */
-    public monitor(options?: DiscoveryOptions): EventEmitter;
+    public monitor(options?: DiscoveryOptions): DiscoveryMonitor;
 }
 ```
 

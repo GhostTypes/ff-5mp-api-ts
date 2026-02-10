@@ -168,14 +168,17 @@ monitor.on('error', (error: Error) => {
 The new API includes printer status from discovery:
 
 ```typescript
-const printer: DiscoveredPrinter = await discovery.discover();
+const printers = await discovery.discover();
+if (printers.length > 0) {
+    const printer = printers[0];
 
-if (printer.status === PrinterStatus.Ready) {
-    console.log('Printer is ready to print');
-} else if (printer.status === PrinterStatus.Busy) {
-    console.log('Printer is busy');
-} else if (printer.status === PrinterStatus.Error) {
-    console.log('Printer has an error');
+    if (printer.status === PrinterStatus.Ready) {
+        console.log('Printer is ready to print');
+    } else if (printer.status === PrinterStatus.Busy) {
+        console.log('Printer is busy');
+    } else if (printer.status === PrinterStatus.Error) {
+        console.log('Printer has an error');
+    }
 }
 ```
 
