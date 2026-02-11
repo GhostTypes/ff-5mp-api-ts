@@ -17,7 +17,16 @@ export { formatScientificNotation } from './api/misc/ScientificNotationFloatConv
 // Network Utilities
 export { FNetCode } from './api/network/FNetCode';
 export { NetworkUtils } from './api/network/NetworkUtils';
-export { FlashForgePrinter, FlashForgePrinterDiscovery } from './api/PrinterDiscovery';
+
+// Printer Discovery
+export { PrinterDiscovery } from './api/PrinterDiscovery';
+export {
+    PrinterModel,
+    DiscoveryProtocol,
+    PrinterStatus,
+    type DiscoveredPrinter,
+    type DiscoveryOptions,
+} from './models/PrinterDiscovery';
 
 // Server constants
 export { Commands } from './api/server/Commands';

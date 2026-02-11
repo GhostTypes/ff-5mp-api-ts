@@ -1,325 +1,716 @@
 /**
- * @fileoverview UDP broadcast discovery for FlashForge 3D printers on local network
+ * @fileoverview Universal FlashForge printer discovery using UDP broadcast/multicast.
  *
- * Sends structured UDP packets to port 48899 and parses binary responses to extract
- * printer name, serial number, and IP address from fixed buffer offsets.
+ * Implements multi-port, multi-format UDP discovery supporting all FlashForge models:
+ * - AD5X, 5M, 5M Pro (276-byte modern protocol)
+ * - Adventurer 4, Adventurer 3 (140-byte legacy protocol)
  */
-// src/api/PrinterDiscovery.ts
 import * as dgram from 'node:dgram';
+import { EventEmitter } from 'node:events';
 import { networkInterfaces } from 'node:os';
+import {
+    type DiscoveredPrinter,
+    type DiscoveryOptions,
+    PrinterModel,
+    PrinterStatus,
+    DiscoveryProtocol,
+} from '../models/PrinterDiscovery';
+import { InvalidResponseError, SocketCreationError } from './network/DiscoveryErrors';
 
 /**
- * Represents a discovered FlashForge 3D printer.
- * Stores information such as name, serial number, and IP address.
+ * Default configuration values for printer discovery.
  */
-export class FlashForgePrinter {
-  /** The name of the printer. */
-  public name: string = '';
-  /** The serial number of the printer. */
-  public serialNumber: string = '';
-  /** The IP address of the printer. */
-  public ipAddress: string = '';
-  /** Optional flag indicating if the discovered printer is an AD5X model, based on its name. */
-  public isAD5X?: boolean;
+const DEFAULT_DISCOVERY_OPTIONS: Required<DiscoveryOptions> = {
+    timeout: 10000,
+    idleTimeout: 1500,
+    maxRetries: 3,
+    useMulticast: true,
+    useBroadcast: true,
+    ports: [8899, 19000, 48899],
+};
 
-  /**
-   * Returns a string representation of the FlashForgePrinter object.
-   * @returns A string containing the printer's name, serial number, IP address, and AD5X status if applicable.
-   */
-  public toString(): string {
-    let str = `Name: ${this.name}, Serial: ${this.serialNumber}, IP: ${this.ipAddress}`;
-    if (this.isAD5X) {
-      str += ', Model: AD5X';
+/**
+ * Multicast group address used by FlashForge printers.
+ */
+const MULTICAST_ADDRESS = '225.0.0.9';
+
+/**
+ * Modern protocol: 276-byte responses (AD5X, 5M, 5M Pro)
+ */
+const MODERN_PROTOCOL_SIZE = 276;
+
+/**
+ * Legacy protocol: 140-byte responses (Adventurer 3, Adventurer 4)
+ */
+const LEGACY_PROTOCOL_SIZE = 140;
+
+/**
+ * EventEmitter-based continuous discovery monitor.
+ *
+ * Emits 'discovered', 'end', and 'error' events during printer discovery.
+ */
+class DiscoveryMonitor extends EventEmitter {
+    private socket: dgram.Socket | null = null;
+    private intervalHandle: NodeJS.Timeout | null = null;
+    private timeoutHandle: NodeJS.Timeout | null = null;
+    private idleTimeoutHandle: NodeJS.Timeout | null = null;
+    private discovered: Set<string> = new Set();
+    private stopped = false;
+    private endEmitted = false;
+
+    constructor(
+        private readonly discovery: PrinterDiscovery,
+        private readonly config: Required<DiscoveryOptions>
+    ) {
+        super();
     }
-    return str;
-  }
-}
 
-/**
- * Handles the discovery of FlashForge printers on the local network.
- * Uses UDP broadcast messages to find printers and parses their responses.
- */
-export class FlashForgePrinterDiscovery {
-  /** The UDP port used for sending discovery messages to FlashForge printers. */
-  private static readonly DISCOVERY_PORT = 48899;
+    private emitEndIfNeeded(): void {
+        if (!this.endEmitted) {
+            this.endEmitted = true;
+            this.emit('end');
+        }
+    }
 
-  // Instance property for easy access to the discovery port
-  /** The UDP port used for sending discovery messages. */
-  private readonly discoveryPort = FlashForgePrinterDiscovery.DISCOVERY_PORT;
+    private resetIdleTimeout(): void {
+        if (this.idleTimeoutHandle) {
+            clearTimeout(this.idleTimeoutHandle);
+        }
 
-  /**
-   * Discovers FlashForge printers on the network asynchronously.
-   * It sends UDP broadcast messages and listens for responses from printers.
-   * The discovery process involves sending a specific UDP packet to the `DISCOVERY_PORT`.
-   * Printers respond with a packet containing their details, which is then parsed.
-   * Retries are implemented in case of no initial response.
-   *
-   * @param timeoutMs The total time (in milliseconds) to wait for printer responses. Defaults to 10000ms.
-   * @param idleTimeoutMs The time (in milliseconds) to wait for additional responses after the last received one. Defaults to 1500ms.
-   * @param maxRetries The maximum number of discovery attempts. Defaults to 3.
-   * @returns A Promise that resolves to an array of `FlashForgePrinter` objects found on the network.
-   */
-  public async discoverPrintersAsync(
-    timeoutMs: number = 10000,
-    idleTimeoutMs: number = 1500,
-    maxRetries: number = 3
-  ): Promise<FlashForgePrinter[]> {
-    const printers: FlashForgePrinter[] = [];
-    const broadcastAddresses = this.getBroadcastAddresses();
-    let attempt = 0;
+        this.idleTimeoutHandle = setTimeout(() => {
+            this.stop();
+        }, this.config.idleTimeout);
+    }
 
-    while (attempt < maxRetries) {
-      attempt++;
-
-      const udpClient = dgram.createSocket({ type: 'udp4', reuseAddr: true });
-
-      try {
-        // Set up socket
-        await new Promise<void>((resolve) => {
-          // Bind to port 18007 to receive responses
-          udpClient.bind(18007, () => {
-            udpClient.setBroadcast(true);
-            resolve();
-          });
-        });
-
-        // Send discovery message to all broadcast addresses
-        // The discovery UDP packet is a 20-byte message.
-        // It starts with "www.usr" followed by specific bytes.
-        // This packet structure is based on observations from FlashPrint software.
-        // Bytes:
-        // 0x77, 0x77, 0x77, 0x2e, 0x75, 0x73, 0x72, 0x22, (www.usr")
-        // 0x65, 0x36, 0xc0, 0x00, 0x00, 0x00, 0x00, 0x00,
-        // 0x00, 0x00, 0x00, 0x00
-        const discoveryMessage = Buffer.from([
-          0x77, 0x77, 0x77, 0x2e, 0x75, 0x73, 0x72, 0x22, 0x65, 0x36, 0xc0, 0x00, 0x00, 0x00, 0x00,
-          0x00, 0x00, 0x00, 0x00, 0x00,
-        ]);
-        for (const broadcastAddress of broadcastAddresses) {
-          try {
-            udpClient.send(discoveryMessage, this.discoveryPort, broadcastAddress);
-          } catch (ex) {
-            console.log(`Failed to send to ${broadcastAddress}: ${(ex as Error).message}`);
-          }
+    /**
+     * Start the monitoring process.
+     */
+    public async start(): Promise<void> {
+        if (this.stopped) {
+            throw new Error('Monitor cannot be started after being stopped');
         }
 
         try {
-          await this.receivePrinterResponses(udpClient, printers, timeoutMs, idleTimeoutMs);
-        } catch (ex) {
-          console.log(`ReceivePrinterResponses error: ${(ex as Error).message}`);
+            this.socket = await this.discovery.createDiscoverySocket();
+            await this.discovery.bindSocket(this.socket);
+
+            this.socket.on('message', (buffer: Buffer, rinfo: dgram.RemoteInfo) => {
+                const printer = this.discovery.parseDiscoveryResponse(buffer, rinfo);
+                if (printer) {
+                    this.resetIdleTimeout();
+
+                    const key = `${printer.ipAddress}:${printer.commandPort}`;
+                    if (!this.discovered.has(key)) {
+                        this.discovered.add(key);
+                        this.emit('discovered', printer);
+                    }
+                }
+            });
+
+            // Send discovery packets periodically
+            const sendPackets = () => {
+                if (this.socket && !this.stopped) {
+                    this.discovery.sendDiscoveryPackets(this.socket, this.config);
+                }
+            };
+
+            sendPackets();
+            this.intervalHandle = setInterval(sendPackets, this.config.timeout);
+
+            // Auto-stop after specified timeout
+            this.timeoutHandle = setTimeout(() => {
+                this.stop();
+            }, this.config.timeout * this.config.maxRetries);
+        } catch (error) {
+            if (this.listenerCount('error') > 0) {
+                this.emit('error', error);
+            } else {
+                console.error('Discovery monitor error:', error);
+            }
+            this.stop();
         }
-      } finally {
-        udpClient.close();
-      }
-
-      if (printers.length > 0) {
-        break; // Printers found, exit the retry loop
-      }
-
-      if (attempt >= maxRetries) continue;
-      await new Promise((resolve) => setTimeout(resolve, 1000)); // Wait before retrying
     }
 
-    return printers;
-  }
-
-  /**
-   * Receives and processes printer responses from the UDP socket.
-   * Listens for messages on the socket and parses them using `parsePrinterResponse`.
-   * Manages timeouts for the overall discovery process and for idle periods between responses.
-   *
-   * @param udpClient The dgram.Socket instance to listen on.
-   * @param printers An array to store the discovered `FlashForgePrinter` objects.
-   * @param totalTimeoutMs The total duration (in milliseconds) to listen for responses.
-   * @param idleTimeoutMs The maximum idle time (in milliseconds) to wait for a new response before stopping.
-   * @returns A Promise that resolves when the listening period is over or an error occurs.
-   * @private
-   */
-  private async receivePrinterResponses(
-    udpClient: dgram.Socket,
-    printers: FlashForgePrinter[],
-    totalTimeoutMs: number,
-    idleTimeoutMs: number
-  ): Promise<void> {
-    return new Promise((resolve, reject) => {
-      let totalTimeoutHandle: NodeJS.Timeout | null = null;
-      let idleTimeoutHandle: NodeJS.Timeout | null = null;
-
-      const cleanupAndResolve = () => {
-        if (totalTimeoutHandle) clearTimeout(totalTimeoutHandle);
-        if (idleTimeoutHandle) clearTimeout(idleTimeoutHandle);
-        udpClient.removeAllListeners('message');
-        udpClient.removeAllListeners('error');
-        resolve();
-      };
-
-      // Set total timeout
-      totalTimeoutHandle = setTimeout(() => {
-        cleanupAndResolve();
-      }, totalTimeoutMs);
-
-      const resetIdleTimeout = () => {
-        if (idleTimeoutHandle) clearTimeout(idleTimeoutHandle);
-        idleTimeoutHandle = setTimeout(() => {
-          cleanupAndResolve();
-        }, idleTimeoutMs);
-      };
-
-      // Handle incoming messages
-      udpClient.on('message', (buffer, rinfo) => {
-        resetIdleTimeout();
-
-        const printer = this.parsePrinterResponse(buffer, rinfo.address);
-        if (printer) {
-          printers.push(printer);
-        }
-      });
-
-      // Handle errors
-      udpClient.on('error', (err) => {
-        console.log(`Socket error: ${err.message}`);
-        reject(err);
-        cleanupAndResolve();
-      });
-
-      // Start the idle timeout
-      resetIdleTimeout();
-    });
-  }
-
-  /**
-   * Parses the UDP response received from a FlashForge printer.
-   * The response is a buffer containing printer information at specific offsets.
-   * - Printer Name: ASCII string at offset 0x00 (32 bytes).
-   * - Serial Number: ASCII string at offset 0x92 (32 bytes).
-   *
-   * @param response The Buffer containing the printer's response.
-   * @param ipAddress The IP address from which the response was received.
-   * @returns A `FlashForgePrinter` object if parsing is successful, otherwise null.
-   * @private
-   */
-  private parsePrinterResponse(response: Buffer, ipAddress: string): FlashForgePrinter | null {
-    // Expected response length is at least 0xC4 (196 bytes) to contain name and serial.
-    if (!response || response.length < 0xc4) {
-      console.log('Invalid response, discarded.');
-      return null;
-    }
-
-    // Printer name is at offset 0x00, padded with null characters.
-    const name = response.toString('ascii', 0, 32).replace(/\0+$/, '');
-    // Serial number is at offset 0x92, padded with null characters.
-    const serialNumber = response.toString('ascii', 0x92, 0x92 + 32).replace(/\0+$/, '');
-
-    const printer = new FlashForgePrinter();
-    printer.name = name;
-    printer.serialNumber = serialNumber;
-    printer.ipAddress = ipAddress;
-    if (name === 'AD5X') {
-      printer.isAD5X = true;
-    }
-
-    return printer;
-  }
-
-  /**
-   * Retrieves a list of broadcast addresses for all active IPv4 network interfaces.
-   * This is used to send the discovery UDP packet to all devices on the local network(s).
-   *
-   * @returns An array of string representations of broadcast addresses.
-   * @private
-   */
-  private getBroadcastAddresses(): string[] {
-    const broadcastAddresses: string[] = [];
-    const interfaces = networkInterfaces();
-
-    for (const [_name, netInterface] of Object.entries(interfaces)) {
-      if (!netInterface) continue;
-
-      for (const iface of netInterface) {
-        // Skip non-IPv4 and internal/loopback interfaces
-        if (iface.family !== 'IPv4' || iface.internal || !iface.netmask) {
-          continue;
+    /**
+     * Stop monitoring and clean up resources.
+     */
+    public stop(): void {
+        if (this.stopped) {
+            return;
         }
 
-        // Calculate broadcast address based on IP and netmask
-        const broadcastAddress = this.calculateBroadcastAddress(iface.address, iface.netmask);
-        if (broadcastAddress) {
-          broadcastAddresses.push(broadcastAddress);
-        }
-      }
-    }
+        this.stopped = true;
 
-    return broadcastAddresses;
-  }
-
-  /**
-   * Calculates the broadcast address for a given IP address and subnet mask.
-   * The broadcast address is calculated as `IP | (~SUBNET_MASK)`.
-   *
-   * @param ipAddress The IPv4 address string (e.g., "192.168.1.10").
-   * @param subnetMask The IPv4 subnet mask string (e.g., "255.255.255.0").
-   * @returns The calculated broadcast address string, or null if input is invalid.
-   * @private
-   */
-  private calculateBroadcastAddress(ipAddress: string, subnetMask: string): string | null {
-    try {
-      // Convert IP and subnet to arrays of numbers
-      const ip = ipAddress.split('.').map(Number);
-      const mask = subnetMask.split('.').map(Number);
-
-      if (ip.length !== 4 || mask.length !== 4) {
-        return null;
-      }
-
-      // Calculate broadcast address: IP | (~MASK)
-      const broadcast = ip.map((octet, index) => octet | (~mask[index] & 255));
-      return broadcast.join('.');
-    } catch (error) {
-      console.log(`Error calculating broadcast address: ${(error as Error).message}`);
-      return null;
-    }
-  }
-
-  /**
-   * Prints detailed debugging information about a received UDP response.
-   * This includes a hex dump and an ASCII dump of the response buffer.
-   * Useful for inspecting the raw data received from printers.
-   *
-   * @param response The Buffer containing the response data.
-   * @param ipAddress The IP address from which the response was received.
-   */
-  public printDebugInfo(response: Buffer, ipAddress: string): void {
-    console.log(`Received response from ${ipAddress}:`);
-    console.log(`Response length: ${response.length} bytes`);
-
-    // Hex dump
-    console.log('Hex dump:');
-    for (let i = 0; i < response.length; i += 16) {
-      let line = `${i.toString(16).padStart(4, '0')}   `;
-
-      // Hex values
-      for (let j = 0; j < 16; j++) {
-        if (i + j < response.length) {
-          line += `${response[i + j].toString(16).padStart(2, '0')} `;
-        } else {
-          line += '   ';
+        if (this.intervalHandle) {
+            clearInterval(this.intervalHandle);
+            this.intervalHandle = null;
         }
 
-        if (j === 7) line += ' ';
-      }
+        if (this.timeoutHandle) {
+            clearTimeout(this.timeoutHandle);
+            this.timeoutHandle = null;
+        }
 
-      // ASCII representation
-      line += '  ';
-      for (let j = 0; j < 16 && i + j < response.length; j++) {
-        const c = response[i + j];
-        line += c >= 32 && c <= 126 ? String.fromCharCode(c) : '.';
-      }
+        if (this.idleTimeoutHandle) {
+            clearTimeout(this.idleTimeoutHandle);
+            this.idleTimeoutHandle = null;
+        }
 
-      console.log(line);
+        if (this.socket) {
+            this.socket.close();
+            this.socket = null;
+        }
+
+        this.emitEndIfNeeded();
+    }
+}
+
+/**
+ * Universal FlashForge printer discovery using UDP broadcast/multicast.
+ *
+ * Supports discovery across multiple protocols and port configurations:
+ * - Modern protocol (276 bytes): AD5X, 5M, 5M Pro
+ * - Legacy protocol (140 bytes): Adventurer 3, Adventurer 4
+ *
+ * Example usage:
+ * ```typescript
+ * const discovery = new PrinterDiscovery();
+ * const printers = await discovery.discover({ timeout: 5000 });
+ *
+ * // Or use event-based monitoring
+ * const monitor = discovery.monitor();
+ * monitor.on('discovered', (printer: DiscoveredPrinter) => {
+ *   console.log(`Found: ${printer.name} at ${printer.ipAddress}`);
+ * });
+ * ```
+ */
+export class PrinterDiscovery {
+    /**
+     * Discovers FlashForge printers on the local network.
+     *
+     * Sends UDP discovery packets to multiple ports and protocols,
+     * collects responses, and returns deduplicated printer information.
+     *
+     * @param options Optional configuration for discovery behavior
+     * @returns Promise resolving to array of discovered printers
+     */
+    public async discover(options?: DiscoveryOptions): Promise<DiscoveredPrinter[]> {
+        const config: Required<DiscoveryOptions> = { ...DEFAULT_DISCOVERY_OPTIONS, ...options };
+        const printers = new Map<string, DiscoveredPrinter>();
+        let attempt = 0;
+
+        while (attempt < config.maxRetries) {
+            attempt++;
+            const socket = await this.createDiscoverySocket();
+
+            try {
+                await this.bindSocket(socket);
+                this.sendDiscoveryPackets(socket, config);
+
+                const discoveredPrinters = await this.receiveResponses(
+                    socket,
+                    config.timeout,
+                    config.idleTimeout
+                );
+
+                // Merge with existing printers, preferring modern protocol responses
+                for (const printer of discoveredPrinters) {
+                    const key = `${printer.ipAddress}:${printer.commandPort}`;
+                    const existing = printers.get(key);
+
+                    if (!existing || printer.protocolFormat === DiscoveryProtocol.Modern) {
+                        printers.set(key, printer);
+                    }
+                }
+
+                if (printers.size > 0) {
+                    break; // Printers found, exit retry loop
+                }
+            } finally {
+                socket.close();
+            }
+
+            if (attempt < config.maxRetries) {
+                await new Promise((resolve) => setTimeout(resolve, 1000));
+            }
+        }
+
+        return Array.from(printers.values());
     }
 
-    // ASCII dump
-    console.log('ASCII dump:');
-    console.log(response.toString('ascii'));
-  }
+    /**
+     * Starts continuous monitoring for printers on the network.
+     *
+     * Returns a DiscoveryMonitor that emits 'discovered' events for each printer found.
+     * Monitoring continues until stop() is called or the timeout expires.
+     * If one or more printers have been discovered, idleTimeout will stop monitoring
+     * early after the configured period of inactivity.
+     *
+     * @param options Optional configuration for monitoring behavior
+     * @returns DiscoveryMonitor that emits 'discovered' events
+     */
+    public monitor(options?: DiscoveryOptions): DiscoveryMonitor {
+        const config: Required<DiscoveryOptions> = { ...DEFAULT_DISCOVERY_OPTIONS, ...options };
+        const monitor = new DiscoveryMonitor(this, config);
+
+        // Start on next tick so callers can attach listeners before events are emitted
+        queueMicrotask(() => {
+            void monitor.start();
+        });
+
+        return monitor;
+    }
+
+    /**
+     * Creates a UDP socket for discovery operations.
+     *
+     * @returns Promise resolving to configured UDP socket
+     * @public
+     */
+    public async createDiscoverySocket(): Promise<dgram.Socket> {
+        return new Promise((resolve, reject) => {
+            try {
+                const socket = dgram.createSocket({ type: 'udp4', reuseAddr: true });
+                socket.on('error', (error) => {
+                    reject(new SocketCreationError(error.message));
+                });
+                resolve(socket);
+            } catch (error) {
+                reject(new SocketCreationError((error as Error).message));
+            }
+        });
+    }
+
+    /**
+     * Binds the discovery socket to an available port.
+     *
+     * @param socket The UDP socket to bind
+     * @returns Promise that resolves when binding is complete
+     * @public
+     */
+    public async bindSocket(socket: dgram.Socket): Promise<void> {
+        return new Promise((resolve, reject) => {
+            socket.bind(0, () => {
+                socket.setBroadcast(true);
+                resolve();
+            });
+            socket.on('error', reject);
+        });
+    }
+
+    /**
+     * Sends UDP discovery packets to all configured ports and addresses.
+     *
+     * @param socket The UDP socket to use for sending
+     * @param options Discovery configuration options
+     * @public
+     */
+    public sendDiscoveryPackets(
+        socket: dgram.Socket,
+        options: Required<DiscoveryOptions>
+    ): void {
+        const emptyPacket = Buffer.alloc(0);
+
+        // Multicast discovery - join group once, then send to all relevant ports
+        if (options.useMulticast) {
+            try {
+                socket.addMembership(MULTICAST_ADDRESS);
+            } catch (error) {
+                // Log but continue - sending may still work depending on OS/network config
+                console.warn(`Discovery: Failed to join multicast group ${MULTICAST_ADDRESS} - ${(error as Error).message}`);
+            }
+
+            for (const port of options.ports) {
+                if (port === 8899 || port === 19000) {
+                    try {
+                        socket.send(emptyPacket, 0, 0, port, MULTICAST_ADDRESS);
+                    } catch (error) {
+                        console.warn(`Discovery: Failed to send multicast to ${MULTICAST_ADDRESS}:${port} - ${(error as Error).message}`);
+                    }
+                }
+            }
+        }
+
+        // Broadcast discovery
+        if (options.useBroadcast) {
+            const broadcastAddresses = this.getBroadcastAddresses();
+            for (const address of broadcastAddresses) {
+                for (const port of options.ports) {
+                    if (port === 48899) {
+                        try {
+                            socket.send(emptyPacket, 0, 0, port, address);
+                        } catch (error) {
+                            console.warn(`Discovery: Failed to send broadcast to ${address}:${port} - ${(error as Error).message}`);
+                        }
+                    }
+                }
+            }
+        }
+
+        // Direct broadcast fallback probes
+        if (options.useBroadcast) {
+            for (const port of options.ports) {
+                try {
+                    socket.send(emptyPacket, 0, 0, port, '255.255.255.255');
+                } catch (error) {
+                    console.warn(`Discovery: Failed to send to broadcast 255.255.255.255:${port} - ${(error as Error).message}`);
+                }
+            }
+        }
+    }
+
+    /**
+     * Receives and parses printer responses from the UDP socket.
+     *
+     * @param socket The UDP socket to listen on
+     * @param totalTimeoutMs Total time to wait for responses
+     * @param idleTimeoutMs Idle time before stopping after last response
+     * @returns Promise resolving to array of discovered printers
+     * @private
+     */
+    protected async receiveResponses(
+        socket: dgram.Socket,
+        totalTimeoutMs: number,
+        idleTimeoutMs: number
+    ): Promise<DiscoveredPrinter[]> {
+        const printers: DiscoveredPrinter[] = [];
+
+        return new Promise((resolve) => {
+            let totalTimeoutHandle: NodeJS.Timeout | null = null;
+            let idleTimeoutHandle: NodeJS.Timeout | null = null;
+
+            const cleanupAndResolve = () => {
+                if (totalTimeoutHandle) {
+                    clearTimeout(totalTimeoutHandle);
+                }
+                if (idleTimeoutHandle) {
+                    clearTimeout(idleTimeoutHandle);
+                }
+                socket.removeAllListeners('message');
+                socket.removeAllListeners('error');
+                resolve(printers);
+            };
+
+            // Set total timeout
+            totalTimeoutHandle = setTimeout(() => {
+                cleanupAndResolve();
+            }, totalTimeoutMs);
+
+            const resetIdleTimeout = () => {
+                if (idleTimeoutHandle) {
+                    clearTimeout(idleTimeoutHandle);
+                }
+                idleTimeoutHandle = setTimeout(() => {
+                    cleanupAndResolve();
+                }, idleTimeoutMs);
+            };
+
+            // Handle incoming messages
+            socket.on('message', (buffer: Buffer, rinfo: dgram.RemoteInfo) => {
+                resetIdleTimeout();
+
+                const printer = this.parseDiscoveryResponse(buffer, rinfo);
+                if (printer) {
+                    printers.push(printer);
+                }
+            });
+
+            // Handle errors gracefully
+            socket.on('error', (error) => {
+                console.error(`Socket error during discovery: ${error.message}`);
+            });
+
+            // Start the idle timeout
+            resetIdleTimeout();
+        });
+    }
+
+    /**
+     * Parses a UDP discovery response from a printer.
+     *
+     * Determines protocol type from response size and delegates to
+     * the appropriate parser.
+     *
+     * @param buffer The response buffer
+     * @param rinfo Remote address information
+     * @returns Parsed printer information or null if parsing fails
+     * @public
+     */
+    public parseDiscoveryResponse(
+        buffer: Buffer,
+        rinfo: dgram.RemoteInfo
+    ): DiscoveredPrinter | null {
+        if (!buffer || buffer.length === 0) {
+            return null;
+        }
+
+        try {
+            // Detect protocol by response size
+            if (buffer.length >= MODERN_PROTOCOL_SIZE) {
+                return this.parseModernProtocol(buffer, rinfo);
+            }
+
+            if (buffer.length >= LEGACY_PROTOCOL_SIZE) {
+                return this.parseLegacyProtocol(buffer, rinfo);
+            }
+
+            // Log invalid response size but don't throw
+            console.warn(
+                `Invalid discovery response: ${buffer.length} bytes from ${rinfo.address}`
+            );
+            return null;
+        } catch (error) {
+            console.error(`Error parsing discovery response: ${(error as Error).message}`);
+            return null;
+        }
+    }
+
+    /**
+     * Parses modern protocol (276-byte) discovery responses.
+     *
+     * Modern protocol structure:
+     * - Printer name: 0x00, 132 bytes, UTF-8
+     * - Command port: 0x84, uint16 BE
+     * - Vendor ID: 0x86, uint16 BE
+     * - Product ID: 0x88, uint16 BE
+     * - Product type: 0x8C, uint16 BE
+     * - Event port: 0x8E, uint16 BE
+     * - Status code: 0x90, uint16 BE
+     * - Serial number: 0x92, 130 bytes, UTF-8
+     *
+     * @param buffer The response buffer (276 bytes)
+     * @param rinfo Remote address information
+     * @returns Parsed printer information
+     * @private
+     */
+    protected parseModernProtocol(
+        buffer: Buffer,
+        rinfo: dgram.RemoteInfo
+    ): DiscoveredPrinter | null {
+        if (buffer.length < MODERN_PROTOCOL_SIZE) {
+            throw new InvalidResponseError(buffer.length, rinfo.address);
+        }
+
+        // Extract printer name (UTF-8, null-terminated)
+        const name = buffer.toString('utf8', 0x00, 0x84).replace(/\0.*$/, '');
+
+        // Extract network configuration (big-endian uint16)
+        const commandPort = buffer.readUInt16BE(0x84);
+        const vendorId = buffer.readUInt16BE(0x86);
+        const productId = buffer.readUInt16BE(0x88);
+        const productType = buffer.readUInt16BE(0x8C);
+        const eventPort = buffer.readUInt16BE(0x8E);
+
+        // Extract status
+        const statusCode = buffer.readUInt16BE(0x90);
+        const status = this.mapStatusCode(statusCode);
+
+        // Extract serial number (UTF-8, null-terminated)
+        const serialNumber = buffer.toString('utf8', 0x92, 0x92 + 130).replace(/\0.*$/, '');
+
+        // Detect model
+        const model = this.detectModernModel(name, productType);
+
+        return {
+            model,
+            protocolFormat: DiscoveryProtocol.Modern,
+            name,
+            ipAddress: rinfo.address,
+            commandPort,
+            serialNumber,
+            eventPort,
+            vendorId,
+            productId,
+            productType,
+            statusCode,
+            status,
+        };
+    }
+
+    /**
+     * Parses legacy protocol (140-byte) discovery responses.
+     *
+     * Legacy protocol structure:
+     * - Printer name: 0x00, 128 bytes, UTF-8
+     * - Padding: 0x80, 4 bytes
+     * - Command port: 0x84, uint16 BE
+     * - Vendor ID: 0x86, uint16 BE
+     * - Product ID: 0x88, uint16 BE
+     * - Status code: 0x8A, uint16 BE
+     *
+     * @param buffer The response buffer (140 bytes)
+     * @param rinfo Remote address information
+     * @returns Parsed printer information
+     * @private
+     */
+    protected parseLegacyProtocol(
+        buffer: Buffer,
+        rinfo: dgram.RemoteInfo
+    ): DiscoveredPrinter | null {
+        if (buffer.length < LEGACY_PROTOCOL_SIZE) {
+            throw new InvalidResponseError(buffer.length, rinfo.address);
+        }
+
+        // Extract printer name (UTF-8, null-terminated)
+        const name = buffer.toString('utf8', 0x00, 0x80).replace(/\0.*$/, '');
+
+        // Extract network configuration (big-endian uint16)
+        const commandPort = buffer.readUInt16BE(0x84);
+        const vendorId = buffer.readUInt16BE(0x86);
+        const productId = buffer.readUInt16BE(0x88);
+
+        // Extract status
+        const statusCode = buffer.readUInt16BE(0x8A);
+        const status = this.mapStatusCode(statusCode);
+
+        // Detect model
+        const model = this.detectLegacyModel(name);
+
+        return {
+            model,
+            protocolFormat: DiscoveryProtocol.Legacy,
+            name,
+            ipAddress: rinfo.address,
+            commandPort,
+            vendorId,
+            productId,
+            statusCode,
+            status,
+        };
+    }
+
+    /**
+     * Detects printer model from modern protocol response.
+     *
+     * Uses both printer name and product type for accurate detection.
+     *
+     * @param name Printer name from response
+     * @param productType Product type code (e.g., 0x5A02 for 5M series)
+     * @returns Detected printer model
+     * @private
+     */
+    protected detectModernModel(name: string, productType: number): PrinterModel {
+        const upperName = name.toUpperCase();
+
+        // Direct name matches (highest priority)
+        if (upperName === 'AD5X') {
+            return PrinterModel.AD5X;
+        }
+
+        // Product type-based detection (0x5A02 = 5M series)
+        if (productType === 0x5A02) {
+            if (upperName.includes('PRO')) {
+                return PrinterModel.Adventurer5MPro;
+            }
+            return PrinterModel.Adventurer5M;
+        }
+
+        // Name-based fallback
+        if (upperName.includes('ADVENTURER 5M') || upperName.includes('AD5M')) {
+            if (upperName.includes('PRO')) {
+                return PrinterModel.Adventurer5MPro;
+            }
+            return PrinterModel.Adventurer5M;
+        }
+
+        return PrinterModel.Unknown;
+    }
+
+    /**
+     * Detects printer model from legacy protocol response.
+     *
+     * Uses printer name heuristics for legacy models.
+     *
+     * @param name Printer name from response
+     * @returns Detected printer model
+     * @private
+     */
+    protected detectLegacyModel(name: string): PrinterModel {
+        const upperName = name.toUpperCase();
+
+        if (upperName.includes('ADVENTURER 4') || upperName.includes('ADVENTURER4') || upperName.includes('AD4')) {
+            return PrinterModel.Adventurer4;
+        }
+
+        if (upperName.includes('ADVENTURER 3') || upperName.includes('ADVENTURER3') || upperName.includes('AD3')) {
+            return PrinterModel.Adventurer3;
+        }
+
+        return PrinterModel.Unknown;
+    }
+
+    /**
+     * Maps status code to PrinterStatus enum.
+     *
+     * @param statusCode Status code from printer response
+     * @returns Mapped printer status
+     * @private
+     */
+    protected mapStatusCode(statusCode: number): PrinterStatus {
+        switch (statusCode) {
+            case 0:
+                return PrinterStatus.Ready;
+            case 1:
+                return PrinterStatus.Busy;
+            case 2:
+                return PrinterStatus.Error;
+            default:
+                return PrinterStatus.Unknown;
+        }
+    }
+
+    /**
+     * Retrieves broadcast addresses for all active IPv4 network interfaces.
+     *
+     * @returns Array of broadcast address strings
+     * @private
+     */
+    protected getBroadcastAddresses(): string[] {
+        const broadcastAddresses: string[] = [];
+        const interfaces = networkInterfaces();
+
+        for (const [_name, netInterface] of Object.entries(interfaces)) {
+            if (!netInterface) continue;
+
+            for (const iface of netInterface) {
+                // Skip non-IPv4 and internal/loopback interfaces
+                if (iface.family !== 'IPv4' || iface.internal || !iface.netmask) {
+                    continue;
+                }
+
+                // Calculate broadcast address
+                const broadcastAddress = this.calculateBroadcastAddress(iface.address, iface.netmask);
+                if (broadcastAddress) {
+                    broadcastAddresses.push(broadcastAddress);
+                }
+            }
+        }
+
+        return broadcastAddresses;
+    }
+
+    /**
+     * Calculates broadcast address from IP address and subnet mask.
+     *
+     * @param ipAddress IPv4 address string
+     * @param subnetMask IPv4 subnet mask string
+     * @returns Broadcast address string or null if calculation fails
+     * @private
+     */
+    protected calculateBroadcastAddress(ipAddress: string, subnetMask: string): string | null {
+        try {
+            const ip = ipAddress.split('.').map(Number);
+            const mask = subnetMask.split('.').map(Number);
+
+            if (ip.length !== 4 || mask.length !== 4) {
+                return null;
+            }
+
+            // Calculate broadcast: IP | (~MASK)
+            const broadcast = ip.map((octet, index) => octet | (~mask[index] & 255));
+            return broadcast.join('.');
+        } catch {
+            return null;
+        }
+    }
 }

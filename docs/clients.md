@@ -123,22 +123,61 @@ Sets the extruder target temperature.
 
 ---
 
-## FlashForgePrinterDiscovery
+## PrinterDiscovery
 
-A utility class for finding printers on the local network.
+A utility class for finding FlashForge printers on the local network via UDP multicast/broadcast. Supports all FlashForge models including AD5X, 5M, 5M Pro, Adventurer 4, and Adventurer 3.
+
+### Constructor
+
+```typescript
+constructor()
+```
 
 ### Methods
 
-#### `discoverPrintersAsync()`
+#### `discover()`
 
 ```typescript
-public async discoverPrintersAsync(timeoutMs: number = 10000, idleTimeoutMs: number = 1500, maxRetries: number = 3): Promise<FlashForgePrinter[]>
+public async discover(options?: DiscoveryOptions): Promise<DiscoveredPrinter[]>
 ```
 
-Broadcasts a discovery packet via UDP and listens for responses.
+Discovers printers on the local network using UDP multicast and broadcast.
 
-- **`timeoutMs`**: Max time to wait for responses.
-- **`idleTimeoutMs`**: Time to wait after the last response before returning.
-- **`maxRetries`**: Number of broadcast attempts if no printers are found initially.
+**Options:**
+- **`timeout`** (number): Total time to wait for responses (default: 10000ms)
+- **`idleTimeout`** (number): Time to wait after last response (default: 1500ms)
+- **`maxRetries`** (number): Maximum retry attempts (default: 3)
+- **`useMulticast`** (boolean): Use multicast discovery (default: true)
+- **`useBroadcast`** (boolean): Use subnet broadcast discovery (default: true)
+- **`ports`** (number[]): Specific ports to scan (default: [8899, 19000, 48899])
 
-**Returns:** An array of `FlashForgePrinter` objects containing IP, Serial, and Name.
+**Returns:** An array of `DiscoveredPrinter` objects with comprehensive printer information.
+
+#### `monitor()`
+
+```typescript
+public monitor(options?: DiscoveryOptions): EventEmitter
+```
+
+Starts continuous monitoring for printers, emitting events as printers are discovered.
+
+**Returns:** EventEmitter that emits:
+- **`discovered`**: Emitted for each new printer found
+- **`end`**: Emitted when monitoring completes
+- **`error`**: Emitted on errors
+
+### Example
+
+```typescript
+import { PrinterDiscovery } from '@ghosttypes/ff-api';
+
+const discovery = new PrinterDiscovery();
+const printers = await discovery.discover({ timeout: 5000 });
+
+printers.forEach(printer => {
+    console.log(`${printer.model}: ${printer.name}`);
+    console.log(`  IP: ${printer.ipAddress}:${printer.commandPort}`);
+    console.log(`  Serial: ${printer.serialNumber || 'N/A'}`);
+    console.log(`  Status: ${printer.status}`);
+});
+```
