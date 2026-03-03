@@ -34,33 +34,45 @@ export class PrintStatus {
    */
   public fromReplay(replay: string): PrintStatus | null {
     try {
-      const data = replay.split('\n');
-      // Example: "SD printing byte 12345/67890"
-      const sdProgress = data[1].replace('SD printing byte ', '').trim();
-      const sdProgressData = sdProgress.split('/');
-      this._sdCurrent = sdProgressData[0].trim();
-      this._sdTotal = sdProgressData[1].trim();
+      const lines = replay
+        .replace(/\r\n/g, '\n')
+        .split('\n')
+        .map((line) => line.trim())
+        .filter((line) => line.length > 0);
 
-      let layerProgress: string;
-      try {
-        // Example: "Layer: 10/250"
-        layerProgress = data[2].replace('Layer: ', '').trim();
-      } catch (_error) {
-        console.log('PrintStatus bad layer progress');
-        console.log(`Raw printer replay: ${replay}`);
+      const sdLine = lines.find((line) => line.startsWith('SD printing byte'));
+      if (!sdLine) {
+        console.log('Error parsing print status');
         return null;
       }
 
-      try {
-        const lpData = layerProgress.split('/');
-        this._layerCurrent = lpData[0].trim();
-        this._layerTotal = lpData[1].trim();
+      const sdMatch = sdLine.match(/SD printing byte\s+(\d+)\s*\/\s*(\d+)/i);
+      if (!sdMatch) {
+        console.log('Error parsing print status');
+        return null;
+      }
+
+      this._sdCurrent = sdMatch[1].trim();
+      this._sdTotal = sdMatch[2].trim();
+
+      const layerLine = lines.find((line) => line.startsWith('Layer:'));
+      if (!layerLine) {
+        // Adventurer 3 reports percentage-like progress without layer metadata.
+        this._layerCurrent = this._sdCurrent;
+        this._layerTotal = this._sdTotal;
         return this;
-      } catch (_error) {
+      }
+
+      const layerMatch = layerLine.match(/Layer:\s*(\d+)\s*\/\s*(\d+)/i);
+      if (!layerMatch) {
         console.log('PrintStatus bad layer progress');
-        console.log(`layerProgress: ${layerProgress}`);
+        console.log(`layerProgress: ${layerLine}`);
         return null;
       }
+
+      this._layerCurrent = layerMatch[1].trim();
+      this._layerTotal = layerMatch[2].trim();
+      return this;
     } catch (_error) {
       console.log('Error parsing print status');
       return null;

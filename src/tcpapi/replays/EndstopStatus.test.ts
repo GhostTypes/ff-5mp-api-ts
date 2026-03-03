@@ -239,6 +239,29 @@ CurrentFile: `;
       expect(result).not.toBeNull();
       expect(result?._MoveMode).toBe(MoveMode.DEFAULT);
     });
+
+    it('should parse the Adventurer 3 M119 response format', () => {
+      const replay = `echo: Endstop: X-max: 0 Y-max: 0 Z-min: 1
+MachineStatus: IDLE
+MoveMode: 0.0
+FilamentStatus: ok
+LEDStatus: on
+PrintFileName: test.gcode`;
+
+      const status = new EndstopStatus();
+      const result = status.fromReplay(replay);
+
+      expect(result).not.toBeNull();
+      expect(result?._Endstop?.Xmax).toBe(0);
+      expect(result?._Endstop?.Ymax).toBe(0);
+      expect(result?._Endstop?.Zmin).toBe(1);
+      expect(result?._MachineStatus).toBe(MachineStatus.READY);
+      expect(result?._MoveMode).toBe(MoveMode.READY);
+      expect(result?._FilamentStatus).toBe('ok');
+      expect(result?._LedEnabled).toBe(true);
+      expect(result?._CurrentFile).toBe('test.gcode');
+      expect(result?.isReady()).toBe(true);
+    });
   });
 
   describe('status checking methods', () => {

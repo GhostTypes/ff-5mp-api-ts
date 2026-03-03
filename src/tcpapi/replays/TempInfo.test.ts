@@ -147,6 +147,19 @@ T):210/210 B:60/60`;
       expect(result).not.toBeNull();
       expect(result?.getExtruderTemp()?.getCurrent()).toBe(210);
     });
+
+    it('should parse single-line Adventurer 3 M105 responses', () => {
+      const m105Response = 'ok T0:185/200 B:60/60\r\n';
+
+      const tempInfo = new TempInfo();
+      const result = tempInfo.fromReplay(m105Response);
+
+      expect(result).not.toBeNull();
+      expect(result?.getExtruderTemp()?.getCurrent()).toBe(185);
+      expect(result?.getExtruderTemp()?.getSet()).toBe(200);
+      expect(result?.getBedTemp()?.getCurrent()).toBe(60);
+      expect(result?.getBedTemp()?.getSet()).toBe(60);
+    });
   });
 
   describe('isCooled', () => {

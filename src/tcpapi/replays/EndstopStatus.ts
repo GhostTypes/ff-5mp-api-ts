@@ -19,6 +19,8 @@ export class EndstopStatus {
   public _Status: Status | null = null;
   /** Indicates if the printer's LED lights are currently enabled. */
   public _LedEnabled: boolean = false;
+  /** Filament sensor state when provided by the firmware. */
+  public _FilamentStatus: string | null = null;
   /** Name of the file currently loaded or being printed. Null if no file is active. */
   public _CurrentFile: string | null = null;
 
@@ -43,26 +45,49 @@ export class EndstopStatus {
     if (!replay) return null;
 
     try {
-      const data = replay.split('\n');
-      this._Endstop = new Endstop(data[1]);
+      const lines = replay
+        .replace(/\r\n/g, '\n')
+        .split('\n')
+        .map((line) => line.trim())
+        .filter((line) => line.length > 0);
 
-      const machineStatus = data[2].replace('MachineStatus: ', '').trim();
+      const endstopLine = lines.find((line) => line.includes('X-max:') && line.includes('Y-max:'));
+      const machineStatusLine = lines.find((line) => line.startsWith('MachineStatus:'));
+      const moveModeLine = lines.find((line) => line.startsWith('MoveMode:'));
+      const statusLine = lines.find((line) => line.startsWith('Status '));
+      const ledLine = lines.find((line) => line.startsWith('LED:') || line.startsWith('LEDStatus:'));
+      const currentFileLine = lines.find(
+        (line) => line.startsWith('CurrentFile:') || line.startsWith('PrintFileName:')
+      );
+      const filamentLine = lines.find((line) => line.startsWith('FilamentStatus:'));
+
+      if (!endstopLine || !machineStatusLine || !moveModeLine) {
+        return null;
+      }
+
+      this._Endstop = new Endstop(endstopLine);
+
+      const machineStatus = machineStatusLine.replace('MachineStatus:', '').trim();
       if (machineStatus.includes('BUILDING_FROM_SD'))
         this._MachineStatus = MachineStatus.BUILDING_FROM_SD;
       else if (machineStatus.includes('BUILDING_COMPLETED'))
         this._MachineStatus = MachineStatus.BUILDING_COMPLETED;
+      else if (machineStatus.includes('PRINTING'))
+        this._MachineStatus = MachineStatus.BUILDING_FROM_SD;
       else if (machineStatus.includes('PAUSED')) this._MachineStatus = MachineStatus.PAUSED;
-      else if (machineStatus.includes('READY')) this._MachineStatus = MachineStatus.READY;
+      else if (machineStatus.includes('READY') || machineStatus.includes('IDLE'))
+        this._MachineStatus = MachineStatus.READY;
       else if (machineStatus.includes('BUSY')) this._MachineStatus = MachineStatus.BUSY;
       else {
         console.log(`EndstopStatus Encountered unknown MachineStatus: ${machineStatus}`);
         this._MachineStatus = MachineStatus.DEFAULT;
       }
 
-      const moveM = data[3].replace('MoveMode: ', '').trim();
+      const moveM = moveModeLine.replace('MoveMode:', '').trim();
       if (moveM.includes('MOVING')) this._MoveMode = MoveMode.MOVING;
       else if (moveM.includes('PAUSED')) this._MoveMode = MoveMode.PAUSED;
-      else if (moveM.includes('READY')) this._MoveMode = MoveMode.READY;
+      else if (moveM.includes('READY') || moveM === '0' || moveM === '0.0')
+        this._MoveMode = MoveMode.READY;
       else if (moveM.includes('WAIT_ON_TOOL')) this._MoveMode = MoveMode.WAIT_ON_TOOL;
       else if (moveM.includes('HOMING')) this._MoveMode = MoveMode.HOMING;
       else {
@@ -70,9 +95,24 @@ export class EndstopStatus {
         this._MoveMode = MoveMode.DEFAULT;
       }
 
-      this._Status = new Status(data[4]);
-      this._LedEnabled = parseInt(data[5].replace('LED: ', '').trim(), 10) === 1;
-      this._CurrentFile = data[6].replace('CurrentFile: ', '').trim();
+      this._Status = statusLine ? new Status(statusLine) : null;
+      if (filamentLine) {
+        this._FilamentStatus = filamentLine.replace('FilamentStatus:', '').trim();
+      }
+
+      if (ledLine?.startsWith('LEDStatus:')) {
+        this._LedEnabled = ledLine.replace('LEDStatus:', '').trim().toLowerCase() === 'on';
+      } else if (ledLine) {
+        this._LedEnabled = parseInt(ledLine.replace('LED:', '').trim(), 10) === 1;
+      } else {
+        this._LedEnabled = false;
+      }
+
+      const currentFile = currentFileLine
+        ?.replace('CurrentFile:', '')
+        .replace('PrintFileName:', '')
+        .trim();
+      this._CurrentFile = currentFile ?? null;
       if (!this._CurrentFile || this._CurrentFile === '') this._CurrentFile = null;
 
       return this;
@@ -177,7 +217,7 @@ export class Endstop {
  * @private
  */
 function getValue(input: string, key: string): number {
-  const pattern = new RegExp(`${key}:(\\d+)`);
+  const pattern = new RegExp(`${key}:\\s*(\\d+)`);
   const match = input.match(pattern);
   if (match?.[1]) return parseInt(match[1], 10);
   return -1;

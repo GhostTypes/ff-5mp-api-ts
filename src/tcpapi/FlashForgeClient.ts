@@ -16,7 +16,7 @@ import { TempInfo } from './replays/TempInfo';
 import { ThumbnailInfo } from './replays/ThumbnailInfo';
 export class FlashForgeClient extends FlashForgeTcpClient {
   /** Controller for sending specific G-code commands. */
-  private control: GCodeController;
+  private control: GCodeController<FlashForgeClient>;
   /** Flag indicating if the connected printer is a 5M Pro model, which may have specific features. */
   private is5mPro: boolean = false;
 
@@ -42,7 +42,7 @@ export class FlashForgeClient extends FlashForgeTcpClient {
    * providing access to specific G-code command methods.
    * @returns The `GCodeController` instance.
    */
-  public gCode(): GCodeController {
+  public gCode(): GCodeController<FlashForgeClient> {
     return this.control;
   }
 

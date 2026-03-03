@@ -48,10 +48,19 @@ export {
   Temperature as TemperatureInterface,
 } from './models/ff-models';
 export { GCodeController } from './tcpapi/client/GCodeController';
+export type { GCodeClientCapabilities } from './tcpapi/client/GCodeClientCapabilities';
 export { GCodes } from './tcpapi/client/GCodes';
+export { A3GCodeController } from './tcpapi/client/A3GCodeController';
 // TCP API
 export { FlashForgeClient } from './tcpapi/FlashForgeClient';
 export { FlashForgeTcpClient } from './tcpapi/FlashForgeTcpClient';
+export {
+  FlashForgeA3Client,
+  type A3BuildVolume,
+  type A3FileEntry,
+  type A3PrinterInfo,
+  type A3Thumbnail,
+} from './tcpapi/FlashForgeA3Client';
 // Replays
 export {
   Endstop,

@@ -98,14 +98,17 @@ Layer: 0/0`;
       expect(printStatus.getSdProgress()).toBe('12345/67890');
     });
 
-    it('should return null for missing layer data', () => {
+    it('should fall back to SD progress when layer data is missing', () => {
       const response = `CMD M27 Received.
 SD printing byte 12345/67890`;
 
       const printStatus = new PrintStatus();
       const result = printStatus.fromReplay(response);
 
-      expect(result).toBeNull();
+      expect(result).not.toBeNull();
+      expect(result?.getSdProgress()).toBe('12345/67890');
+      expect(result?.getLayerProgress()).toBe('12345/67890');
+      expect(result?.getPrintPercent()).toBe(18);
     });
 
     it('should return null for malformed layer data', () => {
@@ -146,6 +149,20 @@ Layer: 1000/5000`;
       expect(result?._sdCurrent).toBe('999999999');
       expect(result?._sdTotal).toBe('1234567890');
       expect(printStatus.getPrintPercent()).toBe(20); // 1000/5000 * 100 = 20
+    });
+
+    it('should parse Adventurer 3 percentage-style M27 responses', () => {
+      const response = `CMD M27 Received.
+SD printing byte 45/100
+ok`;
+
+      const printStatus = new PrintStatus();
+      const result = printStatus.fromReplay(response);
+
+      expect(result).not.toBeNull();
+      expect(result?._sdCurrent).toBe('45');
+      expect(result?._sdTotal).toBe('100');
+      expect(printStatus.getPrintPercent()).toBe(45);
     });
   });
 });

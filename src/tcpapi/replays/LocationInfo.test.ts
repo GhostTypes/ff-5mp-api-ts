@@ -106,6 +106,32 @@ X:10.12345 Y:20.98765 Z:5.55555 E:0.00`;
       expect(result?.Y).toBe('20.98765');
       expect(result?.Z).toBe('5.55555');
     });
+
+    it('should parse Adventurer 3 M114 responses with A/B fields', () => {
+      const response = `CMD M114 Received.
+X:75.00 Y:75.00 Z:10.00 A:0.00 B:0.00`;
+
+      const locationInfo = new LocationInfo();
+      const result = locationInfo.fromReplay(response);
+
+      expect(result).not.toBeNull();
+      expect(result?.X).toBe('75.00');
+      expect(result?.Y).toBe('75.00');
+      expect(result?.Z).toBe('10.00');
+    });
+
+    it('should parse Adventurer 3 M114 responses with Count metadata', () => {
+      const response = `CMD M114 Received.
+X:75.00 Y:75.00 Z:10.00 E:0.00 Count: X:12345 Y:67890 Z:1234 E:0`;
+
+      const locationInfo = new LocationInfo();
+      const result = locationInfo.fromReplay(response);
+
+      expect(result).not.toBeNull();
+      expect(result?.X).toBe('75.00');
+      expect(result?.Y).toBe('75.00');
+      expect(result?.Z).toBe('10.00');
+    });
   });
 
   describe('toString', () => {

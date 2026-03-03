@@ -30,13 +30,22 @@ export class LocationInfo {
    */
   public fromReplay(replay: string): LocationInfo | null {
     try {
-      const data = replay.split('\n');
-      // The first line (data[0]) is often the command echo (e.g., "ok M114") or similar,
-      // actual coordinate data is expected on the second line.
-      const locData = data[1].split(' ');
-      this.X = locData[0].replace('X:', '').trim();
-      this.Y = locData[1].replace('Y:', '').trim();
-      this.Z = locData[2].replace('Z:', '').trim();
+      const lines = replay
+        .replace(/\r\n/g, '\n')
+        .split('\n')
+        .map((line) => line.trim())
+        .filter((line) => line.length > 0);
+      const positionLine = lines.find((line) => /\bX:\s*-?\d/.test(line));
+      if (!positionLine) return null;
+
+      const xMatch = positionLine.match(/X:\s*(-?\d+\.?\d*)/i);
+      const yMatch = positionLine.match(/Y:\s*(-?\d+\.?\d*)/i);
+      const zMatch = positionLine.match(/Z:\s*(-?\d+\.?\d*)/i);
+      if (!xMatch || !yMatch || !zMatch) return null;
+
+      this.X = xMatch[1];
+      this.Y = yMatch[1];
+      this.Z = zMatch[1];
       return this;
     } catch (_error) {
       console.log('LocationInfo replay has bad/null data');

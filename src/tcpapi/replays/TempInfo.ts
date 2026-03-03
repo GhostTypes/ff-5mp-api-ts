@@ -31,15 +31,20 @@ export class TempInfo {
     if (!replay) return null;
 
     try {
-      const data = replay.split('\n');
-      if (data.length <= 1) {
-        console.log(`TempInfo replay has invalid data?: ${data}`);
+      const lines = replay
+        .replace(/\r\n/g, '\n')
+        .split('\n')
+        .map((line) => line.trim())
+        .filter((line) => line.length > 0);
+      const temperatureLine = lines.find(
+        (line) => line.includes('T0:') || line.includes('T:') || line.includes('T):')
+      );
+      if (!temperatureLine) {
+        console.log(`TempInfo replay has invalid data?: ${lines.join(' | ')}`);
         return null;
       }
 
-      // Relevant temperature data is usually on the second line (data[1])
-      // e.g., "T0:25/0 B:28/0 @:0 B@:0" or "T:210/210 B:60/60"
-      const tempData = data[1].split(' ');
+      const tempData = temperatureLine.split(/\s+/);
       let extruderDataStr = null;
       let bedDataStr = null;
 

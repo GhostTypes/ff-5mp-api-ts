@@ -125,6 +125,12 @@ export class FlashForgeTcpClient {
             return;
           }
 
+          if (this.shouldSkipResponseWait(cmd)) {
+            this.socketBusy = false;
+            resolve('');
+            return;
+          }
+
           this.receiveMultiLineReplayAsync(cmd)
             .then((reply) => {
               this.socketBusy = false;
@@ -258,7 +264,22 @@ export class FlashForgeTcpClient {
     return new Promise<string | null>((resolve) => {
       const answer: Buffer[] = [];
       let timeoutId: NodeJS.Timeout;
+      let settleTimeoutId: NodeJS.Timeout | null = null;
       let _lastDataTime = Date.now();
+
+      const queueCleanup = (binary: boolean) => {
+        if (settleTimeoutId) clearTimeout(settleTimeoutId);
+        const delay = this.getResponseCompletionDelayMs(cmd, binary);
+        if (delay === 0) {
+          cleanup(true);
+          return;
+        }
+
+        settleTimeoutId = setTimeout(() => {
+          settleTimeoutId = null;
+          cleanup(true);
+        }, delay);
+      };
 
       // Create our handler functions
       const dataHandler = (data: Buffer) => {
@@ -267,46 +288,28 @@ export class FlashForgeTcpClient {
 
         // First, check for completion in non-binary response formats
         // This is the standard case for most commands
-        if (!cmd.startsWith(GCodes.CmdGetThumbnail)) {
-          // For text commands, we need a complete buffer to check for "ok"
+        if (!this.isBinaryCommand(cmd)) {
           const fullBufferSoFar = Buffer.concat(answer);
           const dataSoFar = fullBufferSoFar.toString('ascii');
 
-          // For M661 file list command
-          if (cmd === GCodes.CmdListLocalFiles && dataSoFar.includes('ok')) {
-            clearTimeout(timeoutId); // Clear the main timeout
-            setTimeout(() => {
-              cleanup(true); // Resolve after the short delay
-            }, 500); // Wait 500ms
-            return; // Prevent immediate cleanup
-          }
-
-          // For all other standard text commands
-          if (dataSoFar.includes('ok')) {
+          if (this.isTextResponseComplete(cmd, dataSoFar)) {
             clearTimeout(timeoutId);
-            cleanup(true);
+            queueCleanup(false);
             return;
           }
-        }
-        // Special case for M662 (thumbnail) command which returns binary data
-        else {
-          // For binary responses, only check the text portion for "ok"
-          // Look only at the beginning of the buffer for the text header
-          try {
-            // Just check for "ok" in the first 100 bytes
-            const headerBuffer = Buffer.concat(answer).slice(0, 100);
-            const header = headerBuffer.toString('ascii');
 
-            if (header.includes('ok')) {
-              // For thumbnail requests, wait longer after "ok" to ensure we get all binary data
+          if (this.shouldUseInactivityCompletion(cmd)) {
+            if (settleTimeoutId) clearTimeout(settleTimeoutId);
+            settleTimeoutId = setTimeout(() => {
               clearTimeout(timeoutId);
-              setTimeout(() => {
-                cleanup(true);
-              }, 1500); // Wait 1.5s for binary data
-              return;
-            }
-          } catch (e) {
-            console.log(`Error checking binary response header: ${e}`);
+              cleanup(true);
+            }, this.getInactivityCompletionDelayMs(cmd));
+          }
+        } else {
+          const fullBufferSoFar = Buffer.concat(answer);
+          if (this.isBinaryResponseComplete(cmd, fullBufferSoFar)) {
+            clearTimeout(timeoutId);
+            queueCleanup(true);
           }
         }
       };
@@ -321,6 +324,10 @@ export class FlashForgeTcpClient {
         // Remove our listeners properly
         this.socket?.removeListener('data', dataHandler);
         this.socket?.removeListener('error', errorHandler);
+        if (settleTimeoutId) {
+          clearTimeout(settleTimeoutId);
+          settleTimeoutId = null;
+        }
 
         if (!success) {
           console.error('Failed to receive complete response:', error?.message);
@@ -339,7 +346,10 @@ export class FlashForgeTcpClient {
           }
         } else {
           // For text responses, convert to UTF-8
-          const result = Buffer.concat(answer).toString('utf8');
+          const result = this.normalizeTextResponse(
+            cmd,
+            Buffer.concat(answer).toString('utf8')
+          );
           if (!result) {
             console.error('ReceiveMultiLineReplayAsync received an empty response.');
             resolve(null);
@@ -349,13 +359,7 @@ export class FlashForgeTcpClient {
         }
       };
 
-      let timeoutDuration = 5000; // default timeout
-      if (cmd === GCodes.CmdListLocalFiles || cmd.startsWith(GCodes.CmdGetThumbnail)) {
-        timeoutDuration = 10000;
-      } // increase command timeout
-      if (cmd === GCodes.CmdHomeAxes || cmd === '~G28') {
-        timeoutDuration = 15000;
-      } // homing takes longer
+      const timeoutDuration = this.getCommandTimeoutMs(cmd);
       if (this.socket) {
         this.socket.setTimeout(timeoutDuration);
       }
@@ -369,6 +373,89 @@ export class FlashForgeTcpClient {
       this.socket?.on('data', dataHandler);
       this.socket?.on('error', errorHandler);
     });
+  }
+
+  /**
+   * Determines whether a command should return immediately after it is written to the socket.
+   * Override in subclasses for fire-and-forget protocols.
+   */
+  protected shouldSkipResponseWait(_cmd: string): boolean {
+    return false;
+  }
+
+  /**
+   * Determines whether a command returns binary payload data.
+   * Thumbnail retrieval is the only binary command currently supported.
+   */
+  protected isBinaryCommand(cmd: string): boolean {
+    return cmd.startsWith(GCodes.CmdGetThumbnail);
+  }
+
+  /**
+   * Determines when a text response is complete.
+   * The default FlashForge protocol terminates command replies with `ok`.
+   */
+  protected isTextResponseComplete(_cmd: string, response: string): boolean {
+    return response.includes('ok');
+  }
+
+  /**
+   * Determines whether a command should finish after a short quiet period even without `ok`.
+   * Adventurer 3 overrides this for commands such as M115 and M119.
+   */
+  protected shouldUseInactivityCompletion(_cmd: string): boolean {
+    return false;
+  }
+
+  /**
+   * Delay used for inactivity-based completion.
+   */
+  protected getInactivityCompletionDelayMs(_cmd: string): number {
+    return 200;
+  }
+
+  /**
+   * Delay added after the completion marker is seen to allow trailing data to arrive.
+   */
+  protected getResponseCompletionDelayMs(cmd: string, binary: boolean): number {
+    if (binary) return 1500;
+    if (cmd === GCodes.CmdListLocalFiles) return 500;
+    return 0;
+  }
+
+  /**
+   * Determines whether a binary response buffer is complete.
+   * The default behavior waits for `ok` in the leading header bytes.
+   */
+  protected isBinaryResponseComplete(_cmd: string, response: Buffer): boolean {
+    try {
+      const header = response.subarray(0, 100).toString('ascii');
+      return header.includes('ok');
+    } catch (error) {
+      console.log(`Error checking binary response header: ${error}`);
+      return false;
+    }
+  }
+
+  /**
+   * Normalizes a text response before it is returned to callers.
+   * Subclasses can strip model-specific transport wrappers here.
+   */
+  protected normalizeTextResponse(_cmd: string, response: string): string {
+    return response;
+  }
+
+  /**
+   * Returns the socket timeout to use for a given command.
+   */
+  protected getCommandTimeoutMs(cmd: string): number {
+    if (cmd === GCodes.CmdListLocalFiles || this.isBinaryCommand(cmd)) {
+      return 10000;
+    }
+    if (cmd === GCodes.CmdHomeAxes || cmd === '~G28') {
+      return 15000;
+    }
+    return 5000;
   }
 
   /**

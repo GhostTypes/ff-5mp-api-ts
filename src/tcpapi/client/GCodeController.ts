@@ -3,16 +3,22 @@
  * wrapping operations like LED control, job management, homing, and temperature control.
  */
 // src/tcpapi/client/GCodeController.ts
-import type { FlashForgeClient } from '../FlashForgeClient';
+import type { GCodeClientCapabilities } from './GCodeClientCapabilities';
 import { GCodes } from './GCodes';
-export class GCodeController {
-  private tcpClient: FlashForgeClient;
+
+/**
+ * Generic G-code controller for FlashForge printers.
+ * @typeParam TClient - The client type that must satisfy GCodeClientCapabilities.
+ */
+export class GCodeController<TClient extends GCodeClientCapabilities = GCodeClientCapabilities> {
+  /** The TCP client used to send commands. */
+  protected tcpClient: TClient;
 
   /**
    * Creates an instance of GCodeController.
-   * @param tcpClient The `FlashForgeClient` instance used to send commands to the printer.
+   * @param tcpClient The client instance used to send commands to the printer.
    */
-  constructor(tcpClient: FlashForgeClient) {
+  constructor(tcpClient: TClient) {
     this.tcpClient = tcpClient;
   }
 
