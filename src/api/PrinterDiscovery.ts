@@ -45,6 +45,16 @@ const MODERN_PROTOCOL_SIZE = 276;
 const LEGACY_PROTOCOL_SIZE = 140;
 
 /**
+ * Known legacy product IDs observed in firmware/discovery research.
+ *
+ * These are used as hints only when the printer name does not identify the model.
+ */
+const LEGACY_PRODUCT_IDS = {
+    Adventurer3: 0x0008,
+    Adventurer4: 0x001e,
+} as const;
+
+/**
  * EventEmitter-based continuous discovery monitor.
  *
  * Emits 'discovered', 'end', and 'error' events during printer discovery.
@@ -564,7 +574,7 @@ export class PrinterDiscovery {
         const status = this.mapStatusCode(statusCode);
 
         // Detect model
-        const model = this.detectLegacyModel(name);
+        const model = this.detectLegacyModel(name, productId);
 
         return {
             model,
@@ -619,13 +629,14 @@ export class PrinterDiscovery {
     /**
      * Detects printer model from legacy protocol response.
      *
-     * Uses printer name heuristics for legacy models.
+     * Uses printer name heuristics first, then known PID hints as a fallback.
      *
      * @param name Printer name from response
+     * @param productId Legacy product ID when available
      * @returns Detected printer model
      * @private
      */
-    protected detectLegacyModel(name: string): PrinterModel {
+    protected detectLegacyModel(name: string, productId?: number): PrinterModel {
         const upperName = name.toUpperCase();
 
         if (upperName.includes('ADVENTURER 4') || upperName.includes('ADVENTURER4') || upperName.includes('AD4')) {
@@ -633,6 +644,14 @@ export class PrinterDiscovery {
         }
 
         if (upperName.includes('ADVENTURER 3') || upperName.includes('ADVENTURER3') || upperName.includes('AD3')) {
+            return PrinterModel.Adventurer3;
+        }
+
+        if (productId === LEGACY_PRODUCT_IDS.Adventurer4) {
+            return PrinterModel.Adventurer4;
+        }
+
+        if (productId === LEGACY_PRODUCT_IDS.Adventurer3) {
             return PrinterModel.Adventurer3;
         }
 

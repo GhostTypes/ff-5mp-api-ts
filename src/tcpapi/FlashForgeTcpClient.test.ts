@@ -1,8 +1,15 @@
 /**
  * @fileoverview Tests for FlashForgeTcpClient file list parsing logic, validating extraction
- * of filenames from M661 command responses across different printer models.
+ * of filenames from M661 command responses across different printer models and
+ * the shared legacy upload workflow used by Adventurer 3/4-style printers.
  */
+import * as fs from 'node:fs';
+import type * as net from 'node:net';
+import * as os from 'node:os';
+import * as path from 'node:path';
+import { EventEmitter } from 'node:events';
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
+import { GCodes } from './client/GCodes';
 import { FlashForgeTcpClient } from './FlashForgeTcpClient';
 
 // Suppress logs (from API files) during tests
@@ -32,6 +39,61 @@ const parseFileListResponse = (response: string): string[] => {
   // @ts-expect-error
   FlashForgeTcpClient.prototype.connect = originalConnect;
   return result;
+};
+
+const createUploadTestClient = (
+  commandResponses: Record<string, string | null>
+): {
+  client: FlashForgeTcpClient;
+  writes: Array<string | Buffer>;
+} => {
+  const writes: Array<string | Buffer> = [];
+  const mockSocket = new EventEmitter() as net.Socket;
+
+  Object.assign(mockSocket, {
+    destroyed: false,
+    setTimeout: vi.fn(),
+    destroy: vi.fn(() => {
+      Object.assign(mockSocket, { destroyed: true });
+    }),
+    write: vi.fn(
+      (
+        data: string | Buffer,
+        encodingOrCallback?: BufferEncoding | ((error?: Error | null) => void),
+        callbackMaybe?: (error?: Error | null) => void
+      ) => {
+        const callback =
+          typeof encodingOrCallback === 'function' ? encodingOrCallback : callbackMaybe;
+        writes.push(Buffer.isBuffer(data) ? Buffer.from(data) : data);
+        callback?.(null);
+
+        if (!Buffer.isBuffer(data)) {
+          const response = commandResponses[data];
+          if (response !== undefined && response !== null) {
+            setTimeout(() => {
+              mockSocket.emit('data', Buffer.from(response, 'utf8'));
+            }, 0);
+          }
+        }
+
+        return true;
+      }
+    ),
+  });
+
+  // @ts-expect-error access private connect for tests
+  const originalConnect = FlashForgeTcpClient.prototype.connect;
+  // @ts-expect-error inject a mocked socket instead of opening a real TCP connection
+  FlashForgeTcpClient.prototype.connect = function mockConnect(): void {
+    this.socket = mockSocket;
+  };
+
+  const client = new FlashForgeTcpClient('localhost');
+
+  // @ts-expect-error restore private method after client creation
+  FlashForgeTcpClient.prototype.connect = originalConnect;
+
+  return { client, writes };
 };
 
 describe('FlashForgeTcpClient', () => {
@@ -124,6 +186,73 @@ describe('FlashForgeTcpClient', () => {
       expect(result).toContain('Concave Dodecahedron_PLA_38m12s.gcode');
       expect(result).toContain('Icecream_PLA_1h2m.gcode');
       expect(result.length).toBe(15);
+    });
+  });
+
+  describe('uploadFile', () => {
+    it('should upload a legacy file using M28, raw binary data, and M29', async () => {
+      const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'ff-api-upload-'));
+      const localFile = path.join(tempDir, 'test-upload.gcode');
+      const fileData = Buffer.from('G28\nG1 X10 Y10\nM104 S200\n', 'utf8');
+      fs.writeFileSync(localFile, fileData);
+
+      const startCommand = `${GCodes.CmdPrepFileUpload.replace('%%size%%', fileData.length.toString()).replace('%%filename%%', 'test-upload.gcode')}\n`;
+      const { client, writes } = createUploadTestClient({
+        [startCommand]: 'CMD M28 Received.\n/data/test-upload.gcode\n',
+        [`${GCodes.CmdCompleteFileUpload}\n`]: 'CMD M29 Received.\n',
+      });
+
+      try {
+        await expect(client.uploadFile(localFile)).resolves.toBe(true);
+      } finally {
+        fs.rmSync(tempDir, { recursive: true, force: true });
+      }
+
+      const textWrites = writes.filter((entry): entry is string => typeof entry === 'string');
+      const binaryWrites = writes.filter((entry): entry is Buffer => Buffer.isBuffer(entry));
+
+      expect(textWrites).toEqual([startCommand, `${GCodes.CmdCompleteFileUpload}\n`]);
+      expect(Buffer.concat(binaryWrites)).toEqual(fileData);
+    });
+
+    it('should normalize legacy prefixes in the requested remote file name', async () => {
+      const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'ff-api-upload-'));
+      const localFile = path.join(tempDir, 'local-name.gcode');
+      const fileData = Buffer.from('M105\n', 'utf8');
+      fs.writeFileSync(localFile, fileData);
+
+      const normalizedStartCommand = `${GCodes.CmdPrepFileUpload.replace('%%size%%', fileData.length.toString()).replace('%%filename%%', 'renamed.gx')}\n`;
+      const { client, writes } = createUploadTestClient({
+        [normalizedStartCommand]: 'CMD M28 Received.\n/data/renamed.gx\n',
+        [`${GCodes.CmdCompleteFileUpload}\n`]: 'CMD M29 Received.\n',
+      });
+
+      try {
+        await expect(client.uploadFile(localFile, '/data/renamed.gx')).resolves.toBe(true);
+      } finally {
+        fs.rmSync(tempDir, { recursive: true, force: true });
+      }
+
+      expect(writes[0]).toBe(normalizedStartCommand);
+    });
+
+    it('should fail the upload when M29 reports a size mismatch', async () => {
+      const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'ff-api-upload-'));
+      const localFile = path.join(tempDir, 'broken-upload.gcode');
+      const fileData = Buffer.from('G1 X5 Y5\n', 'utf8');
+      fs.writeFileSync(localFile, fileData);
+
+      const startCommand = `${GCodes.CmdPrepFileUpload.replace('%%size%%', fileData.length.toString()).replace('%%filename%%', 'broken-upload.gcode')}\n`;
+      const { client } = createUploadTestClient({
+        [startCommand]: 'CMD M28 Received.\n/data/broken-upload.gcode\n',
+        [`${GCodes.CmdCompleteFileUpload}\n`]: 'CMD M29 Received.\nFile Is Not Available\n',
+      });
+
+      try {
+        await expect(client.uploadFile(localFile)).resolves.toBe(false);
+      } finally {
+        fs.rmSync(tempDir, { recursive: true, force: true });
+      }
     });
   });
 });

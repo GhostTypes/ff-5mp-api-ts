@@ -58,9 +58,8 @@ export class GCodes {
   /** Command to set bed temperature and wait until it's reached. Requires S[temperature] or R[temperature] (for cooling) parameter. (M190) */
   public static readonly WaitForBedTemp = '~M190';
 
-  // Commented out commands, potentially for file upload operations, not currently in active use.
-  // /** Command to prepare for file upload, specifying size and path. `%%size%%` and `%%filename%%` are placeholders. */
-  // public static readonly CmdPrepFileUpload = "~M28 %%size%% 0:/user/%%filename%%"
-  // /** Command to indicate completion of file upload. */
-  // public static readonly CmdCompleteFileUpload = "~M29"
+  /** Command to prepare for file upload, specifying size and path. `%%size%%` and `%%filename%%` are placeholders. */
+  public static readonly CmdPrepFileUpload = '~M28 %%size%% 0:/user/%%filename%%';
+  /** Command to indicate completion of file upload. */
+  public static readonly CmdCompleteFileUpload = '~M29';
 }

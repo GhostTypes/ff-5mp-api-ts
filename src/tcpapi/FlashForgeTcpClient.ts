@@ -2,7 +2,9 @@
  * @fileoverview Low-level TCP socket client for FlashForge printers, managing connections,
  * command serialization, multi-line response parsing, and keep-alive mechanisms.
  */
+import { createReadStream, promises as fs } from 'node:fs';
 import * as net from 'node:net';
+import * as path from 'node:path';
 import { setTimeout as sleep } from 'node:timers/promises';
 import { GCodes } from './client/GCodes';
 export class FlashForgeTcpClient {
@@ -51,6 +53,11 @@ export class FlashForgeTcpClient {
     const runKeepAlive = async () => {
       try {
         while (!this.keepAliveCancellationToken) {
+          if (this.socketBusy) {
+            await sleep(250);
+            continue;
+          }
+
           //console.log("KeepAlive");
           const result = await this.sendCommandAsync(GCodes.CmdPrintStatus);
           if (result === null) {
@@ -112,47 +119,155 @@ export class FlashForgeTcpClient {
 
     this.socketBusy = true;
 
+    try {
+      return await this.sendCommandWithLockedSocket(cmd);
+    } finally {
+      this.socketBusy = false;
+    }
+  }
+
+  /**
+   * Uploads a file to legacy printer storage using the documented M28/raw-binary/M29 flow.
+   * The file is stored in the printer's `/data/` directory using a normalized filename.
+   *
+   * @param localFilePath Absolute or relative path to the local file to upload.
+   * @param remoteFileName Optional target filename. Legacy prefixes such as `0:/user/` or `/data/`
+   * are normalized automatically.
+   * @returns True when the printer accepts the upload and finalizes it successfully.
+   */
+  public async uploadFile(localFilePath: string, remoteFileName?: string): Promise<boolean> {
+    let stats: Awaited<ReturnType<typeof fs.stat>>;
+    try {
+      stats = await fs.stat(localFilePath);
+    } catch (error) {
+      console.error(
+        `Upload failed: unable to access file ${localFilePath}: ${
+          error instanceof Error ? error.message : String(error)
+        }`
+      );
+      return false;
+    }
+
+    if (!stats.isFile()) {
+      console.error(`Upload failed: ${localFilePath} is not a file.`);
+      return false;
+    }
+
+    const normalizedFileName = this.normalizeLegacyUploadFilename(
+      remoteFileName ?? localFilePath
+    );
+    if (!normalizedFileName) {
+      console.error('Upload failed: remote file name resolved to an empty value.');
+      return false;
+    }
+
+    const startCommand = GCodes.CmdPrepFileUpload
+      .replace('%%size%%', stats.size.toString())
+      .replace('%%filename%%', normalizedFileName);
+
+    if (this.socketBusy) {
+      await this.waitUntilSocketAvailable(30000);
+    }
+
+    this.socketBusy = true;
+    try {
+      const startResponse = await this.sendCommandWithLockedSocket(startCommand);
+      if (!startResponse || !this.isSuccessfulUploadBoundaryResponse(startCommand, startResponse)) {
+        console.error('Upload failed: printer rejected M28 upload initialization.');
+        return false;
+      }
+
+      for await (const chunk of createReadStream(localFilePath)) {
+        await this.writeSocketData(chunk);
+      }
+
+      const finishResponse = await this.sendCommandWithLockedSocket(
+        GCodes.CmdCompleteFileUpload,
+        false
+      );
+      if (!finishResponse) {
+        console.error('Upload failed: printer did not respond to M29 upload finalization.');
+        return false;
+      }
+
+      return this.isSuccessfulUploadBoundaryResponse(GCodes.CmdCompleteFileUpload, finishResponse);
+    } catch (error: unknown) {
+      console.error(
+        `Upload failed for ${normalizedFileName}: ${
+          error instanceof Error ? error.message : String(error)
+        }`
+      );
+      this.resetSocket();
+      return false;
+    } finally {
+      this.socketBusy = false;
+    }
+  }
+
+  /**
+   * Waits until the socket is no longer busy or a timeout is reached.
+   * This is used to serialize commands sent over the socket.
+   * @throws Error if the socket remains busy for too long (10 seconds by default).
+   * @private
+   */
+  private async waitUntilSocketAvailable(maxWaitTime: number = 10000): Promise<void> {
+    const startTime = Date.now();
+
+    while (this.socketBusy && Date.now() - startTime < maxWaitTime) {
+      await sleep(100);
+    }
+
+    if (this.socketBusy) {
+      throw new Error('Socket remained busy for too long, timing out');
+    }
+  }
+
+  private async sendCommandWithLockedSocket(
+    cmd: string,
+    allowReconnect: boolean = true
+  ): Promise<string | null> {
     console.log(`sendCommand: ${cmd}`);
     try {
-      this.checkSocket();
+      if (allowReconnect) {
+        this.checkSocket();
+      } else if (!this.socket || this.socket.destroyed) {
+        console.error('Error while sending command: socket is unavailable.');
+        return null;
+      }
 
-      return new Promise<string | null>((resolve, reject) => {
+      return await new Promise<string | null>((resolve, reject) => {
         this.socket?.write(`${cmd}\n`, 'ascii', (err) => {
           if (err) {
-            this.socketBusy = false;
             console.error('Error writing command to socket:', err);
             reject(err);
             return;
           }
 
           if (this.shouldSkipResponseWait(cmd)) {
-            this.socketBusy = false;
             resolve('');
             return;
           }
 
           this.receiveMultiLineReplayAsync(cmd)
             .then((reply) => {
-              this.socketBusy = false;
               if (reply !== null) {
-                //console.log("Received reply for command:", reply);
                 resolve(reply);
               } else {
                 console.warn('Invalid or no reply received, resetting connection to printer.');
                 this.resetSocket();
-                this.checkSocket();
+                if (allowReconnect) {
+                  this.checkSocket();
+                }
                 resolve(null);
               }
             })
             .catch((error) => {
-              this.socketBusy = false;
               console.error('Error receiving reply:', error);
               reject(error);
             });
         });
       });
     } catch (error: unknown) {
-      this.socketBusy = false;
       const err = error as { code?: string; message: string; stack: string };
 
       if (err.code === 'ENETUNREACH') {
@@ -165,25 +280,6 @@ export class FlashForgeTcpClient {
         console.error(`Error while sending command: ${err.message}\n${err.stack}`);
       }
       return null;
-    }
-  }
-
-  /**
-   * Waits until the socket is no longer busy or a timeout is reached.
-   * This is used to serialize commands sent over the socket.
-   * @throws Error if the socket remains busy for too long (10 seconds).
-   * @private
-   */
-  private async waitUntilSocketAvailable(): Promise<void> {
-    const maxWaitTime = 10000; // 10 seconds
-    const startTime = Date.now();
-
-    while (this.socketBusy && Date.now() - startTime < maxWaitTime) {
-      await sleep(100);
-    }
-
-    if (this.socketBusy) {
-      throw new Error('Socket remained busy for too long, timing out');
     }
   }
 
@@ -404,13 +500,16 @@ export class FlashForgeTcpClient {
    * Adventurer 3 overrides this for commands such as M115 and M119.
    */
   protected shouldUseInactivityCompletion(_cmd: string): boolean {
-    return false;
+    return this.isLegacyUploadBoundaryCommand(_cmd);
   }
 
   /**
    * Delay used for inactivity-based completion.
    */
-  protected getInactivityCompletionDelayMs(_cmd: string): number {
+  protected getInactivityCompletionDelayMs(cmd: string): number {
+    if (this.isLegacyUploadBoundaryCommand(cmd)) {
+      return 250;
+    }
     return 200;
   }
 
@@ -450,6 +549,9 @@ export class FlashForgeTcpClient {
    */
   protected getCommandTimeoutMs(cmd: string): number {
     if (cmd === GCodes.CmdListLocalFiles || this.isBinaryCommand(cmd)) {
+      return 10000;
+    }
+    if (this.isLegacyUploadBoundaryCommand(cmd)) {
       return 10000;
     }
     if (cmd === GCodes.CmdHomeAxes || cmd === '~G28') {
@@ -508,6 +610,70 @@ export class FlashForgeTcpClient {
     }
 
     return filePaths;
+  }
+
+  private async writeSocketData(data: Buffer | string): Promise<void> {
+    if (!this.socket || this.socket.destroyed) {
+      throw new Error('Socket is unavailable for raw upload data.');
+    }
+
+    await new Promise<void>((resolve, reject) => {
+      if (Buffer.isBuffer(data)) {
+        this.socket?.write(data, (err) => {
+          if (err) {
+            reject(err);
+            return;
+          }
+
+          resolve();
+        });
+        return;
+      }
+
+      this.socket?.write(data, 'ascii', (err) => {
+        if (err) {
+          reject(err);
+          return;
+        }
+
+        resolve();
+      });
+    });
+  }
+
+  private normalizeLegacyUploadFilename(fileName: string): string {
+    const normalizedPath = fileName.replace(/\\/g, '/');
+    const withoutLegacyPrefix = normalizedPath
+      .replace(/^0:\/user\//i, '')
+      .replace(/^\/data\//i, '');
+
+    return path.posix.basename(withoutLegacyPrefix);
+  }
+
+  private isLegacyUploadBoundaryCommand(cmd: string): boolean {
+    return /^~?M28\b/i.test(cmd.trim()) || /^~?M29\b/i.test(cmd.trim());
+  }
+
+  private isSuccessfulUploadBoundaryResponse(cmd: string, response: string): boolean {
+    const normalized = response.replace(/\r\n/g, '\n').trim();
+    if (!normalized) {
+      return false;
+    }
+
+    if (
+      /error:|control failed\.|file is not available|cannot create file|not enough space/i.test(
+        normalized
+      )
+    ) {
+      return false;
+    }
+
+    const bareCommand = cmd.trim().replace(/^~/, '').split(/\s+/, 1)[0];
+    return (
+      normalized.includes('ok') ||
+      normalized.includes('Received.') ||
+      new RegExp(`\\b${bareCommand}\\b`, 'i').test(normalized)
+    );
   }
 
   /**

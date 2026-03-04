@@ -286,6 +286,40 @@ describe('PrinterDiscovery', () => {
             expect(result?.status).toBe(PrinterStatus.Error);
         });
 
+        it('should classify an unknown legacy printer by Adventurer 4 PID fallback', () => {
+            const discovery = createDiscovery();
+            const buffer = createLegacyBuffer({
+                name: 'Workshop Printer',
+                productId: 0x001e,
+            });
+
+            const result = discovery['parseLegacyProtocol'](buffer, {
+                address: '10.0.0.101',
+                port: 8899,
+                family: 'IPv4',
+                size: 140,
+            });
+
+            expect(result?.model).toBe(PrinterModel.Adventurer4);
+        });
+
+        it('should classify an unknown legacy printer by Adventurer 3 PID fallback', () => {
+            const discovery = createDiscovery();
+            const buffer = createLegacyBuffer({
+                name: 'Workshop Printer',
+                productId: 0x0008,
+            });
+
+            const result = discovery['parseLegacyProtocol'](buffer, {
+                address: '10.0.0.102',
+                port: 8899,
+                family: 'IPv4',
+                size: 140,
+            });
+
+            expect(result?.model).toBe(PrinterModel.Adventurer3);
+        });
+
         it('should throw InvalidResponseError for undersized buffer', () => {
             const discovery = createDiscovery();
             const buffer = Buffer.alloc(50); // Too small
@@ -367,6 +401,30 @@ describe('PrinterDiscovery', () => {
                 expect(discovery['detectLegacyModel']('Adventurer 3')).toBe(PrinterModel.Adventurer3);
                 expect(discovery['detectLegacyModel']('Adventurer3')).toBe(PrinterModel.Adventurer3);
                 expect(discovery['detectLegacyModel']('AD3')).toBe(PrinterModel.Adventurer3);
+            });
+
+            it('should use Adventurer 4 PID as a fallback when the name is unknown', () => {
+                const discovery = createDiscovery();
+                expect(discovery['detectLegacyModel']('Workshop Printer', 0x001e)).toBe(
+                    PrinterModel.Adventurer4
+                );
+            });
+
+            it('should use Adventurer 3 PID as a fallback when the name is unknown', () => {
+                const discovery = createDiscovery();
+                expect(discovery['detectLegacyModel']('Workshop Printer', 0x0008)).toBe(
+                    PrinterModel.Adventurer3
+                );
+            });
+
+            it('should prefer name matches over conflicting PID hints', () => {
+                const discovery = createDiscovery();
+                expect(discovery['detectLegacyModel']('Adventurer 3', 0x001e)).toBe(
+                    PrinterModel.Adventurer3
+                );
+                expect(discovery['detectLegacyModel']('Adventurer 4', 0x0008)).toBe(
+                    PrinterModel.Adventurer4
+                );
             });
 
             it('should return Unknown for unrecognized models', () => {
