@@ -1,258 +1,348 @@
 # Material Station (IFS) Implementation Specification
 
-**Status:** Proposed
-**Version:** 1.0.0
-**Date:** 2025-02-07
+**Status:** Updated
+**Version:** 1.1.1
+**Date:** 2026-02-11
 **Printer Models:** AD5X Series
 **API Version:** HTTP API (Port 8898)
 
 ## Table of Contents
 
 1. [Overview](#overview)
-2. [Requirements](#requirements)
-3. [State Machine Enums](#state-machine-enums)
-4. [Type Definitions](#type-definitions)
-5. [API Design](#api-design)
-6. [Implementation Details](#implementation-details)
-7. [Error Handling](#error-handling)
-8. [Testing Strategy](#testing-strategy)
-9. [Usage Examples](#usage-examples)
-10. [Future Enhancements](#future-enhancements)
+2. [Firmware-Derived Command Behavior](#firmware-derived-command-behavior)
+3. [Material and Color Datasets](#material-and-color-datasets)
+4. [Validation Policy](#validation-policy)
+5. [State Machine Enums](#state-machine-enums)
+6. [Type Definitions](#type-definitions)
+7. [API Design](#api-design)
+8. [Implementation Details](#implementation-details)
+9. [Testing Strategy](#testing-strategy)
+10. [Usage Examples](#usage-examples)
+11. [Appendix](#appendix)
 
 ---
 
 ## Overview
 
-The Intelligent Filament Station (IFS) is a 4-slot multi-material system for AD5X series printers. This specification defines the implementation of TypeScript API methods to:
+This specification defines the AD5X Intelligent Filament Station (IFS) API surface for `@ghosttypes/ff-api` using the latest reverse engineering baseline:
 
-- Query material station status and slot information
-- Configure slot material metadata (type, color)
-- Control load/unload operations for each slot
-- Provide human-readable state machine enums
+- `docs/ad5x/AD5X-1.2.1-1.1.1-3.0.7-20251217-Factory/ifs-material-config-dialog.md`
+- `clean_for_production/ad5x/endpoints/endpoints_ad5x_1.2.1.yaml`
 
-### Scope
+This revision adds:
 
-**In Scope:**
-- Material station status queries
-- Slot material configuration
-- Load/unload operations
-- State machine enums
-- Type-safe API methods
-
-**Out of Scope:**
-- Independent filament path (slot 0) operations
-- Serial F-command protocols
-- IFS firmware updates
-- Low-level stall detection
+- Independent path support (`ipdMsConfig_cmd`, `ipdMs_cmd`)
+- Full valid UI material list and extended firmware-recognized types
+- Full 24-color firmware palette
+- Explicit slot routing and persistence behavior
+- Validation modes aligned to firmware behavior (strict UI vs compatible vs pass-through)
 
 ---
 
-## Requirements
+## Firmware-Derived Command Behavior
 
-### Functional Requirements
+### Command Surface
 
-#### FR1: Query Material Station Status
-The API MUST provide a method to retrieve the current status of all 4 slots, including:
-- Slot IDs (1-4)
-- Filament presence (hasFilament)
-- Material name (e.g., "PLA", "ABS")
-- Material color (hex string)
-- Current stateAction and stateStep values
+| Command | Args | Intended Path | Observed Behavior |
+|---|---|---|---|
+| `msConfig_cmd` | `slot`, `mt`, `rgb` | IFS slot config | Slot `1..4` persist to `ffmType1..4` / `ffmColor1..4`; slot `0` is a no-op |
+| `ipdMsConfig_cmd` | `mt`, `rgb` | Independent path config | Persists to slot `0` (`ffmType0`, `ffmColor0`) |
+| `ms_cmd` | `action`, `slot` | IFS operations | `action`: `0=load`, `1=unload`, `2=cancel`; slot expected `1..4` |
+| `ipdMs_cmd` | `action` | Independent operations | `action`: `0=load`, `1=unload`, `2=cancel`; implicit slot `0` |
 
-#### FR2: Configure Slot Material
-The API MUST provide a method to set the material type and color for a specific slot.
+### Payload Shapes
 
-**Parameters:**
-- Slot ID: 1-4
-- Material type: string (e.g., "PLA", "ABS", "PETG")
-- Color: hex string (e.g., "FF0000", "#FF0000")
+`msConfig_cmd`:
 
-#### FR3: Load Filament
-The API MUST provide a method to initiate a load operation for a specific slot.
+```json
+{
+  "cmd": "msConfig_cmd",
+  "args": {
+    "slot": 1,
+    "mt": "PLA",
+    "rgb": "#FFFFFF"
+  }
+}
+```
 
-**Parameters:**
-- Slot ID: 1-4
+`ipdMsConfig_cmd`:
 
-#### FR4: Unload Filament
-The API MUST provide a method to initiate an unload operation for a specific slot.
+```json
+{
+  "cmd": "ipdMsConfig_cmd",
+  "args": {
+    "mt": "PLA",
+    "rgb": "#FFFFFF"
+  }
+}
+```
 
-**Parameters:**
-- Slot ID: 1-4
+`ms_cmd`:
 
-#### FR5: Cancel Operation
-The API MUST provide a method to cancel an in-progress load/unload operation.
+```json
+{
+  "cmd": "ms_cmd",
+  "args": {
+    "action": 0,
+    "slot": 1
+  }
+}
+```
 
-**Parameters:**
-- Slot ID: 1-4
+`ipdMs_cmd`:
 
-### Non-Functional Requirements
+```json
+{
+  "cmd": "ipdMs_cmd",
+  "args": {
+    "action": 0
+  }
+}
+```
 
-#### NFR1: Type Safety
-All methods MUST use TypeScript enums for state values and strict types for slot numbers.
+### Signal and Routing Notes (Important)
 
-#### NFR2: Error Handling
-All methods MUST return boolean success indicators and handle error responses.
+- `emitSetMsConfig(int, QString, QString)` is emitted as `(slot, rgb, mt)`.
+- `emitSetIpdMsConfig(QString, QString)` is emitted as `(rgb, mt)`.
+- MainWindow handlers treat argument 2 as color and argument 3 as material.
 
-#### NFR3: Validation
-Input parameters MUST be validated:
-- Slot numbers: 1-4
-- Color format: #RRGGBB or RRGGBB
-- Material type: non-empty string
+### Persistence and Routing Rules
 
-#### NFR4: Backward Compatibility
-Changes MUST NOT break existing API functionality.
+- `msConfig_cmd` writes only for slot `1..4`.
+- `msConfig_cmd` with slot `0` is a no-op.
+- `ipdMsConfig_cmd` always writes slot `0`.
+- Persisted keys under `FFMInfo`:
+  - `ffmType0..4`
+  - `ffmColor0..4`
+- Both config paths trigger immediate `Filament::updateSlotStatus` UI refresh when filament singleton exists.
+
+### Firmware Validation Reality
+
+Firmware-side handlers do not strictly validate material or color strings:
+
+- Arbitrary `mt` and `rgb` strings can be persisted.
+- Invalid colors can break UI style/icon resolution.
+
+Client-side validation is therefore mandatory for predictable behavior.
+
+---
+
+## Material and Color Datasets
+
+### UI Material Type Set (Strict UI-Compatible)
+
+```text
+PLA
+PLA-CF
+ABS
+PETG
+PETG-CF
+TPU
+SILK
+```
+
+### Extended Firmware-Recognized Material Strings
+
+```text
+PC-ABS
+PET-CF
+PPS-CF
+PC
+PA-CF
+PA
+PAHT-CF
+```
+
+### Canonical Combined Material Set
+
+```text
+PLA, PLA-CF, ABS, PETG, PETG-CF, TPU, SILK,
+PC-ABS, PET-CF, PPS-CF, PC, PA-CF, PA, PAHT-CF
+```
+
+### AD5X 24-Color Palette (Hardcoded)
+
+```text
+#FFFFFF
+#FEF043
+#DCF478
+#0ACC38
+#067749
+#0C6283
+#0DE2A0
+#75D9F3
+#45A8F9
+#2750E0
+#46328E
+#A03CF7
+#F330F9
+#D4B0DC
+#F95D73
+#F72224
+#7C4B00
+#F98D33
+#FDEBD5
+#D3C4A3
+#AF7836
+#898989
+#BCBCBC
+#161616
+```
+
+Special note: `#161616` is special-cased in firmware UI style logic.
+
+---
+
+## Validation Policy
+
+### Validation Modes
+
+Use explicit validation modes to match product requirements:
+
+- `strict_ui`
+  - `mt` must be in the 7-item UI set.
+  - `rgb` must exactly match one of the 24 palette values.
+- `compatible_extended`
+  - `mt` must be in the 14-item combined set.
+  - `rgb` must match `^#[0-9A-F]{6}$`.
+  - If color is not in palette, allow but warn in logs/telemetry.
+- `pass_through`
+  - Non-empty `mt` and non-empty `rgb` only.
+  - Use when replaying existing device state or forensic tooling.
+
+Default recommendation for SDK APIs: `strict_ui`.
+
+### User-Facing UI Policy (Decision)
+
+For end-user UI in `@ghosttypes/ff-api` integrations, selection must be locked to `strict_ui`:
+
+- Material types: only 7 UI types (`PLA`, `PLA-CF`, `ABS`, `PETG`, `PETG-CF`, `TPU`, `SILK`).
+- Colors: only the 24 hardcoded AD5X palette colors.
+- UI must be picker-based; do not expose free-text material entry or custom color input.
+
+`compatible_extended` and `pass_through` are non-UI/internal modes and must not be used for normal user pickers.
+
+### Slot Rules
+
+- `setSlotMaterial`: slot `1..4` only.
+- `setIndependentMaterial`: implicit slot `0` via `ipdMsConfig_cmd`.
+- Never call `msConfig_cmd` with slot `0` unless intentionally testing no-op behavior.
 
 ---
 
 ## State Machine Enums
 
-### MaterialStateAction
+`matlStationInfo.stateAction` values:
 
-Represents the current action state of a material station operation.
+| Value | Name | Meaning |
+|---|---|---|
+| 0 | Idle | No operation in progress |
+| 2 | LoadStep2 | Load operation in progress |
+| 3 | LoadStep3 | Load operation near completion |
+| 4 | UnloadStep2 | Unload operation in progress |
+| 5 | UnloadStep3 | Unload operation near completion |
+| 6 | Complete | Operation completed |
 
-```typescript
-export enum MaterialStateAction {
-    /** No operation in progress */
-    Idle = 0,
+`matlStationInfo.stateStep` values:
 
-    /** Load operation - step 2 (mid-operation) */
-    LoadStep2 = 2,
+| Value | Name | Meaning |
+|---|---|---|
+| 0 | Idle | No operation in progress |
+| 1 | Load | Load operation category |
+| 2 | Unload | Unload operation category |
+| 3 | Cancel | Cancel operation category |
 
-    /** Load operation - step 3 (near completion) */
-    LoadStep3 = 3,
-
-    /** Unload operation - step 2 (mid-operation) */
-    UnloadStep2 = 4,
-
-    /** Unload operation - step 3 (near completion) */
-    UnloadStep3 = 5,
-
-    /** Operation completed successfully */
-    Complete = 6
-}
-```
-
-### MaterialStateStep
-
-Represents the current step category of a material station operation.
-
-```typescript
-export enum MaterialStateStep {
-    /** No operation in progress */
-    Idle = 0,
-
-    /** Load operation in progress */
-    Load = 1,
-
-    /** Unload operation in progress */
-    Unload = 2,
-
-    /** Operation cancellation in progress */
-    Cancel = 3
-}
-```
-
-### Usage Example
-
-```typescript
-const status = await client.materialStation.getStatus();
-
-if (status.stateAction === MaterialStateAction.Complete) {
-    console.log('Operation completed');
-} else if (status.stateStep === MaterialStateStep.Load) {
-    console.log('Currently loading filament');
-}
-```
+These values are read from `/detail` in `matlStationInfo` and should be exposed as enums for strongly typed operation monitoring.
 
 ---
 
 ## Type Definitions
 
-### Extended Interfaces
-
-#### MatlStationInfo (Updated)
-
 ```typescript
-export interface MatlStationInfo {
-    /** Total number of slots (always 4 for AD5X) */
-    slotCnt: number;
+export type MaterialValidationMode = 'strict_ui' | 'compatible_extended' | 'pass_through';
 
-    /** Currently active slot for printing */
-    currentSlot: number;
+export type MaterialSlot = 1 | 2 | 3 | 4;
 
-    /** Slot currently being loaded/unloaded */
-    currentLoadSlot: number;
-
-    /** Current action state */
-    stateAction: MaterialStateAction;
-
-    /** Current operation step */
-    stateStep: MaterialStateStep;
-
-    /** Array of slot information */
-    slotInfos: SlotInfo[];
+export enum MaterialStateAction {
+  Idle = 0,
+  LoadStep2 = 2,
+  LoadStep3 = 3,
+  UnloadStep2 = 4,
+  UnloadStep3 = 5,
+  Complete = 6
 }
-```
 
-#### SlotInfo (No Changes Required)
+export enum MaterialStateStep {
+  Idle = 0,
+  Load = 1,
+  Unload = 2,
+  Cancel = 3
+}
 
-```typescript
 export interface SlotInfo {
-    /** Slot ID (1-4) */
-    slotId: number;
-
-    /** Whether filament is loaded in this slot */
-    hasFilament: boolean;
-
-    /** Material name (e.g., "PLA", "ABS") */
-    materialName: string;
-
-    /** Material color as hex string (e.g., "#FF0000") */
-    materialColor: string;
+  slotId: number;
+  hasFilament: boolean;
+  materialName: string;
+  materialColor: string;
 }
-```
 
-### New Types for MaterialStation Module
+export interface MatlStationInfo {
+  slotCnt: number;
+  currentSlot: number;
+  currentLoadSlot: number;
+  stateAction: MaterialStateAction;
+  stateStep: MaterialStateStep;
+  slotInfos: SlotInfo[];
+}
 
-#### MsConfigCommandArgs
+export const AD5X_UI_MATERIAL_TYPES = [
+  'PLA', 'PLA-CF', 'ABS', 'PETG', 'PETG-CF', 'TPU', 'SILK'
+] as const;
 
-```typescript
+export const AD5X_EXTENDED_MATERIAL_TYPES = [
+  'PC-ABS', 'PET-CF', 'PPS-CF', 'PC', 'PA-CF', 'PA', 'PAHT-CF'
+] as const;
+
+export const AD5X_ALL_MATERIAL_TYPES = [
+  ...AD5X_UI_MATERIAL_TYPES,
+  ...AD5X_EXTENDED_MATERIAL_TYPES
+] as const;
+
+export const AD5X_COLOR_PALETTE = [
+  '#FFFFFF', '#FEF043', '#DCF478', '#0ACC38', '#067749', '#0C6283',
+  '#0DE2A0', '#75D9F3', '#45A8F9', '#2750E0', '#46328E', '#A03CF7',
+  '#F330F9', '#D4B0DC', '#F95D73', '#F72224', '#7C4B00', '#F98D33',
+  '#FDEBD5', '#D3C4A3', '#AF7836', '#898989', '#BCBCBC', '#161616'
+] as const;
+
+export type UICompatibleMaterialType = typeof AD5X_UI_MATERIAL_TYPES[number];
+export type ExtendedMaterialType = typeof AD5X_EXTENDED_MATERIAL_TYPES[number];
+export type AnyKnownMaterialType = typeof AD5X_ALL_MATERIAL_TYPES[number];
+
 export interface MsConfigCommandArgs {
-    /** Slot number to configure (1-4) */
-    slot: 1 | 2 | 3 | 4;
-
-    /** Material type (e.g., "PLA", "ABS", "PETG") */
-    mt: string;
-
-    /** Color as hex string without # (e.g., "FF0000") */
-    rgb: string;
+  slot: MaterialSlot;
+  mt: string;
+  rgb: string; // canonical form: #RRGGBB
 }
-```
 
-#### MsCommandAction
+export interface IpdMsConfigCommandArgs {
+  mt: string;
+  rgb: string; // canonical form: #RRGGBB
+}
 
-```typescript
 export enum MsCommandAction {
-    /** Load filament */
-    Load = 0,
-
-    /** Unload filament */
-    Unload = 1,
-
-    /** Cancel operation */
-    Cancel = 2
+  Load = 0,
+  Unload = 1,
+  Cancel = 2
 }
-```
 
-#### MsCommandArgs
-
-```typescript
 export interface MsCommandArgs {
-    /** Action to perform */
-    action: MsCommandAction;
+  action: MsCommandAction;
+  slot: MaterialSlot;
+}
 
-    /** Slot number (1-4) */
-    slot: 1 | 2 | 3 | 4;
+export interface IpdMsCommandArgs {
+  action: MsCommandAction;
 }
 ```
 
@@ -260,88 +350,53 @@ export interface MsCommandArgs {
 
 ## API Design
 
-### Module Structure
-
-```
-src/
-├── models/
-│   └── ff-models.ts          # Add enums: MaterialStateAction, MaterialStateStep, MsCommandAction
-├── api/
-│   ├── Commands.ts           # Add: MsConfigCmd, MsCmd
-│   ├── materials/
-│   │   └── MaterialStation.ts # New module
-│   ├── FiveMClient.ts        # Add: materialStation property
-│   └── Info.ts               # No changes (already returns MatlStationInfo)
-└── utils/
-    └── NetworkUtils.ts       # No changes (existing isOk() method)
-```
-
 ### Public API
 
-#### MaterialStation Class
-
 ```typescript
+export interface MaterialValidationOptions {
+  validationMode?: MaterialValidationMode;
+}
+
 export class MaterialStation {
-    constructor(private client: FiveMClient) {}
+  public async getStatus(): Promise<MatlStationInfo>;
 
-    /**
-     * Get the current status of the material station.
-     * @returns Promise<MatlStationInfo> Current status of all 4 slots
-     */
-    public async getStatus(): Promise<MatlStationInfo>;
+  // IFS slots (1-4)
+  public async setSlotMaterial(
+    slot: MaterialSlot,
+    materialType: string,
+    color: string,
+    options?: MaterialValidationOptions
+  ): Promise<boolean>;
 
-    /**
-     * Configure the material type and color for a specific slot.
-     * @param slot Slot number (1-4)
-     * @param materialType Material name (e.g., "PLA", "ABS")
-     * @param color Color as hex string with or without # prefix
-     * @returns Promise<boolean> True if successful
-     */
-    public async setSlotMaterial(
-        slot: 1 | 2 | 3 | 4,
-        materialType: string,
-        color: string
-    ): Promise<boolean>;
+  public async loadSlot(slot: MaterialSlot): Promise<boolean>;
+  public async unloadSlot(slot: MaterialSlot): Promise<boolean>;
+  public async cancelOperation(slot: MaterialSlot): Promise<boolean>;
 
-    /**
-     * Load filament from the specified slot.
-     * @param slot Slot number (1-4)
-     * @returns Promise<boolean> True if operation initiated successfully
-     */
-    public async loadSlot(slot: 1 | 2 | 3 | 4): Promise<boolean>;
+  // Independent path (slot 0)
+  public async setIndependentMaterial(
+    materialType: string,
+    color: string,
+    options?: MaterialValidationOptions
+  ): Promise<boolean>;
 
-    /**
-     * Unload filament from the specified slot.
-     * @param slot Slot number (1-4)
-     * @returns Promise<boolean> True if operation initiated successfully
-     */
-    public async unloadSlot(slot: 1 | 2 | 3 | 4): Promise<boolean>;
+  public async loadIndependent(): Promise<boolean>;
+  public async unloadIndependent(): Promise<boolean>;
+  public async cancelIndependent(): Promise<boolean>;
 
-    /**
-     * Cancel the current operation for the specified slot.
-     * @param slot Slot number (1-4)
-     * @returns Promise<boolean> True if cancellation initiated successfully
-     */
-    public async cancelOperation(slot: 1 | 2 | 3 | 4): Promise<boolean>;
+  // IFS error management
+  public async clearError(errorCode: IFSError): Promise<boolean>;
+  public async getActiveError(): Promise<IFSLErrorInfo | null>;
 }
 ```
 
-#### FiveMClient Extension
+### Commands Constants
 
 ```typescript
-export class FiveMClient {
-    // ... existing properties ...
-
-    /**
-     * Material station control module.
-     * Only available on AD5X printers with IFS hardware.
-     */
-    public readonly materialStation: MaterialStation;
-
-    constructor(...) {
-        // ... existing code ...
-        this.materialStation = new MaterialStation(this);
-    }
+export class Commands {
+  static readonly MsConfigCmd = 'msConfig_cmd';
+  static readonly IpdMsConfigCmd = 'ipdMsConfig_cmd';
+  static readonly MsCmd = 'ms_cmd';
+  static readonly IpdMsCmd = 'ipdMs_cmd';
 }
 ```
 
@@ -349,412 +404,88 @@ export class FiveMClient {
 
 ## Implementation Details
 
-### 1. State Enums Implementation
-
-**File:** `src/models/ff-models.ts`
-
-**Changes:**
+### Color Normalization
 
 ```typescript
-// Add new enums after existing enums (around line 100-150)
+function normalizeColor(input: string): string {
+  const raw = input.trim().toUpperCase();
+  const withPrefix = raw.startsWith('#') ? raw : `#${raw}`;
 
-/**
- * Material station action states.
- * Represents the current action state of a material station operation.
- */
-export enum MaterialStateAction {
-    Idle = 0,
-    LoadStep2 = 2,
-    LoadStep3 = 3,
-    UnloadStep2 = 4,
-    UnloadStep3 = 5,
-    Complete = 6
-}
+  if (!/^#[0-9A-F]{6}$/.test(withPrefix)) {
+    throw new Error(`Invalid color format: ${input}. Expected #RRGGBB or RRGGBB`);
+  }
 
-/**
- * Material station operation steps.
- * Represents the current step category of a material station operation.
- */
-export enum MaterialStateStep {
-    Idle = 0,
-    Load = 1,
-    Unload = 2,
-    Cancel = 3
-}
-
-/**
- * Material station command actions.
- */
-export enum MsCommandAction {
-    Load = 0,
-    Unload = 1,
-    Cancel = 2
+  return withPrefix;
 }
 ```
 
-**Update MatlStationInfo Interface:**
+### Material and Color Validation
 
 ```typescript
-export interface MatlStationInfo {
-    slotCnt: number;
-    currentSlot: number;
-    currentLoadSlot: number;
-    stateAction: MaterialStateAction;  // Changed from: number
-    stateStep: MaterialStateStep;      // Changed from: number
-    slotInfos: SlotInfo[];
-}
-```
+function validateMaterialAndColor(
+  materialType: string,
+  color: string,
+  mode: MaterialValidationMode = 'strict_ui'
+): { mt: string; rgb: string } {
+  const mt = materialType.trim();
+  const rgb = normalizeColor(color);
 
-### 2. Command Constants
+  if (!mt) {
+    throw new Error('Material type cannot be empty');
+  }
 
-**File:** `src/api/Commands.ts`
-
-**Changes:**
-
-```typescript
-export class Commands {
-    // ... existing commands ...
-
-    /** Command for configuring material station slot settings */
-    static readonly MsConfigCmd = "msConfig_cmd";
-
-    /** Command for controlling material station load/unload operations */
-    static readonly MsCmd = "ms_cmd";
-}
-```
-
-### 3. MaterialStation Module
-
-**File:** `src/api/materials/MaterialStation.ts` (NEW)
-
-```typescript
-import { FiveMClient } from '../FiveMClient';
-import { Commands } from '../Commands';
-import { MatlStationInfo, MsConfigCommandArgs, MsCommandArgs, MsCommandAction } from '../../models/ff-models';
-import { NetworkUtils } from '../../utils/NetworkUtils';
-import { GenericResponse } from '../../models/generics';
-
-/**
- * MaterialStation class provides control over the Intelligent Filament Station (IFS).
- *
- * The IFS is a 4-slot multi-material system for AD5X series printers.
- *
- * @example
- * ```typescript
- * const client = new FiveMClient(...);
- * const status = await client.materialStation.getStatus();
- * console.log(`Slot 1 has ${status.slotInfos[0].hasFilament ? 'filament' : 'no filament'}`);
- * ```
- */
-export class MaterialStation {
-    constructor(private client: FiveMClient) {}
-
-    /**
-     * Get the current status of the material station.
-     *
-     * @returns Promise<MatlStationInfo> Current status including slot information
-     * @throws Error if HTTP request fails or printer is not connected
-     *
-     * @example
-     * ```typescript
-     * const status = await client.materialStation.getStatus();
-     *
-     * // Check state using enums
-     * if (status.stateAction === MaterialStateAction.Complete) {
-     *     console.log('Operation completed');
-     * }
-     *
-     * // Iterate through slots
-     * status.slotInfos.forEach(slot => {
-     *     console.log(`Slot ${slot.slotId}: ${slot.materialName} ${slot.materialColor}`);
-     * });
-     * ```
-     */
-    public async getStatus(): Promise<MatlStationInfo> {
-        const detail = await this.client.info.getDetailResponse();
-        return detail.machineInfo.matlStationInfo;
+  if (mode === 'strict_ui') {
+    if (!AD5X_UI_MATERIAL_TYPES.includes(mt as UICompatibleMaterialType)) {
+      throw new Error(`Unsupported UI material type: ${mt}`);
     }
 
-    /**
-     * Configure the material type and color for a specific slot.
-     *
-     * This updates the printer's record of what material is loaded in each slot.
-     * Use this after physically changing filament to keep the printer's metadata accurate.
-     *
-     * @param slot Slot number to configure (1-4)
-     * @param materialType Material name (e.g., "PLA", "ABS", "PETG", "TPU")
-     * @param color Color as hex string with or without # prefix (e.g., "#FF0000" or "FF0000")
-     * @returns Promise<boolean> True if configuration successful
-     * @throws Error if slot number is invalid or color format is incorrect
-     *
-     * @example
-     * ```typescript
-     * // Set slot 1 to red PLA
-     * await client.materialStation.setSlotMaterial(1, "PLA", "#FF0000");
-     *
-     * // Set slot 2 to blue PETG
-     * await client.materialStation.setSlotMaterial(2, "PETG", "0000FF");
-     * ```
-     */
-    public async setSlotMaterial(
-        slot: 1 | 2 | 3 | 4,
-        materialType: string,
-        color: string
-    ): Promise<boolean> {
-        // Validate inputs
-        if (!materialType || materialType.trim() === '') {
-            throw new Error('Material type cannot be empty');
-        }
-
-        // Strip # prefix if present
-        const rgb = color.replace(/^#/, '').toUpperCase();
-
-        // Validate hex color format
-        if (!/^[0-9A-F]{6}$/i.test(rgb)) {
-            throw new Error(`Invalid color format: ${color}. Expected format: #RRGGBB or RRGGBB`);
-        }
-
-        const args: MsConfigCommandArgs = {
-            slot,
-            mt: materialType.trim(),
-            rgb
-        };
-
-        return this.sendMsConfigCommand(args);
+    if (!AD5X_COLOR_PALETTE.includes(rgb as (typeof AD5X_COLOR_PALETTE)[number])) {
+      throw new Error(`Unsupported AD5X palette color: ${rgb}`);
     }
-
-    /**
-     * Load filament from the specified slot.
-     *
-     * Initiates the load sequence for the given slot. The printer will:
-     * 1. Cut the filament crotch
-     * 2. Feed filament into the extruder
-     * 3. Verify successful loading
-     *
-     * Monitor operation progress using getStatus() and checking stateAction/stateStep.
-     *
-     * @param slot Slot number to load from (1-4)
-     * @returns Promise<boolean> True if load operation initiated successfully
-     * @throws Error if slot number is invalid
-     *
-     * @example
-     * ```typescript
-     * // Start loading from slot 1
-     * await client.materialStation.loadSlot(1);
-     *
-     * // Monitor progress
-     * let status = await client.materialStation.getStatus();
-     * while (status.stateAction !== MaterialStateAction.Complete &&
-     *        status.stateAction !== MaterialStateAction.Idle) {
-     *     await new Promise(resolve => setTimeout(resolve, 1000));
-     *     status = await client.materialStation.getStatus();
-     * }
-     * ```
-     */
-    public async loadSlot(slot: 1 | 2 | 3 | 4): Promise<boolean> {
-        return this.sendMsCommand({
-            action: MsCommandAction.Load,
-            slot
-        });
+  } else if (mode === 'compatible_extended') {
+    if (!AD5X_ALL_MATERIAL_TYPES.includes(mt as AnyKnownMaterialType)) {
+      throw new Error(`Unsupported known AD5X material type: ${mt}`);
     }
+  }
 
-    /**
-     * Unload filament from the specified slot.
-     *
-     * Initiates the unload sequence for the given slot. The printer will:
-     * 1. Cut the filament crotch
-     * 2. Retract filament from the extruder
-     * 3. Verify successful unloading
-     *
-     * Monitor operation progress using getStatus() and checking stateAction/stateStep.
-     *
-     * @param slot Slot number to unload from (1-4)
-     * @returns Promise<boolean> True if unload operation initiated successfully
-     * @throws Error if slot number is invalid
-     *
-     * @example
-     * ```typescript
-     * // Start unloading from slot 2
-     * await client.materialStation.unloadSlot(2);
-     *
-     * // Monitor progress
-     * let status = await client.materialStation.getStatus();
-     * while (status.stateStep === MaterialStateStep.Unload) {
-     *     await new Promise(resolve => setTimeout(resolve, 1000));
-     *     status = await client.materialStation.getStatus();
-     * }
-     * ```
-     */
-    public async unloadSlot(slot: 1 | 2 | 3 | 4): Promise<boolean> {
-        return this.sendMsCommand({
-            action: MsCommandAction.Unload,
-            slot
-        });
-    }
-
-    /**
-     * Cancel the current operation for the specified slot.
-     *
-     * Use this to stop an in-progress load or unload operation.
-     *
-     * @param slot Slot number to cancel operation for (1-4)
-     * @returns Promise<boolean> True if cancellation initiated successfully
-     * @throws Error if slot number is invalid
-     *
-     * @example
-     * ```typescript
-     * // Cancel load operation on slot 3
-     * await client.materialStation.cancelOperation(3);
-     * ```
-     */
-    public async cancelOperation(slot: 1 | 2 | 3 | 4): Promise<boolean> {
-        return this.sendMsCommand({
-            action: MsCommandAction.Cancel,
-            slot
-        });
-    }
-
-    /**
-     * Send a material station configuration command.
-     * @private
-     */
-    private async sendMsConfigCommand(args: MsConfigCommandArgs): Promise<boolean> {
-        const response = await this.client.control.sendControlCommand(
-            Commands.MsConfigCmd,
-            args
-        );
-
-        const parsed = JSON.parse(response) as GenericResponse;
-        return NetworkUtils.isOk(parsed.code);
-    }
-
-    /**
-     * Send a material station load/unload/cancel command.
-     * @private
-     */
-    private async sendMsCommand(args: MsCommandArgs): Promise<boolean> {
-        const response = await this.client.control.sendControlCommand(
-            Commands.MsCmd,
-            args
-        );
-
-        const parsed = JSON.parse(response) as GenericResponse;
-        return NetworkUtils.isOk(parsed.code);
-    }
+  return { mt, rgb };
 }
 ```
 
-### 4. FiveMClient Integration
-
-**File:** `src/api/FiveMClient.ts`
-
-**Changes:**
+### Command Senders
 
 ```typescript
-import { MaterialStation } from './materials/MaterialStation';
+private async sendMsConfigCommand(args: MsConfigCommandArgs): Promise<boolean> {
+  const response = await this.client.control.sendControlCommand(Commands.MsConfigCmd, args);
+  const parsed = JSON.parse(response) as GenericResponse;
+  return NetworkUtils.isOk(parsed.code);
+}
 
-export class FiveMClient {
-    public readonly info: Info;
-    public readonly control: Control;
-    public readonly files: Files;
-    public readonly move: Move;
-    public readonly temperature: Temperature;
-    // ... existing properties ...
+private async sendIpdMsConfigCommand(args: IpdMsConfigCommandArgs): Promise<boolean> {
+  const response = await this.client.control.sendControlCommand(Commands.IpdMsConfigCmd, args);
+  const parsed = JSON.parse(response) as GenericResponse;
+  return NetworkUtils.isOk(parsed.code);
+}
 
-    /**
-     * Material station control module.
-     * Only available on AD5X printers with IFS hardware.
-     */
-    public readonly materialStation: MaterialStation;
+private async sendMsCommand(args: MsCommandArgs): Promise<boolean> {
+  const response = await this.client.control.sendControlCommand(Commands.MsCmd, args);
+  const parsed = JSON.parse(response) as GenericResponse;
+  return NetworkUtils.isOk(parsed.code);
+}
 
-    constructor(
-        ipAddress: string,
-        serialNumber: string,
-        checkCode: string
-    ) {
-        // ... existing initialization ...
-
-        // Add material station initialization
-        this.materialStation = new MaterialStation(this);
-    }
+private async sendIpdMsCommand(args: IpdMsCommandArgs): Promise<boolean> {
+  const response = await this.client.control.sendControlCommand(Commands.IpdMsCmd, args);
+  const parsed = JSON.parse(response) as GenericResponse;
+  return NetworkUtils.isOk(parsed.code);
 }
 ```
 
-### 5. Module Index
+### SDK Safety Rules
 
-**File:** `src/api/materials/index.ts` (NEW)
-
-```typescript
-export { MaterialStation } from './MaterialStation';
-```
-
----
-
-## Error Handling
-
-### Error Response Format
-
-All commands follow the standard GenericResponse format:
-
-```typescript
-interface GenericResponse {
-    code: number;        // 0 = success, non-zero = error
-    message: string;     // Error message (if code != 0)
-}
-```
-
-### Validation Errors
-
-Thrown before sending commands:
-
-```typescript
-// Invalid slot number
-throw new Error('Slot number must be between 1 and 4');
-
-// Empty material type
-throw new Error('Material type cannot be empty');
-
-// Invalid color format
-throw new Error('Invalid color format: XYZ. Expected format: #RRGGBB or RRGGBB');
-```
-
-### Operation Errors
-
-Returned as boolean false values:
-
-```typescript
-const success = await client.materialStation.loadSlot(1);
-if (!success) {
-    console.error('Failed to initiate load operation');
-}
-```
-
-### Error Codes
-
-Common printer error codes for material station operations:
-
-- `E0100-E0103`: Channel 1-4 feeding timeout
-- `E0104-E0107`: Channel 1-4 retracting timeout
-- `E0108`: Failed to feed filament to extruder
-- `E0109`: IFS odometer roller not moving (stall detection)
-- `E0114`: IFS homing error
-
-### Error Handling Best Practices
-
-```typescript
-try {
-    const success = await client.materialStation.loadSlot(1);
-
-    if (!success) {
-        // Check printer status for error details
-        const detail = await client.info.getDetailResponse();
-        console.error('Load failed:', detail.machineInfo.machineState);
-    }
-} catch (error) {
-    // Handle validation errors
-    console.error('Validation error:', error.message);
-}
-```
+- Validate slot range on client before sending commands.
+- Keep `setSlotMaterial` and `setIndependentMaterial` separate APIs to avoid slot-0 confusion.
+- Do not silently map slot `0` to `ipdMsConfig_cmd`; require explicit independent APIs.
+- For `compatible_extended`, emit warning telemetry for non-palette colors.
 
 ---
 
@@ -762,668 +493,155 @@ try {
 
 ### Unit Tests
 
-**File:** `src/api/materials/__tests__/MaterialStation.test.ts`
+- `setSlotMaterial` serializes `msConfig_cmd` with slot `1..4`.
+- `setIndependentMaterial` serializes `ipdMsConfig_cmd` with no slot field.
+- `loadIndependent`/`unloadIndependent`/`cancelIndependent` serialize `ipdMs_cmd` with actions `0/1/2`.
+- Validation mode tests:
+  - `strict_ui` accepts only 7 UI materials and 24 colors.
+  - `compatible_extended` accepts all 14 materials.
+  - `pass_through` accepts arbitrary non-empty strings.
 
-```typescript
-import { MaterialStation } from '../MaterialStation';
-import { FiveMClient } from '../../FiveMClient';
-import { Commands } from '../../Commands';
-import { MaterialStateAction, MaterialStateStep } from '../../../models/ff-models';
+### Integration Tests (AD5X Hardware)
 
-describe('MaterialStation', () => {
-    let client: FiveMClient;
-    let materialStation: MaterialStation;
-
-    beforeEach(() => {
-        client = new FiveMClient('192.168.1.100', 'SN123', '1234');
-        materialStation = client.materialStation;
-    });
-
-    describe('getStatus', () => {
-        it('should return material station info', async () => {
-            const mockDetail = {
-                machineInfo: {
-                    matlStationInfo: {
-                        slotCnt: 4,
-                        currentSlot: 1,
-                        currentLoadSlot: 0,
-                        stateAction: MaterialStateAction.Idle,
-                        stateStep: MaterialStateStep.Idle,
-                        slotInfos: [
-                            { slotId: 1, hasFilament: true, materialName: 'PLA', materialColor: '#FF0000' },
-                            { slotId: 2, hasFilament: false, materialName: '', materialColor: '#000000' },
-                            { slotId: 3, hasFilament: false, materialName: '', materialColor: '#000000' },
-                            { slotId: 4, hasFilament: false, materialName: '', materialColor: '#000000' }
-                        ]
-                    }
-                }
-            };
-
-            jest.spyOn(client.info, 'getDetailResponse').mockResolvedValue(mockDetail);
-
-            const status = await materialStation.getStatus();
-
-            expect(status.slotCnt).toBe(4);
-            expect(status.stateAction).toBe(MaterialStateAction.Idle);
-            expect(status.slotInfos[0].hasFilament).toBe(true);
-            expect(status.slotInfos[0].materialName).toBe('PLA');
-        });
-    });
-
-    describe('setSlotMaterial', () => {
-        it('should configure slot material with # prefix', async () => {
-            const mockResponse = JSON.stringify({ code: 0, message: 'ok' });
-            jest.spyOn(client.control, 'sendControlCommand').mockResolvedValue(mockResponse);
-
-            const result = await materialStation.setSlotMaterial(1, 'PLA', '#FF0000');
-
-            expect(result).toBe(true);
-            expect(client.control.sendControlCommand).toHaveBeenCalledWith(
-                Commands.MsConfigCmd,
-                { slot: 1, mt: 'PLA', rgb: 'FF0000' }
-            );
-        });
-
-        it('should configure slot material without # prefix', async () => {
-            const mockResponse = JSON.stringify({ code: 0, message: 'ok' });
-            jest.spyOn(client.control, 'sendControlCommand').mockResolvedValue(mockResponse);
-
-            const result = await materialStation.setSlotMaterial(2, 'ABS', '00FF00');
-
-            expect(result).toBe(true);
-            expect(client.control.sendControlCommand).toHaveBeenCalledWith(
-                Commands.MsConfigCmd,
-                { slot: 2, mt: 'ABS', rgb: '00FF00' }
-            );
-        });
-
-        it('should reject invalid color format', async () => {
-            await expect(materialStation.setSlotMaterial(1, 'PLA', 'XYZ'))
-                .rejects.toThrow('Invalid color format');
-        });
-
-        it('should reject empty material type', async () => {
-            await expect(materialStation.setSlotMaterial(1, '', '#FF0000'))
-                .rejects.toThrow('Material type cannot be empty');
-        });
-    });
-
-    describe('loadSlot', () => {
-        it('should initiate load operation', async () => {
-            const mockResponse = JSON.stringify({ code: 0, message: 'ok' });
-            jest.spyOn(client.control, 'sendControlCommand').mockResolvedValue(mockResponse);
-
-            const result = await materialStation.loadSlot(1);
-
-            expect(result).toBe(true);
-            expect(client.control.sendControlCommand).toHaveBeenCalledWith(
-                Commands.MsCmd,
-                { action: 0, slot: 1 }
-            );
-        });
-    });
-
-    describe('unloadSlot', () => {
-        it('should initiate unload operation', async () => {
-            const mockResponse = JSON.stringify({ code: 0, message: 'ok' });
-            jest.spyOn(client.control, 'sendControlCommand').mockResolvedValue(mockResponse);
-
-            const result = await materialStation.unloadSlot(2);
-
-            expect(result).toBe(true);
-            expect(client.control.sendControlCommand).toHaveBeenCalledWith(
-                Commands.MsCmd,
-                { action: 1, slot: 2 }
-            );
-        });
-    });
-
-    describe('cancelOperation', () => {
-        it('should cancel operation', async () => {
-            const mockResponse = JSON.stringify({ code: 0, message: 'ok' });
-            jest.spyOn(client.control, 'sendControlCommand').mockResolvedValue(mockResponse);
-
-            const result = await materialStation.cancelOperation(3);
-
-            expect(result).toBe(true);
-            expect(client.control.sendControlCommand).toHaveBeenCalledWith(
-                Commands.MsCmd,
-                { action: 2, slot: 3 }
-            );
-        });
-    });
-});
-```
-
-### Integration Tests
-
-**File:** `src/api/materials/__tests__/MaterialStation.integration.test.ts`
-
-```typescript
-import { FiveMClient } from '../../FiveMClient';
-import { MaterialStateAction, MaterialStateStep } from '../../../models/ff-models';
-
-describe('MaterialStation Integration Tests', () => {
-    let client: FiveMClient;
-
-    beforeAll(() => {
-        const ipAddress = process.env.AD5X_IP;
-        const serialNumber = process.env.AD5X_SERIAL;
-        const checkCode = process.env.AD5X_CHECK_CODE;
-
-        if (!ipAddress || !serialNumber || !checkCode) {
-            throw new Error('Missing AD5X connection environment variables');
-        }
-
-        client = new FiveMClient(ipAddress, serialNumber, checkCode);
-    });
-
-    it('should get material station status', async () => {
-        const status = await client.materialStation.getStatus();
-
-        expect(status.slotCnt).toBe(4);
-        expect(status.slotInfos).toHaveLength(4);
-        expect(status.slotInfos[0].slotId).toBe(1);
-
-        console.log('Current stateAction:', status.stateAction);
-        console.log('Current stateStep:', status.stateStep);
-    });
-
-    it('should set slot material configuration', async () => {
-        const result = await client.materialStation.setSlotMaterial(
-            1,
-            'PLA',
-            '#FF0000'
-        );
-
-        expect(result).toBe(true);
-
-        // Verify configuration
-        const status = await client.materialStation.getStatus();
-        expect(status.slotInfos[0].materialName).toBe('PLA');
-        expect(status.slotInfos[0].materialColor).toBe('#FF0000');
-    });
-});
-```
+- Verify `msConfig_cmd` with slot `0` does not change persisted values.
+- Verify `ipdMsConfig_cmd` updates `indepMatlInfo` / slot `0` material metadata.
+- Verify immediate UI reflection via `/detail` polling after each config command.
+- Verify color round-trip for all 24 palette values.
 
 ---
 
 ## Usage Examples
 
-### Example 1: Check Material Station Status
+### Configure IFS Slot With Strict UI Validation
 
 ```typescript
-import { FiveMClient } from '@ghosttypes/ff-api';
-import { MaterialStateAction, MaterialStateStep } from '@ghosttypes/ff-api/models';
+await client.materialStation.setSlotMaterial(
+  1,
+  'PLA',
+  '#FFFFFF',
+  { validationMode: 'strict_ui' }
+);
+```
 
-const client = new FiveMClient(
-    '192.168.1.100',
-    'SNAD5X12345',
-    '12345'
+### Configure Independent Path (Slot 0)
+
+```typescript
+await client.materialStation.setIndependentMaterial(
+  'PETG',
+  '#FEF043',
+  { validationMode: 'strict_ui' }
 );
 
-// Get current status
-const status = await client.materialStation.getStatus();
-
-console.log('Material Station Status:');
-console.log(`  Total slots: ${status.slotCnt}`);
-console.log(`  Current slot: ${status.currentSlot}`);
-console.log(`  Action state: ${MaterialStateAction[status.stateAction]}`);
-console.log(`  Step state: ${MaterialStateStep[status.stateStep]}`);
-
-console.log('\nSlot Information:');
-status.slotInfos.forEach(slot => {
-    console.log(`  Slot ${slot.slotId}:`);
-    console.log(`    Has filament: ${slot.hasFilament}`);
-    console.log(`    Material: ${slot.materialName || 'None'}`);
-    console.log(`    Color: ${slot.materialColor}`);
-});
+await client.materialStation.loadIndependent();
 ```
 
-**Output:**
-```
-Material Station Status:
-  Total slots: 4
-  Current slot: 1
-  Action state: Idle
-  Step state: Idle
-
-Slot Information:
-  Slot 1:
-    Has filament: true
-    Material: PLA
-    Color: #FF0000
-  Slot 2:
-    Has filament: false
-    Material: None
-    Color: #000000
-  Slot 3:
-    Has filament: false
-    Material: None
-    Color: #000000
-  Slot 4:
-    Has filament: false
-    Material: None
-    Color: #000000
-```
-
-### Example 2: Configure Slot Materials
+### Extended Material Mode
 
 ```typescript
-// Configure all 4 slots
-await client.materialStation.setSlotMaterial(1, 'PLA', '#FF0000');    // Red PLA
-await client.materialStation.setSlotMaterial(2, 'ABS', '#00FF00');    // Green ABS
-await client.materialStation.setSlotMaterial(3, 'PETG', '#0000FF');   // Blue PETG
-await client.materialStation.setSlotMaterial(4, 'TPU', '#FFFF00');    // Yellow TPU
-
-console.log('All slots configured successfully');
+await client.materialStation.setSlotMaterial(
+  2,
+  'PAHT-CF',
+  '#A03CF7',
+  { validationMode: 'compatible_extended' }
+);
 ```
-
-### Example 3: Load and Monitor Operation
-
-```typescript
-// Start loading from slot 1
-const success = await client.materialStation.loadSlot(1);
-
-if (!success) {
-    console.error('Failed to start load operation');
-    return;
-}
-
-console.log('Load operation initiated...');
-
-// Monitor progress
-let status = await client.materialStation.getStatus();
-
-while (status.stateAction !== MaterialStateAction.Complete &&
-       status.stateAction !== MaterialStateAction.Idle) {
-
-    console.log(`  Current state: ${MaterialStateAction[status.stateAction]}`);
-
-    // Check for errors
-    if (status.stateAction === MaterialStateAction.Idle && status.stateStep === MaterialStateStep.Idle) {
-        console.error('Operation failed or was cancelled');
-        return;
-    }
-
-    // Wait 1 second before checking again
-    await new Promise(resolve => setTimeout(resolve, 1000));
-    status = await client.materialStation.getStatus();
-}
-
-console.log('Load operation completed!');
-
-// Verify filament is loaded
-status = await client.materialStation.getStatus();
-if (status.slotInfos[0].hasFilament) {
-    console.log(`Slot 1 now has ${status.slotInfos[0].materialName} filament loaded`);
-}
-```
-
-### Example 4: Multi-Material Setup for Printing
-
-```typescript
-async function setupMultiMaterialPrint() {
-    // Define materials for a 4-color print
-    const materials = [
-        { slot: 1 as const, type: 'PLA', color: '#FF0000' },  // Red
-        { slot: 2 as const, type: 'PLA', color: '#00FF00' },  // Green
-        { slot: 3 as const, type: 'PLA', color: '#0000FF' },  // Blue
-        { slot: 4 as const, type: 'PLA', color: '#FFFF00' }   // Yellow
-    ];
-
-    // Configure all slots
-    for (const material of materials) {
-        await client.materialStation.setSlotMaterial(
-            material.slot,
-            material.type,
-            material.color
-        );
-        console.log(`Configured slot ${material.slot}: ${material.type} ${material.color}`);
-    }
-
-    // Load all filaments
-    for (const material of materials) {
-        console.log(`Loading slot ${material.slot}...`);
-
-        // Start load
-        await client.materialStation.loadSlot(material.slot);
-
-        // Wait for completion
-        await waitForOperationComplete();
-    }
-
-    console.log('All materials loaded and ready for printing!');
-}
-
-async function waitForOperationComplete() {
-    let status = await client.materialStation.getStatus();
-
-    while (status.stateAction !== MaterialStateAction.Complete &&
-           status.stateAction !== MaterialStateAction.Idle) {
-        await new Promise(resolve => setTimeout(resolve, 500));
-        status = await client.materialStation.getStatus();
-    }
-}
-```
-
-### Example 5: Unload All Filaments
-
-```typescript
-async function unloadAllFilaments() {
-    const status = await client.materialStation.getStatus();
-
-    for (const slot of status.slotInfos) {
-        if (slot.hasFilament) {
-            console.log(`Unloading slot ${slot.slotId}...`);
-
-            // Start unload
-            await client.materialStation.unloadSlot(slot.slotId);
-
-            // Wait for completion
-            await waitForOperationComplete();
-
-            console.log(`Slot ${slot.slotId} unloaded`);
-        }
-    }
-
-    console.log('All filaments unloaded');
-}
-```
-
-### Example 6: Error Handling and Recovery
-
-```typescript
-async function safeLoadSlot(slot: 1 | 2 | 3 | 4, maxRetries = 3) {
-    for (let attempt = 1; attempt <= maxRetries; attempt++) {
-        console.log(`Load attempt ${attempt}/${maxRetries} for slot ${slot}...`);
-
-        // Start load operation
-        const success = await client.materialStation.loadSlot(slot);
-
-        if (!success) {
-            console.error(`Failed to initiate load on attempt ${attempt}`);
-            continue;
-        }
-
-        // Monitor progress
-        let status = await client.materialStation.getStatus();
-        const startTime = Date.now();
-        const timeout = 60000; // 60 seconds
-
-        while (status.stateAction !== MaterialStateAction.Complete) {
-            // Check timeout
-            if (Date.now() - startTime > timeout) {
-                console.error('Load operation timed out');
-
-                // Cancel operation
-                await client.materialStation.cancelOperation(slot);
-                await waitForIdle();
-
-                break;
-            }
-
-            // Check for error state
-            if (status.stateAction === MaterialStateAction.Idle &&
-                status.stateStep === MaterialStateStep.Idle) {
-                console.error('Load operation failed');
-
-                // Check printer error
-                const detail = await client.info.getDetailResponse();
-                console.error('Printer state:', detail.machineInfo.machineState);
-
-                break;
-            }
-
-            await new Promise(resolve => setTimeout(resolve, 1000));
-            status = await client.materialStation.getStatus();
-        }
-
-        // Verify success
-        status = await client.materialStation.getStatus();
-        if (status.slotInfos[slot - 1].hasFilament) {
-            console.log(`Slot ${slot} loaded successfully`);
-            return true;
-        }
-
-        console.log(`Load attempt ${attempt} failed, retrying...`);
-    }
-
-    console.error(`Failed to load slot ${slot} after ${maxRetries} attempts`);
-    return false;
-}
-
-async function waitForIdle() {
-    let status = await client.materialStation.getStatus();
-    while (status.stateAction !== MaterialStateAction.Idle) {
-        await new Promise(resolve => setTimeout(resolve, 500));
-        status = await client.materialStation.getStatus();
-    }
-}
-```
-
----
-
-## Future Enhancements
-
-### Potential Future Features
-
-These features are **not in scope** for this implementation but may be considered for future releases:
-
-#### 1. Operation Progress Monitoring
-
-Provide a method to monitor operation progress with callbacks:
-
-```typescript
-interface LoadOptions {
-    onProgress?: (progress: number) => void;
-    onComplete?: () => void;
-    onError?: (error: string) => void;
-}
-
-materialStation.loadSlot(1, {
-    onProgress: (p) => console.log(`Progress: ${p}%`),
-    onComplete: () => console.log('Done!'),
-    onError: (e) => console.error(`Error: ${e}`)
-});
-```
-
-#### 2. Batch Operations
-
-Configure or load multiple slots in parallel:
-
-```typescript
-// Configure all slots at once
-materialStation.configureAllSlots([
-    { slot: 1, material: 'PLA', color: '#FF0000' },
-    { slot: 2, material: 'ABS', color: '#00FF00' },
-    { slot: 3, material: 'PETG', color: '#0000FF' },
-    { slot: 4, material: 'TPU', color: '#FFFF00' }
-]);
-```
-
-#### 3. Material Type Validation
-
-Predefined material types with validation:
-
-```typescript
-enum MaterialType {
-    PLA = 'PLA',
-    ABS = 'ABS',
-    PETG = 'PETG',
-    TPU = 'TPU',
-    ASA = 'ASA',
-    // ... etc
-}
-
-materialStation.setSlotMaterial(1, MaterialType.PLA, '#FF0000');
-```
-
-#### 4. Independent Filament Path (Slot 0)
-
-Support for the independent filament path that bypasses the IFS:
-
-```typescript
-materialStation.setIndependentMaterial('PLA', '#FF0000');
-materialStation.loadIndependent();
-materialStation.unloadIndependent();
-```
-
-#### 5. Event-Based Status Updates
-
-WebSocket or long-polling support for real-time status updates:
-
-```typescript
-materialStation.on('stateChanged', ( newState) => {
-    console.log('State changed:', newState);
-});
-
-materialStation.on('operationComplete', (slot) => {
-    console.log('Slot', slot, 'operation complete');
-});
-```
-
-#### 6. History and Logging
-
-Track material changes and operation history:
-
-```typescript
-const history = await materialStation.getOperationHistory();
-console.log('Last 10 operations:', history);
-```
-
-### Compatibility Notes
-
-Future enhancements should maintain backward compatibility with this implementation. All methods added in this specification should remain stable and unchanged in future versions.
 
 ---
 
 ## Appendix
 
-### A. Command Reference
+### A. Full Material Lists
 
-#### msConfig_cmd
+UI-compatible:
 
-Configure material station slot metadata.
+- `PLA`
+- `PLA-CF`
+- `ABS`
+- `PETG`
+- `PETG-CF`
+- `TPU`
+- `SILK`
 
-**Endpoint:** `POST /control`
+Extended recognized strings:
 
-**Request:**
-```json
-{
-    "serialNumber": "SNAD5X12345",
-    "checkCode": "12345",
-    "payload": {
-        "cmd": "msConfig_cmd",
-        "args": {
-            "slot": 1,
-            "mt": "PLA",
-            "rgb": "FF0000"
-        }
-    }
-}
-```
+- `PC-ABS`
+- `PET-CF`
+- `PPS-CF`
+- `PC`
+- `PA-CF`
+- `PA`
+- `PAHT-CF`
 
-**Response:**
-```json
-{
-    "code": 0,
-    "message": "ok"
-}
-```
+### B. Full AD5X Palette
 
-#### ms_cmd
+1. `#FFFFFF`
+2. `#FEF043`
+3. `#DCF478`
+4. `#0ACC38`
+5. `#067749`
+6. `#0C6283`
+7. `#0DE2A0`
+8. `#75D9F3`
+9. `#45A8F9`
+10. `#2750E0`
+11. `#46328E`
+12. `#A03CF7`
+13. `#F330F9`
+14. `#D4B0DC`
+15. `#F95D73`
+16. `#F72224`
+17. `#7C4B00`
+18. `#F98D33`
+19. `#FDEBD5`
+20. `#D3C4A3`
+21. `#AF7836`
+22. `#898989`
+23. `#BCBCBC`
+24. `#161616`
 
-Control material station load/unload operations.
+### C. Firmware Helper Behavior (Material-Dependent)
 
-**Endpoint:** `POST /control`
+These are used by firmware helpers and UI logic; include for integration/debug parity.
 
-**Request (Load):**
-```json
-{
-    "serialNumber": "SNAD5X12345",
-    "checkCode": "12345",
-    "payload": {
-        "cmd": "ms_cmd",
-        "args": {
-            "action": 0,
-            "slot": 1
-        }
-    }
-}
-```
-
-**Request (Unload):**
-```json
-{
-    "serialNumber": "SNAD5X12345",
-    "checkCode": "12345",
-    "payload": {
-        "cmd": "ms_cmd",
-        "args": {
-            "action": 1,
-            "slot": 1
-        }
-    }
-}
-```
-
-**Request (Cancel):**
-```json
-{
-    "serialNumber": "SNAD5X12345",
-    "checkCode": "12345",
-    "payload": {
-        "cmd": "ms_cmd",
-        "args": {
-            "action": 2,
-            "slot": 1
-        }
-    }
-}
-```
-
-**Response:**
-```json
-{
-    "code": 0,
-    "message": "ok"
-}
-```
-
-### B. State Machine Reference
-
-#### StateAction Values
-
-| Value | Enum Name | Description |
-|-------|-----------|-------------|
-| 0 | Idle | No operation in progress |
-| 2 | LoadStep2 | Load operation - step 2 |
-| 3 | LoadStep3 | Load operation - step 3 |
-| 4 | UnloadStep2 | Unload operation - step 2 |
-| 5 | UnloadStep3 | Unload operation - step 3 |
-| 6 | Complete | Operation completed successfully |
-
-#### StateStep Values
-
-| Value | Enum Name | Description |
-|-------|-----------|-------------|
-| 0 | Idle | No operation in progress |
-| 1 | Load | Load operation in progress |
-| 2 | Unload | Unload operation in progress |
-| 3 | Cancel | Operation cancellation in progress |
-
-### C. Related Documentation
-
-- **HTTP API Reference:** `docs/http-api.md`
-- **AD5X API Documentation:** `repos/flashforge-api-docs/ad5x-api.md`
-- **Multi-Material Workflow:** `repos/flashforge-api-docs/ad5x-workflow.md`
-- **Firmware Documentation:** `docs/ad5x/`
+- `getFilamentTypeTemp`
+  - `TPU`, `SILK` -> `230`
+  - `PC-ABS`, `PETG`, `PETG-CF` -> `250`
+  - fallback -> `220`
+- `getFilamentTypeTime`
+  - `TPU`, `SILK` -> `36`
+  - others -> `15`
+- `getFilamentTypeLoadFristSpace`
+  - `PETG` -> `70`
+  - others -> `80`
+- `getFilamentTypeLoadSpace`
+  - `TPU`, `PETG` -> `50`
+  - `PETG-CF` -> `40`
+  - others -> `60`
+- `getFilamentTypeUnloadSpeed`
+  - `PETG` -> `300`
+  - `TPU` -> `200`
+  - `SILK` -> `600`
+  - others -> `300`
+- `getFilamentTypeUnloadSpace`
+  - returns `60`
+- `updateFilamentTemp`
+  - `PET-CF`, `PPS-CF` -> `280`
+  - `PC` -> `290`
+  - `PA-CF` -> `274`
+  - `PC-ABS` -> `270`
+  - `PA` -> `230`
+  - `PLA`, `PLA-CF` -> `220`
+  - `SILK` -> `230`
+  - `PAHT-CF` -> `305`
+  - `TPU` -> `250`
+  - fallback -> `230`
 
 ### D. Revision History
 
 | Version | Date | Author | Changes |
-|---------|------|--------|---------|
+|---|---|---|---|
+| 1.1.1 | 2026-02-11 | Codex | Locked user-facing UI policy to `strict_ui` with picker-only 7 material types and 24 palette colors |
+| 1.1.0 | 2026-02-11 | Codex | Added independent path commands, full material/color datasets, validation modes, and firmware-derived routing rules |
 | 1.0.0 | 2025-02-07 | Claude Code | Initial specification |
 
 ---

@@ -1,8 +1,8 @@
 # AD5X Control Commands Implementation Specification
 
-**Status:** Proposed
-**Version:** 1.0.0
-**Date:** 2025-02-07
+**Status:** Updated
+**Version:** 1.1.1
+**Date:** 2026-02-11
 **Printer Models:** AD5X (primary), 5M/5M Pro (future support)
 **API Version:** HTTP API (Port 8898)
 
@@ -32,30 +32,34 @@ This specification defines the implementation of advanced printer control comman
 - **Homing operations** - Home all axes (AD5X, future 5M)
 - **Error code management** - Query and clear IFS errors (AD5X only)
 
+Material-station command/configuration details (`msConfig_cmd`, `ipdMsConfig_cmd`, `ms_cmd`, `ipdMs_cmd`) are defined in `material-station-implementation.md`; this control spec must stay aligned with the same firmware-derived datasets and behavior.
+
 ### Current Firmware Support
 
 | Command | AD5X | 5M | 5M Pro | Notes |
-|---------|------|----|----|----|
-| `reName_cmd` | ✅ | ✅ | ✅ | Available on all models |
-| `moveCtrl_cmd` | ✅ | ❌ | ❌ | Expected in future 5M firmware |
-| `extrudeCtrl_cmd` | ✅ | ❌ | ❌ | Expected in future 5M firmware |
-| `homingCtrl_cmd` | ✅ | ❌ | ❌ | 5M has alternative via TCP |
-| `errorCodeCtrl_cmd` | ✅ | ❌ | ❌ | IFS-specific, unlikely on 5M |
+|---|---|---|---|---|
+| `reName_cmd` | Yes | Yes | Yes | Available on all models |
+| `moveCtrl_cmd` | Yes | No | No | Expected in future 5M firmware |
+| `extrudeCtrl_cmd` | Yes | No | No | Expected in future 5M firmware |
+| `homingCtrl_cmd` | Yes | No | No | 5M has alternative via TCP |
+| `errorCodeCtrl_cmd` | Yes | No | No | IFS-specific, unlikely on 5M |
+
+Related IFS commands in the companion material-station spec: `msConfig_cmd`, `ipdMsConfig_cmd`, `ms_cmd`, `ipdMs_cmd`.
 
 ### Design Philosophy
 
 **Runtime Capability Detection:** Commands automatically enable/disable based on capability flags in the `/detail` endpoint response. The detection logic:
 
-1. **Check field presence** - If capability field doesn't exist → feature unavailable
-2. **Check field value** - If field exists, must be exactly `1` (or `true` for boolean flags)
+1. **Check field presence** - If capability field does not exist, feature is unavailable.
+2. **Check field value** - If field exists, it must be exactly `1` (or `true` for boolean flags).
 
 This approach ensures:
 
-- ✅ No breaking changes when 5M firmware adds these features
-- ✅ Automatic capability detection without manual code updates
-- ✅ Type-safe API with proper capability checks
-- ✅ Clear error messages when attempting unsupported operations
-- ✅ Future-proof: when 5M firmware adds `moveCtrl: 1`, it automatically works
+- No breaking changes when 5M firmware adds these features
+- Automatic capability detection without manual code updates
+- Type-safe API with proper capability checks
+- Clear error messages when attempting unsupported operations
+- Future-proof support when 5M firmware adds `moveCtrl: 1` or `extrudeCtrl: 1`
 
 ### Scope
 
@@ -65,16 +69,83 @@ This approach ensures:
 - Comprehensive error code enums
 - Cross-platform compatibility foundation
 - Error clearing in MaterialStation module
+- Synchronization with AD5X material metadata datasets used by MaterialStation APIs
 
 **Out of Scope:**
 - `stateCtrl_cmd` - Platform state management (purpose not fully understood)
 - TCP G-code fallbacks for 5M (use existing `FlashForgeTcpClient`)
-
-**Out of Scope:**
-- TCP G-code fallbacks for 5M (use existing `FlashForgeTcpClient`)
 - Real-time position monitoring (future enhancement)
 - Movement queues or motion planning
 - Custom homing sequences
+
+### Material Metadata Dataset Alignment
+
+The following datasets are firmware-derived and must remain in sync with `material-station-implementation.md`.
+
+Strict UI material types:
+
+```text
+PLA
+PLA-CF
+ABS
+PETG
+PETG-CF
+TPU
+SILK
+```
+
+Extended recognized material strings:
+
+```text
+PC-ABS
+PET-CF
+PPS-CF
+PC
+PA-CF
+PA
+PAHT-CF
+```
+
+AD5X hardcoded 24-color palette:
+
+```text
+#FFFFFF
+#FEF043
+#DCF478
+#0ACC38
+#067749
+#0C6283
+#0DE2A0
+#75D9F3
+#45A8F9
+#2750E0
+#46328E
+#A03CF7
+#F330F9
+#D4B0DC
+#F95D73
+#F72224
+#7C4B00
+#F98D33
+#FDEBD5
+#D3C4A3
+#AF7836
+#898989
+#BCBCBC
+#161616
+```
+
+Behavioral alignment notes:
+
+- Firmware config handlers persist arbitrary `mt`/`rgb` strings when client validation is bypassed.
+- `msConfig_cmd` with slot `0` is a no-op.
+- Independent-path metadata must use `ipdMsConfig_cmd` (implicit slot `0`).
+
+User-facing UI policy (required):
+
+- Material types shown to users must be only the 7 UI types: `PLA`, `PLA-CF`, `ABS`, `PETG`, `PETG-CF`, `TPU`, `SILK`.
+- Colors shown to users must be only the 24 AD5X palette colors.
+- User input must come from pickers; no free-text material type entry and no arbitrary custom color entry.
 
 ---
 
@@ -687,6 +758,8 @@ export class Control {
 ### Public API - MaterialStation Extensions
 
 **File:** `src/api/materials/MaterialStation.ts`
+
+This spec only covers error-management extensions in `MaterialStation`. Material config/control APIs, including independent path methods (`setIndependentMaterial`, `loadIndependent`, `unloadIndependent`, `cancelIndependent`), are defined in `material-station-implementation.md`.
 
 ```typescript
 export class MaterialStation {
@@ -2055,6 +2128,7 @@ Clear an IFS error code.
 ### D. Related Documentation
 
 - **Material Station Spec:** `docs/specs/material-station-implementation.md`
+- **IFS Material Config RE Baseline:** `docs/ad5x/AD5X-1.2.1-1.1.1-3.0.7-20251217-Factory/ifs-material-config-dialog.md`
 - **HTTP API Reference:** `docs/http-api.md`
 - **AD5X API Documentation:** `repos/flashforge-api-docs/ad5x-api.md`
 - **Firmware Documentation:** `docs/ad5x/`
@@ -2063,6 +2137,8 @@ Clear an IFS error code.
 
 | Version | Date | Author | Changes |
 |---------|------|--------|---------|
+| 1.1.1 | 2026-02-11 | Codex | Locked user-facing UI policy to strict_ui picker set (7 material types, 24 palette colors) |
+| 1.1.0 | 2026-02-11 | Codex | Added explicit alignment with IFS material datasets (valid material types, 24-color palette, slot-0/IPD behavior) and companion-spec boundaries |
 | 1.0.0 | 2025-02-07 | Claude Code | Initial specification |
 
 ---
