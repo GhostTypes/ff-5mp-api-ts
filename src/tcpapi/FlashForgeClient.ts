@@ -7,7 +7,7 @@
 import type { Filament } from '../api/filament/Filament';
 import { GCodeController } from './client/GCodeController';
 import { GCodes } from './client/GCodes';
-import { FlashForgeTcpClient } from './FlashForgeTcpClient';
+import { FlashForgeTcpClient, type FlashForgeTcpClientOptions } from './FlashForgeTcpClient';
 import { EndstopStatus } from './replays/EndstopStatus';
 import { LocationInfo } from './replays/LocationInfo';
 import { PrinterInfo } from './replays/PrinterInfo';
@@ -23,9 +23,10 @@ export class FlashForgeClient extends FlashForgeTcpClient {
   /**
    * Creates an instance of FlashForgeClient.
    * @param hostname The IP address or hostname of the FlashForge printer.
+   * @param options Optional transport overrides.
    */
-  constructor(hostname: string) {
-    super(hostname);
+  constructor(hostname: string, options?: FlashForgeTcpClientOptions) {
+    super(hostname, options);
     this.control = new GCodeController(this);
   }
 

@@ -106,6 +106,34 @@ describe('FlashForgeTcpClient', () => {
     vi.restoreAllMocks();
   });
 
+  describe('constructor options', () => {
+    it('uses default command port when no override is provided', () => {
+      // @ts-expect-error access private connect for tests
+      const originalConnect = FlashForgeTcpClient.prototype.connect;
+      // @ts-expect-error mock private connect to avoid real sockets
+      FlashForgeTcpClient.prototype.connect = vi.fn();
+
+      const client = new FlashForgeTcpClient('localhost');
+      expect((client as any).port).toBe(8899);
+
+      // @ts-expect-error restore private method after assertion
+      FlashForgeTcpClient.prototype.connect = originalConnect;
+    });
+
+    it('uses custom command port override when provided', () => {
+      // @ts-expect-error access private connect for tests
+      const originalConnect = FlashForgeTcpClient.prototype.connect;
+      // @ts-expect-error mock private connect to avoid real sockets
+      FlashForgeTcpClient.prototype.connect = vi.fn();
+
+      const client = new FlashForgeTcpClient('localhost', { port: 19099 });
+      expect((client as any).port).toBe(19099);
+
+      // @ts-expect-error restore private method after assertion
+      FlashForgeTcpClient.prototype.connect = originalConnect;
+    });
+  });
+
   describe('parseFileListResponse', () => {
     it('should parse Pro model response correctly', () => {
       // Sample response from 5M Pro

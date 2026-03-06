@@ -15,13 +15,23 @@ import { MachineInfo } from './models/MachineInfo';
 import { FlashForgeClient } from './tcpapi/FlashForgeClient';
 
 /**
+ * Optional connection overrides for modern printers.
+ */
+export interface FiveMClientConnectionOptions {
+  /** HTTP API/event port override (defaults to 8898). */
+  httpPort?: number;
+  /** Legacy TCP command port override used by the embedded tcp client (defaults to 8899). */
+  tcpPort?: number;
+}
+
+/**
  * Represents a client for interacting with a FlashForge 3D printer.
  * This class provides methods for controlling the printer, managing print jobs,
  * retrieving information, and handling file operations.
  */
 export class FiveMClient {
   /** Port used for HTTP communication with the printer. */
-  private readonly PORT = 8898;
+  private readonly PORT: number;
 
   /** Instance for general printer control operations. */
   public control: Control;
@@ -72,11 +82,18 @@ export class FiveMClient {
    * @param ipAddress The IP address of the printer.
    * @param serialNumber The serial number of the printer.
    * @param checkCode The check code for the printer.
+   * @param options Optional transport overrides.
    */
-  constructor(ipAddress: string, serialNumber: string, checkCode: string) {
+  constructor(
+    ipAddress: string,
+    serialNumber: string,
+    checkCode: string,
+    options?: FiveMClientConnectionOptions
+  ) {
     this.ipAddress = ipAddress;
     this.serialNumber = serialNumber;
     this.checkCode = checkCode;
+    this.PORT = options?.httpPort ?? 8898;
 
     this.httpClient = axios.create({
       timeout: 5000,
@@ -87,7 +104,8 @@ export class FiveMClient {
 
     // FlashForgeClient is used internally for some "lower-level" stuff like sending direct g/m-code
     // That isn't available over the new API
-    this.tcpClient = new FlashForgeClient(ipAddress);
+    const tcpOptions = options?.tcpPort !== undefined ? { port: options.tcpPort } : undefined;
+    this.tcpClient = new FlashForgeClient(ipAddress, tcpOptions);
 
     this.control = new Control(this);
     this.jobControl = new JobControl(this);

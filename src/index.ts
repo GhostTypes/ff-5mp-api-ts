@@ -31,7 +31,7 @@ export {
 // Server constants
 export { Commands } from './api/server/Commands';
 export { Endpoints } from './api/server/Endpoints';
-export { FiveMClient, Product } from './FiveMClient';
+export { FiveMClient, type FiveMClientConnectionOptions, Product } from './FiveMClient';
 // Models
 export {
   AD5XLocalJobParams,
@@ -53,7 +53,7 @@ export { GCodes } from './tcpapi/client/GCodes';
 export { A3GCodeController } from './tcpapi/client/A3GCodeController';
 // TCP API
 export { FlashForgeClient } from './tcpapi/FlashForgeClient';
-export { FlashForgeTcpClient } from './tcpapi/FlashForgeTcpClient';
+export { FlashForgeTcpClient, type FlashForgeTcpClientOptions } from './tcpapi/FlashForgeTcpClient';
 export {
   FlashForgeA3Client,
   type A3BuildVolume,

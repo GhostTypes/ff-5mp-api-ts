@@ -7,11 +7,20 @@ import * as net from 'node:net';
 import * as path from 'node:path';
 import { setTimeout as sleep } from 'node:timers/promises';
 import { GCodes } from './client/GCodes';
+
+/**
+ * Optional transport overrides for TCP printer clients.
+ */
+export interface FlashForgeTcpClientOptions {
+  /** TCP command port override (defaults to 8899). */
+  port?: number;
+}
+
 export class FlashForgeTcpClient {
   /** The underlying network socket for TCP communication. Null if not connected. */
   protected socket: net.Socket | null = null;
   /** The default TCP port used for connecting to FlashForge printers. */
-  protected readonly port = 8899;
+  protected readonly port: number;
   /** The default timeout (in milliseconds) for socket operations. */
   protected readonly timeout = 5000;
   /** The hostname or IP address of the printer. */
@@ -27,9 +36,11 @@ export class FlashForgeTcpClient {
    * Creates an instance of FlashForgeTcpClient.
    * Initializes the hostname and attempts to connect to the printer.
    * @param hostname The IP address or hostname of the FlashForge printer.
+   * @param options Optional transport overrides.
    */
-  constructor(hostname: string) {
+  constructor(hostname: string, options?: FlashForgeTcpClientOptions) {
     this.hostname = hostname;
+    this.port = options?.port ?? 8899;
     try {
       console.log('TcpPrinterClient creation');
       this.connect();
@@ -518,7 +529,9 @@ export class FlashForgeTcpClient {
    */
   protected getResponseCompletionDelayMs(cmd: string, binary: boolean): number {
     if (binary) return 1500;
-    if (cmd === GCodes.CmdListLocalFiles) return 500;
+    // M661 replies are two-stage on many printers/emulators: immediate "ok", then delayed file payload.
+    // Keep a wider settle window so callers don't race and parse an empty list intermittently.
+    if (cmd === GCodes.CmdListLocalFiles) return 1200;
     return 0;
   }
 
