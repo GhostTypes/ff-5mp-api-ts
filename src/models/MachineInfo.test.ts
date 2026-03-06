@@ -158,6 +158,23 @@ describe('MachineInfo', () => {
       expect(result.MachineState).toBe(MachineState.Unknown); // status was not in AD5X JSON, so defaults to Unknown
     });
 
+    it('should detect AD5X from material station presence even with a custom printer name', () => {
+      const customNamedAd5xDetail: FFPrinterDetail = {
+        ...AD5X_PRINTER_DETAIL_JSON,
+        name: 'E2E-AD5X',
+      };
+
+      const result = machineInfoConverter.fromDetail(customNamedAd5xDetail);
+
+      expect(result).not.toBeNull();
+      if (!result) return;
+
+      expect(result.Name).toBe('E2E-AD5X');
+      expect(result.IsAD5X).toBe(true);
+      expect(result.IsPro).toBe(false);
+      expect(result.HasMatlStation).toBe(true);
+    });
+
     it('should correctly parse generic (non-AD5X) printer details', () => {
       const result = machineInfoConverter.fromDetail(GENERIC_PRINTER_DETAIL_JSON);
 

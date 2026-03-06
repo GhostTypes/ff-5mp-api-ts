@@ -29,6 +29,12 @@ export class MachineInfo {
     if (!detail) return null;
 
     try {
+      const hasMaterialStation =
+        detail.hasMatlStation === true ||
+        (detail.matlStationInfo?.slotCnt ?? 0) > 0 ||
+        (detail.matlStationInfo?.slotInfos?.length ?? 0) > 0;
+      const isAD5X = detail.name === 'AD5X' || hasMaterialStation;
+      const isPro = (detail.name || '').includes('Pro') && !isAD5X;
       const printEta = this.formatTimeFromSeconds(detail.estimatedTime || 0);
       const completionTime = new Date(Date.now() + (detail.estimatedTime || 0) * 1000);
       const formattedRunTime = this.formatTimeFromSeconds(detail.printDuration || 0);
@@ -93,8 +99,8 @@ export class MachineInfo {
         FillAmount: detail.fillAmount || 0,
         FirmwareVersion: detail.firmwareVersion || '',
         Name: detail.name || '',
-        IsPro: (detail.name || '').includes('Pro') && detail.name !== 'AD5X', // AD5X is special
-        IsAD5X: detail.name === 'AD5X',
+        IsPro: isPro,
+        IsAD5X: isAD5X,
         NozzleSize: detail.nozzleModel || '',
 
         // Material Station Info
