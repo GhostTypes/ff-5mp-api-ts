@@ -49,7 +49,10 @@ jobs:
             VERSION="${CURRENT_VERSION}-${TIMESTAMP}"
           fi
           echo "Using version: $VERSION"
-          pnpm version $VERSION --no-git-tag-version
+          CURRENT_VERSION=$(node -p "require('./package.json').version")
+          if [[ "$CURRENT_VERSION" != "$VERSION" ]]; then
+            pnpm version $VERSION --no-git-tag-version
+          fi
           echo "version=$VERSION" >> $GITHUB_OUTPUT
 
       - name: Publish to GitHub Packages
