@@ -127,6 +127,7 @@ describe('MachineInfo', () => {
       expect(result.IsAD5X).toBe(true);
       expect(result.IsPro).toBe(false); // As per our logic Name=AD5X implies IsPro=false
       expect(result.FirmwareVersion).toBe('1.1.3-1.0.8');
+      expect(result.CameraStreamUrl).toBe('');
 
       expect(result.HasMatlStation).toBe(true);
       expect(result.CoolingFanLeftSpeed).toBe(0);
@@ -185,6 +186,7 @@ describe('MachineInfo', () => {
       expect(result.IsAD5X).toBe(false);
       expect(result.IsPro).toBe(false); // "FlashForge 5M" does not contain "Pro"
       expect(result.FirmwareVersion).toBe('1.0.0');
+      expect(result.CameraStreamUrl).toBe('');
 
       expect(result.HasMatlStation).toBeUndefined();
       expect(result.MatlStationInfo).toBeUndefined();
@@ -230,10 +232,23 @@ describe('MachineInfo', () => {
       expect(result.IsAD5X).toBe(false);
       expect(result.IsPro).toBe(false);
       expect(result.FirmwareVersion).toBe(''); // Defaults to empty string
+      expect(result.CameraStreamUrl).toBe('');
       expect(result.CoolingFanSpeed).toBe(0); // Defaults to 0
       expect(result.PrintBed.current).toBe(0);
       expect(result.Extruder.set).toBe(0);
       expect(result.MachineState).toBe(MachineState.Unknown); // status is empty
+    });
+
+    it('preserves a populated camera stream URL from detail data', () => {
+      const result = machineInfoConverter.fromDetail({
+        ...GENERIC_PRINTER_DETAIL_JSON,
+        cameraStreamUrl: 'http://192.168.1.100:8080/?action=stream',
+      });
+
+      expect(result).not.toBeNull();
+      if (!result) return;
+
+      expect(result.CameraStreamUrl).toBe('http://192.168.1.100:8080/?action=stream');
     });
   });
 });

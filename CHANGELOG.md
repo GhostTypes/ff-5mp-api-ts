@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.2.0] - 2026-03-08
+
+### Added
+
+- `FiveMClient.cameraStreamUrl` — caches the OEM camera stream URL reported by the printer in machine-info responses, cleared on dispose
+
+### Changed
+
+- `FiveMClient.updateMachineInfo()` now populates `cameraStreamUrl` from `info.CameraStreamUrl`
+
 ## [1.1.0] - 2026-03-08
 
 ### Added

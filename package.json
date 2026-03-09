@@ -1,6 +1,6 @@
 {
   "name": "@ghosttypes/ff-api",
-  "version": "1.1.0",
+  "version": "1.2.0",
   "description": "FlashForge 3D Printer API for Node.js",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",

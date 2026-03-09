@@ -59,6 +59,7 @@ export class FiveMClient {
   public isAD5X: boolean = false;
   public firmwareVersion: string = '';
   public firmVer: string = '';
+  public cameraStreamUrl: string = '';
 
   public ipAddress: string;
   public macAddress: string = '';
@@ -161,6 +162,7 @@ export class FiveMClient {
    * Disposes of the FiveMClient instance, stopping keep-alive messages and cleaning up resources.
    */
   public async dispose(): Promise<void> {
+    this.cameraStreamUrl = '';
     await this.tcpClient.dispose();
   }
 
@@ -178,6 +180,7 @@ export class FiveMClient {
     this.isAD5X = info.IsAD5X; // Cache the AD5X status
     this.firmwareVersion = info.FirmwareVersion || '';
     this.firmVer = info.FirmwareVersion ? info.FirmwareVersion.split('-')[0] : '';
+    this.cameraStreamUrl = info.CameraStreamUrl || '';
     this.macAddress = info.MacAddress || '';
     this.flashCloudCode = info.FlashCloudRegisterCode || '';
     this.polarCloudCode = info.PolarCloudRegisterCode || '';
