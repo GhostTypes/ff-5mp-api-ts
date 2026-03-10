@@ -8,6 +8,8 @@
 
 The printer discovery API has been completely rewritten to support all FlashForge printer models (AD5X, 5M, 5M Pro, Adventurer 4, Adventurer 3) with multi-protocol UDP discovery. The legacy API has been removed.
 
+This guide applies only to the TypeScript discovery surface. It does not imply strict 1:1 parity with the Python library, which still exposes a compatibility wrapper named `FlashForgePrinterDiscovery`.
+
 ## What Changed
 
 | Old API | New API |

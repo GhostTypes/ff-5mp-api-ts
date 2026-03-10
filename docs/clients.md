@@ -1,131 +1,90 @@
 # Client Documentation
 
-This section documents the primary client classes used to interact with FlashForge printers.
+This page documents the current TypeScript client surface. If you are comparing this repository with the Python library, read [parity.md](parity.md) first.
 
 ## FiveMClient
 
-The `FiveMClient` is the modern interface for Adventurer 5M, 5M Pro, and Adventurer 5X (AD5X) printers. It combines HTTP API calls with a TCP connection for comprehensive control.
+`FiveMClient` is the primary modern client for Adventurer 5M, Adventurer 5M Pro, and AD5X printers.
 
 ### Constructor
 
 ```typescript
-constructor(ipAddress: string, serialNumber: string, checkCode: string)
+constructor(
+  ipAddress: string,
+  serialNumber: string,
+  checkCode: string,
+  options?: FiveMClientConnectionOptions
+)
 ```
 
-- **`ipAddress`** (`string`): The local IP address of the printer.
-- **`serialNumber`** (`string`): The printer's serial number (required for authentication).
-- **`checkCode`** (`string`): The check code for authentication.
+### Connection Options
 
-### Properties
+```typescript
+interface FiveMClientConnectionOptions {
+  httpPort?: number;
+  tcpPort?: number;
+}
+```
 
-- **`control`** (`Control`): Interface for general printer controls (home, fans, LEDs, etc.).
-- **`jobControl`** (`JobControl`): Interface for managing print jobs (start, stop, pause, file upload).
-- **`info`** (`Info`): Interface for retrieving machine status and details.
-- **`files`** (`Files`): Interface for file management (list files, get thumbnails).
-- **`tempControl`** (`TempControl`): Interface for temperature management.
-- **`tcpClient`** (`FlashForgeClient`): The underlying TCP client instance.
-- **`printerName`** (`string`): The configured name of the printer.
-- **`isPro`** (`boolean`): True if the printer is a Pro model.
-- **`isAD5X`** (`boolean`): True if the printer is an AD5X model.
-- **`firmwareVersion`** (`string`): The full firmware version string.
-- **`ledControl`** (`boolean`): True if LED control is available/enabled.
-- **`filtrationControl`** (`boolean`): True if filtration control is available/enabled.
+### Important Properties
+
+- `control`
+- `jobControl`
+- `info`
+- `files`
+- `tempControl`
+- `tcpClient`
+- `printerName`
+- `isPro`
+- `isAD5X`
+- `firmwareVersion`
+- `cameraStreamUrl`
+- `ledControl`
+- `filtrationControl`
 
 ### Key Methods
 
-#### `initialize()`
+- `initialize()`
+- `initControl()`
+- `verifyConnection()`
+- `sendProductCommand()`
+- `cacheDetails(info)`
+- `dispose()`
 
-```typescript
-public async initialize(): Promise<boolean>
-```
+### Notes
 
-Initializes the client by verifying the connection to the printer. Returns `true` if successful.
-
-#### `initControl()`
-
-```typescript
-public async initControl(): Promise<boolean>
-```
-
-Fully initializes control capabilities by authenticating via the product command and establishing the TCP connection. Must be called before performing control actions.
-
-#### `verifyConnection()`
-
-```typescript
-public async verifyConnection(): Promise<boolean>
-```
-
-Checks connectivity by attempting to fetch printer details. Updates cached machine info.
-
-#### `dispose()`
-
-```typescript
-public async dispose(): Promise<void>
-```
-
-Cleanly closes connections and stops background keep-alive processes.
-
----
+- This client does not try to mirror every Python convenience helper.
+- TypeScript callers should use the module objects directly, for example `client.jobControl.pausePrintJob()` rather than expecting higher-level wrapper aliases.
 
 ## FlashForgeClient
 
-The `FlashForgeClient` is a TCP-based client for legacy printers or low-level G-code operations. It extends `FlashForgeTcpClient`.
+`FlashForgeClient` is the lower-level TCP-oriented client used for legacy printers and direct G-code operations.
 
 ### Constructor
 
 ```typescript
-constructor(hostname: string)
+constructor(hostname: string, options?: FlashForgeTcpClientOptions)
 ```
 
-- **`hostname`** (`string`): The IP address or hostname of the printer.
+### Typical Use Cases
 
-### Key Methods
+- Adventurer 3 / 4 and other legacy TCP workflows
+- direct TCP control
+- low-level operations wrapped by `FiveMClient`
 
-#### `initControl()`
+### Example
 
 ```typescript
-public async initControl(): Promise<boolean>
+import { FlashForgeClient } from '@ghosttypes/ff-api';
+
+const client = new FlashForgeClient('192.168.1.100');
+await client.initControl();
+const info = await client.getPrinterInfo();
 ```
-
-Establishes the TCP connection, logs in, and starts the keep-alive loop.
-
-#### `getPrinterInfo()`
-
-```typescript
-public async getPrinterInfo(): Promise<PrinterInfo | null>
-```
-
-Retrieves basic printer information (firmware, machine type, etc.).
-
-#### `getTempInfo()`
-
-```typescript
-public async getTempInfo(): Promise<TempInfo | null>
-```
-
-Gets current extruder and bed temperatures.
-
-#### `move(x, y, z, feedrate)`
-
-```typescript
-public async move(x: number, y: number, z: number, feedrate: number): Promise<boolean>
-```
-
-Moves the print head to the specified absolute coordinates.
-
-#### `setExtruderTemp(temp, waitFor)`
-
-```typescript
-public async setExtruderTemp(temp: number, waitFor: boolean = false): Promise<boolean>
-```
-
-Sets the extruder target temperature.
-
----
 
 ## PrinterDiscovery
 
-A utility class for finding FlashForge printers on the local network via UDP multicast/broadcast. Supports all FlashForge models including AD5X, 5M, 5M Pro, Adventurer 4, and Adventurer 3.
+`PrinterDiscovery` is the typed discovery API for all supported FlashForge models.
 
 ### Constructor
 
@@ -135,36 +94,8 @@ constructor()
 
 ### Methods
 
-#### `discover()`
-
-```typescript
-public async discover(options?: DiscoveryOptions): Promise<DiscoveredPrinter[]>
-```
-
-Discovers printers on the local network using UDP multicast and broadcast.
-
-**Options:**
-- **`timeout`** (number): Total time to wait for responses (default: 10000ms)
-- **`idleTimeout`** (number): Time to wait after last response (default: 1500ms)
-- **`maxRetries`** (number): Maximum retry attempts (default: 3)
-- **`useMulticast`** (boolean): Use multicast discovery (default: true)
-- **`useBroadcast`** (boolean): Use subnet broadcast discovery (default: true)
-- **`ports`** (number[]): Specific ports to scan (default: [8899, 19000, 48899])
-
-**Returns:** An array of `DiscoveredPrinter` objects with comprehensive printer information.
-
-#### `monitor()`
-
-```typescript
-public monitor(options?: DiscoveryOptions): EventEmitter
-```
-
-Starts continuous monitoring for printers, emitting events as printers are discovered.
-
-**Returns:** EventEmitter that emits:
-- **`discovered`**: Emitted for each new printer found
-- **`end`**: Emitted when monitoring completes
-- **`error`**: Emitted on errors
+- `discover(options?: DiscoveryOptions)`
+- `monitor(options?: DiscoveryOptions)`
 
 ### Example
 
@@ -173,11 +104,4 @@ import { PrinterDiscovery } from '@ghosttypes/ff-api';
 
 const discovery = new PrinterDiscovery();
 const printers = await discovery.discover({ timeout: 5000 });
-
-printers.forEach(printer => {
-    console.log(`${printer.model}: ${printer.name}`);
-    console.log(`  IP: ${printer.ipAddress}:${printer.commandPort}`);
-    console.log(`  Serial: ${printer.serialNumber || 'N/A'}`);
-    console.log(`  Status: ${printer.status}`);
-});
 ```

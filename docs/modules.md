@@ -1,56 +1,57 @@
 # Modules and Namespaces
 
-The API is organized into several control modules, typically accessed through the `FiveMClient` instance. Each module groups related functionality.
+The TypeScript API is organized into modules hanging off `FiveMClient`.
 
 ## Control (`client.control`)
 
-Handles general printer operations and hardware control.
+Key methods:
 
-### Key Methods
-
-- **`homeAxes()`**: Homes all axes.
-- **`setLedOn() / setLedOff()`**: Controls the internal LED lights.
-- **`setChamberFanSpeed(speed)`**: Sets the chamber fan speed percentage (0-100).
-- **`setCoolingFanSpeed(speed)`**: Sets the part cooling fan speed percentage (0-100).
-- **`setInternalFiltrationOn() / setExternalFiltrationOn()`**: Controls the air filtration system.
+- `homeAxes()`
+- `homeAxesRapid()`
+- `setLedOn()`
+- `setLedOff()`
+- `turnCameraOn()`
+- `turnCameraOff()`
+- `setInternalFiltrationOn()`
+- `setExternalFiltrationOn()`
+- `setFiltrationOff()`
+- `setSpeedOverride(speed)`
+- `setZAxisOverride(offset)`
 
 ## JobControl (`client.jobControl`)
 
-Manages the lifecycle of print jobs and file uploads.
+Key methods:
 
-### Key Methods
-
-- **`pausePrintJob()`**: Pauses the active print.
-- **`resumePrintJob()`**: Resumes a paused print.
-- **`cancelPrintJob()`**: Cancels the active print.
-- **`uploadFile(path, start, level)`**: Uploads a file and optionally starts it.
-- **`uploadFileAD5X(params)`**: Specialized upload for AD5X with material mapping support.
-- **`startAD5XMultiColorJob(params)`**: Starts a multi-color print from a local file on AD5X.
+- `pausePrintJob()`
+- `resumePrintJob()`
+- `cancelPrintJob()`
+- `uploadFile(filePath, startPrint, levelBeforePrint)`
+- `uploadFileAD5X(params)`
+- `printLocalFile(fileName, levelingBeforePrint)`
+- `startAD5XMultiColorJob(params)`
+- `startAD5XSingleColorJob(params)`
 
 ## Info (`client.info`)
 
-Retrieves status and information.
+Key methods:
 
-### Key Methods
-
-- **`get()`**: Returns a `Promise<FFMachineInfo>` with the latest printer state.
-- **`isPrinting()`**: Returns `true` if the printer is currently printing.
-- **`getStatus()`**: Returns the raw status string.
+- `get()`
+- `getDetailResponse()`
+- `getStatus()`
+- `getMachineState()`
+- `isPrinting()`
 
 ## Files (`client.files`)
 
-Handles file listing and thumbnail retrieval.
+Key methods:
 
-### Key Methods
-
-- **`getRecentFileList()`**: Returns a list of recently printed files.
-- **`getGCodeThumbnail(fileName)`**: Returns a `Buffer` containing the thumbnail image for a specific file.
+- `getLocalFileList()`
+- `getRecentFileList()`
+- `getGCodeThumbnail(fileName)`
 
 ## TempControl (`client.tempControl`)
 
-Manages heating elements.
+Key methods:
 
-### Key Methods
-
-- **`setExtruderTemp(temp)`**: Sets the target extruder temperature.
-- **`setBedTemp(temp)`**: Sets the target bed temperature.
+- `setExtruderTemp(temp, waitFor?)`
+- `setBedTemp(temp, waitFor?)`
