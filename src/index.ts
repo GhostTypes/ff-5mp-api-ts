@@ -55,6 +55,13 @@ export { A3GCodeController } from './tcpapi/client/A3GCodeController';
 export { FlashForgeClient } from './tcpapi/FlashForgeClient';
 export { FlashForgeTcpClient, type FlashForgeTcpClientOptions } from './tcpapi/FlashForgeTcpClient';
 export {
+  FlashForgeA4Client,
+  type A4BuildVolume,
+  type A4FileEntry,
+  type A4PrinterInfo,
+  type A4PrinterVariant,
+} from './tcpapi/FlashForgeA4Client';
+export {
   FlashForgeA3Client,
   type A3BuildVolume,
   type A3FileEntry,

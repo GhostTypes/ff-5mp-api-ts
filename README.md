@@ -9,7 +9,7 @@ TypeScript and Node.js library for controlling FlashForge 3D printers over the m
 | Adventurer 5M | Full |
 | Adventurer 5M Pro | Full |
 | AD5X | Full |
-| Adventurer 3 / 4 | TCP support |
+| Adventurer 3 / 4 | Dedicated TCP clients |
 
 ## Installation
 
@@ -50,17 +50,17 @@ main();
 
 ### Legacy TCP Printers
 
-Use `FlashForgeClient` for direct TCP control on older printers.
+Use `FlashForgeA4Client` or `FlashForgeA3Client` for documented legacy TCP control. `FlashForgeClient` remains available as a generic fallback.
 
 ```typescript
-import { FlashForgeClient } from '@ghosttypes/ff-api';
+import { FlashForgeA4Client } from '@ghosttypes/ff-api';
 
 async function main() {
-  const client = new FlashForgeClient('192.168.1.101');
+  const client = new FlashForgeA4Client('192.168.1.101');
 
   if (await client.initControl()) {
     const info = await client.getPrinterInfo();
-    console.log(info?.TypeName);
+    console.log(`${info?.machineType} (${info?.variant})`);
   }
 
   await client.dispose();
@@ -73,7 +73,9 @@ main();
 
 - `FiveMClient`: modern HTTP + TCP client for 5M, 5M Pro, and AD5X
 - `PrinterDiscovery`: UDP discovery for supported FlashForge printers
-- `FlashForgeClient`: lower-level TCP client for legacy printers and direct G-code workflows
+- `FlashForgeA4Client`: documented TCP client for Adventurer 4 Lite / Pro printers
+- `FlashForgeA3Client`: documented TCP client for Adventurer 3 printers
+- `FlashForgeClient`: generic legacy TCP fallback for direct G-code workflows
 
 ## Capabilities
 

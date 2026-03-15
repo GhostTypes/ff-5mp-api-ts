@@ -51,7 +51,8 @@ const LEGACY_PROTOCOL_SIZE = 140;
  */
 const LEGACY_PRODUCT_IDS = {
     Adventurer3: 0x0008,
-    Adventurer4: 0x001e,
+    Adventurer4Lite: 0x0016,
+    Adventurer4Pro: 0x001e,
 } as const;
 
 /**
@@ -647,7 +648,10 @@ export class PrinterDiscovery {
             return PrinterModel.Adventurer3;
         }
 
-        if (productId === LEGACY_PRODUCT_IDS.Adventurer4) {
+        if (
+            productId === LEGACY_PRODUCT_IDS.Adventurer4Lite ||
+            productId === LEGACY_PRODUCT_IDS.Adventurer4Pro
+        ) {
             return PrinterModel.Adventurer4;
         }
 

@@ -245,6 +245,24 @@ describe('PrinterDiscovery', () => {
             expect(result?.eventPort).toBeUndefined();
         });
 
+        it('should parse Adventurer 4 Lite response correctly', () => {
+            const discovery = createDiscovery();
+            const buffer = createLegacyBuffer({
+                name: 'Adventurer 4 Lite',
+                productId: 0x0016,
+            });
+
+            const result = discovery['parseLegacyProtocol'](buffer, {
+                address: '192.168.1.201',
+                port: 8899,
+                family: 'IPv4',
+                size: 140,
+            });
+
+            expect(result?.model).toBe(PrinterModel.Adventurer4);
+            expect(result?.productId).toBe(0x0016);
+        });
+
         it('should parse Adventurer 3 response correctly', () => {
             const discovery = createDiscovery();
             const buffer = createLegacyBuffer({
@@ -303,6 +321,23 @@ describe('PrinterDiscovery', () => {
             expect(result?.model).toBe(PrinterModel.Adventurer4);
         });
 
+        it('should classify an unknown legacy printer by Adventurer 4 Lite PID fallback', () => {
+            const discovery = createDiscovery();
+            const buffer = createLegacyBuffer({
+                name: 'Workshop Printer',
+                productId: 0x0016,
+            });
+
+            const result = discovery['parseLegacyProtocol'](buffer, {
+                address: '10.0.0.102',
+                port: 8899,
+                family: 'IPv4',
+                size: 140,
+            });
+
+            expect(result?.model).toBe(PrinterModel.Adventurer4);
+        });
+
         it('should classify an unknown legacy printer by Adventurer 3 PID fallback', () => {
             const discovery = createDiscovery();
             const buffer = createLegacyBuffer({
@@ -311,7 +346,7 @@ describe('PrinterDiscovery', () => {
             });
 
             const result = discovery['parseLegacyProtocol'](buffer, {
-                address: '10.0.0.102',
+                address: '10.0.0.103',
                 port: 8899,
                 family: 'IPv4',
                 size: 140,
@@ -406,6 +441,13 @@ describe('PrinterDiscovery', () => {
             it('should use Adventurer 4 PID as a fallback when the name is unknown', () => {
                 const discovery = createDiscovery();
                 expect(discovery['detectLegacyModel']('Workshop Printer', 0x001e)).toBe(
+                    PrinterModel.Adventurer4
+                );
+            });
+
+            it('should use Adventurer 4 Lite PID as a fallback when the name is unknown', () => {
+                const discovery = createDiscovery();
+                expect(discovery['detectLegacyModel']('Workshop Printer', 0x0016)).toBe(
                     PrinterModel.Adventurer4
                 );
             });

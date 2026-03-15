@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- `FlashForgeA4Client` — dedicated Adventurer 4 Lite / Pro TCP client aligned with the documented M601 and M115 behavior
+- `A4BuildVolume`, `A4FileEntry`, `A4PrinterInfo`, and `A4PrinterVariant` types for typed Adventurer 4 responses
+
+### Changed
+
+- `PrinterDiscovery` now recognizes Adventurer 4 Lite discovery packets by PID `0x0016` in addition to the existing Pro PID `0x001e`
+- README examples now point legacy Adventurer 3 / 4 users at the dedicated TCP clients instead of the generic legacy fallback
+
 ## [1.2.0] - 2026-03-08
 
 ### Added
@@ -28,7 +38,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `PrinterModel`, `DiscoveryProtocol`, `PrinterStatus` enums providing fully-typed discovery results
 - `DiscoveredPrinter` and `DiscoveryOptions` TypeScript interfaces replacing loosely-typed discovery objects
 - `DiscoveryErrors` — custom error class hierarchy for structured discovery error handling
-- PID-based legacy model fallback in `PrinterDiscovery`: known USB product IDs (`0x0008` Adventurer 3, `0x001e` Adventurer 4) are used as a secondary hint when name heuristics are inconclusive
+- PID-based legacy model fallback in `PrinterDiscovery`: known USB product IDs (`0x0008` Adventurer 3, `0x001e` Adventurer 4 Pro) are used as a secondary hint when name heuristics are inconclusive
 - `FlashForgeTcpClient.uploadFile()` — M28 / raw-binary / M29 file upload flow for legacy printers, with automatic filename normalization
 - `FiveMClientConnectionOptions` — optional HTTP port and TCP port overrides for `FiveMClient` construction
 - `FlashForgeTcpClientOptions` — optional TCP port override for `FlashForgeTcpClient` construction
@@ -82,6 +92,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - AD5X job info parsing returning incomplete data
 - `NetworkUtils.isOk` usage corrected across response handlers
 
-[Unreleased]: https://github.com/GhostTypes/ff-5mp-api-ts/compare/v1.1.0...HEAD
+[Unreleased]: https://github.com/GhostTypes/ff-5mp-api-ts/compare/v1.2.0...HEAD
+[1.2.0]: https://github.com/GhostTypes/ff-5mp-api-ts/compare/v1.1.0...v1.2.0
 [1.1.0]: https://github.com/GhostTypes/ff-5mp-api-ts/compare/v1.0.0...v1.1.0
 [1.0.0]: https://github.com/GhostTypes/ff-5mp-api-ts/releases/tag/v1.0.0
