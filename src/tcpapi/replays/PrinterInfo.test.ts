@@ -64,9 +64,8 @@ Machine Type: Adventurer 5M Pro`;
       expect(result).toBeNull();
     });
 
-    it('should return null when machine type line is malformed', () => {
+    it('should return null when machine type is missing', () => {
       const invalidResponse = `CMD M115 Received.
-InvalidLine
 Machine Name: MyPrinter
 Firmware: V1.2.3
 SN: SN123456789
@@ -78,6 +77,49 @@ Mac Address: AA:BB:CC:DD:EE:FF`;
       const result = printerInfo.fromReplay(invalidResponse);
 
       expect(result).toBeNull();
+    });
+
+    it('should handle blank lines in response (Adventurer 3C Pro format)', () => {
+      const response = `CMD M115 Received.
+Machine Type: FlashForge Adventurer III Pro
+Machine Name:  CowaPrint
+
+Firmware: v2.1.2
+SN: SNCCCA95105901
+X: 150 Y: 150 Z: 150
+Tool Count: 1
+Mac Address:88:A9:A7:92:DE:72
+
+ok`;
+
+      const printerInfo = new PrinterInfo();
+      const result = printerInfo.fromReplay(response);
+
+      expect(result).not.toBeNull();
+      expect(result?.TypeName).toBe('FlashForge Adventurer III Pro');
+      expect(result?.Name).toBe('CowaPrint');
+      expect(result?.FirmwareVersion).toBe('v2.1.2');
+      expect(result?.SerialNumber).toBe('SNCCCA95105901');
+      expect(result?.Dimensions).toBe('X: 150 Y: 150 Z: 150');
+      expect(result?.ToolCount).toBe('1');
+      expect(result?.MacAddress).toBe('88:A9:A7:92:DE:72');
+    });
+
+    it('should handle Serial Number: prefix variant', () => {
+      const response = `CMD M115 Received.
+Machine Type: FlashForge Adventurer 3
+Machine Name: MyPrinter
+Firmware: V1.0.0
+Serial Number: SN12345
+X:150 Y:150 Z:150
+Tool count: 1
+Mac Address: AA:BB:CC:DD:EE:FF`;
+
+      const printerInfo = new PrinterInfo();
+      const result = printerInfo.fromReplay(response);
+
+      expect(result).not.toBeNull();
+      expect(result?.SerialNumber).toBe('SN12345');
     });
 
     it('should handle extra whitespace in values', () => {

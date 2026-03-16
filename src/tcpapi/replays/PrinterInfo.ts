@@ -32,17 +32,11 @@ export class PrinterInfo {
    * provides a piece of information in a "Key: Value" format.
    *
    * Parsing logic:
-   * - Splits the replay by newline characters.
-   * - Line 1 (data[0]): Usually command echo/header, often ignored or assumed specific format.
-   * - Line 2 (data[1]): Expected to be "Machine Type: [TypeName]". `getRight` extracts the value.
-   * - Line 3 (data[2]): Expected to be "Machine Name: [Name]". `getRight` extracts the value.
-   * - Line 4 (data[3]): Expected to be "Firmware: [FirmwareVersion]". `getRight` extracts the value.
-   * - Line 5 (data[4]): Expected to be "SN: [SerialNumber]". `getRight` extracts the value.
-   * - Line 6 (data[5]): Expected to be the dimensions string directly (e.g., "X:220 Y:220 Z:220").
-   * - Line 7 (data[6]): Expected to be "Tool count: [ToolCount]". `getRight` extracts the value.
-   * - Line 8 (data[7]): Expected to be "Mac Address:[MacAddress]". The prefix is removed.
-   *
-   * The `getRight` helper function is used to extract the value part after the colon for several lines.
+   * - Splits the replay by newline characters, trims each line, and filters out blank lines.
+   * - Iterates through lines matching known prefixes (Machine Type, Machine Name, Firmware, etc.).
+   * - This approach is resilient to blank lines, extra whitespace, and minor formatting variations
+   *   across different printer firmware versions (e.g., Adventurer 3C Pro inserts a blank line
+   *   between Machine Name and Firmware).
    *
    * @param replay The raw multi-line string response from the M115 command.
    * @returns The populated `PrinterInfo` instance, or null if parsing fails
@@ -52,47 +46,41 @@ export class PrinterInfo {
     if (!replay) return null;
 
     try {
-      const data = replay.split('\n');
-      // Assumes data[0] is "CMD M115 Received." or similar header.
+      const lines = replay
+        .split('\n')
+        .map((line) => line.trim())
+        .filter((line) => line.length > 0 && line !== 'ok');
 
-      const name = getRight(data[1]); // Expected: "Machine Type: Adventurer 5M Pro"
-      if (name === null) {
+      for (const line of lines) {
+        if (line.startsWith('Machine Type:')) {
+          this.TypeName = line.replace('Machine Type:', '').trim();
+        } else if (line.startsWith('Machine Name:')) {
+          this.Name = line.replace('Machine Name:', '').trim();
+        } else if (line.startsWith('Firmware:')) {
+          this.FirmwareVersion = line.replace('Firmware:', '').trim();
+        } else if (line.startsWith('SN:') || line.startsWith('Serial Number:')) {
+          this.SerialNumber = line.replace(/^(SN|Serial Number):/, '').trim();
+        } else if (line.startsWith('Tool Count:') || line.startsWith('Tool count:')) {
+          this.ToolCount = line.split(':')[1]?.trim() ?? '';
+        } else if (line.startsWith('Mac Address:')) {
+          this.MacAddress = line.replace('Mac Address:', '').trim();
+        } else {
+          const volumeMatch = line.match(/X:\s*\d+\s+Y:\s*\d+\s+Z:\s*\d+/i);
+          if (volumeMatch) {
+            this.Dimensions = line;
+          }
+        }
+      }
+
+      if (!this.TypeName) {
         console.log('PrinterInfo replay has null Machine Type');
         return null;
       }
-      this.TypeName = name;
-
-      const nick = getRight(data[2]); // Expected: "Machine Name: MyPrinter"
-      if (nick === null) {
-        console.log('PrinterInfo replay has null Machine Name');
-        return null;
-      }
-      this.Name = nick;
-
-      const fw = getRight(data[3]); // Expected: "Firmware: V1.2.3"
-      if (fw === null) {
+      if (!this.FirmwareVersion) {
         console.log('PrinterInfo replay has null firmware version');
         return null;
       }
-      this.FirmwareVersion = fw;
 
-      const sn = getRight(data[4]); // Expected: "SN: SN12345"
-      if (sn === null) {
-        console.log('PrinterInfo replay has null serial number');
-        return null;
-      }
-      this.SerialNumber = sn;
-
-      this.Dimensions = data[5].trim(); // Expected: "X:220 Y:220 Z:220" (or similar, directly)
-
-      const tcs = getRight(data[6]); // Expected: "Tool count: 1"
-      if (tcs === null) {
-        console.log('PrinterInfo replay has null tool count');
-        return null;
-      }
-      this.ToolCount = tcs;
-
-      this.MacAddress = data[7].replace('Mac Address:', '').trim(); // Expected: "Mac Address: XX:XX:XX:XX:XX:XX"
       return this;
     } catch (_error) {
       console.log('Error creating PrinterInfo instance from replay');
@@ -130,17 +118,3 @@ export class PrinterInfo {
   }
 }
 
-/**
- * Helper function to extract the value part of a "Key: Value" string.
- * It splits the input string by the first colon and returns the trimmed value part.
- * @param rpData The input string (e.g., "Machine Type: Adventurer 5M Pro").
- * @returns The extracted value string (e.g., "Adventurer 5M Pro"), or null if parsing fails.
- * @private
- */
-function getRight(rpData: string): string | null {
-  try {
-    return rpData.split(':')[1].trim();
-  } catch {
-    return null;
-  }
-}
