@@ -479,15 +479,17 @@ export class PrinterDiscovery {
     /**
      * Parses modern protocol (276-byte) discovery responses.
      *
-     * Modern protocol structure:
-     * - Printer name: 0x00, 132 bytes, UTF-8
+     * Modern protocol structure (276 bytes / 0x114):
+     * - Printer name: 0x00, 128 bytes, UTF-8 (+ 4 bytes padding at 0x80)
      * - Command port: 0x84, uint16 BE
      * - Vendor ID: 0x86, uint16 BE
      * - Product ID: 0x88, uint16 BE
+     * - Status code: 0x8A, uint16 BE
      * - Product type: 0x8C, uint16 BE
      * - Event port: 0x8E, uint16 BE
-     * - Status code: 0x90, uint16 BE
-     * - Serial number: 0x92, 130 bytes, UTF-8
+     * - LAN mode: 0x90, uint8 (0=cloud, 1=LAN-only)
+     * - Reserved: 0x91, uint8
+     * - Serial number: 0x92, 128 bytes, UTF-8 (+ 2 bytes padding)
      *
      * @param buffer The response buffer (276 bytes)
      * @param rinfo Remote address information
@@ -509,15 +511,15 @@ export class PrinterDiscovery {
         const commandPort = buffer.readUInt16BE(0x84);
         const vendorId = buffer.readUInt16BE(0x86);
         const productId = buffer.readUInt16BE(0x88);
-        const productType = buffer.readUInt16BE(0x8C);
-        const eventPort = buffer.readUInt16BE(0x8E);
+        const statusCode = buffer.readUInt16BE(0x8a);
+        const productType = buffer.readUInt16BE(0x8c);
+        const eventPort = buffer.readUInt16BE(0x8e);
 
         // Extract status
-        const statusCode = buffer.readUInt16BE(0x90);
         const status = this.mapStatusCode(statusCode);
 
         // Extract serial number (UTF-8, null-terminated)
-        const serialNumber = buffer.toString('utf8', 0x92, 0x92 + 130).replace(/\0.*$/, '');
+        const serialNumber = buffer.toString('utf8', 0x92, 0x92 + 128).replace(/\0.*$/, '');
 
         // Detect model
         const model = this.detectModernModel(name, productType);

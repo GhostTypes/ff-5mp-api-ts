@@ -69,13 +69,13 @@ describe('PrinterDiscovery', () => {
         buffer.writeUInt16BE(commandPort, 0x84);
         buffer.writeUInt16BE(vendorId, 0x86);
         buffer.writeUInt16BE(productId, 0x88);
-        buffer.writeUInt16BE(productType, 0x8C);
-        buffer.writeUInt16BE(eventPort, 0x8E);
-        buffer.writeUInt16BE(statusCode, 0x90);
+        buffer.writeUInt16BE(statusCode, 0x8a);
+        buffer.writeUInt16BE(productType, 0x8c);
+        buffer.writeUInt16BE(eventPort, 0x8e);
 
         // Write serial number (UTF-8, null-terminated)
         buffer.write(serialNumber, 0x92, 'utf8');
-        buffer.fill(0, 0x92 + serialNumber.length, 0x92 + 130);
+        buffer.fill(0, 0x92 + serialNumber.length, 0x92 + 128);
 
         return buffer;
     };
