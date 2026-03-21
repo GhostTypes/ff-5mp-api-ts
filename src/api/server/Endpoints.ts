@@ -11,6 +11,8 @@
  * for various API requests.
  */
 export class Endpoints {
+  /** Known OEM camera stream port exposed by FlashForge firmware. */
+  static readonly CAMERA_STREAM_PORT = 8080;
   /** Endpoint for sending control commands to the printer (e.g., light control, job control, temperature control). */
   static readonly Control = '/control';
   /** Endpoint for retrieving detailed information and status about the printer. */

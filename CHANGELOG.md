@@ -7,9 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.3.0] - 2026-03-21
+
 ### Added
 
-- `FlashForgeA4Client` — dedicated Adventurer 4 Lite / Pro TCP client aligned with the documented M601 and M115 behavior
+- `Endpoints.CAMERA_STREAM_PORT` - exported constant for the known FlashForge OEM MJPEG stream port
+- `FiveMClient.detectCameraStream()` - probes `http://<printer-ip>:8080/?action=stream` and falls back from `HEAD` to `GET` when firmware does not report `cameraStreamUrl`
+- Vitest coverage for camera stream probing success, `HEAD` timeout fallback, and no-camera behavior
+- `FlashForgeA4Client` - dedicated Adventurer 4 Lite / Pro TCP client aligned with the documented M601 and M115 behavior
 - `A4BuildVolume`, `A4FileEntry`, `A4PrinterInfo`, and `A4PrinterVariant` types for typed Adventurer 4 responses
 
 ### Changed
@@ -21,7 +26,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
-- `FiveMClient.cameraStreamUrl` — caches the OEM camera stream URL reported by the printer in machine-info responses, cleared on dispose
+- `FiveMClient.cameraStreamUrl` â€” caches the OEM camera stream URL reported by the printer in machine-info responses, cleared on dispose
 
 ### Changed
 
@@ -31,17 +36,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
-- `FlashForgeA3Client` — full Adventurer 3 TCP client aligned with the documented G-code protocol, exported from the package root
-- `A3GCodeController` — A3-specific G-code command controller with a dedicated instruction set
+- `FlashForgeA3Client` â€” full Adventurer 3 TCP client aligned with the documented G-code protocol, exported from the package root
+- `A3GCodeController` â€” A3-specific G-code command controller with a dedicated instruction set
 - `A3BuildVolume`, `A3FileEntry`, `A3PrinterInfo`, `A3Thumbnail` types for typed Adventurer 3 responses
 - `GCodeClientCapabilities` interface for capability-based client selection across printer generations
 - `PrinterModel`, `DiscoveryProtocol`, `PrinterStatus` enums providing fully-typed discovery results
 - `DiscoveredPrinter` and `DiscoveryOptions` TypeScript interfaces replacing loosely-typed discovery objects
-- `DiscoveryErrors` — custom error class hierarchy for structured discovery error handling
+- `DiscoveryErrors` â€” custom error class hierarchy for structured discovery error handling
 - PID-based legacy model fallback in `PrinterDiscovery`: known USB product IDs (`0x0008` Adventurer 3, `0x001e` Adventurer 4 Pro) are used as a secondary hint when name heuristics are inconclusive
-- `FlashForgeTcpClient.uploadFile()` — M28 / raw-binary / M29 file upload flow for legacy printers, with automatic filename normalization
-- `FiveMClientConnectionOptions` — optional HTTP port and TCP port overrides for `FiveMClient` construction
-- `FlashForgeTcpClientOptions` — optional TCP port override for `FlashForgeTcpClient` construction
+- `FlashForgeTcpClient.uploadFile()` â€” M28 / raw-binary / M29 file upload flow for legacy printers, with automatic filename normalization
+- `FiveMClientConnectionOptions` â€” optional HTTP port and TCP port overrides for `FiveMClient` construction
+- `FlashForgeTcpClientOptions` â€” optional TCP port override for `FlashForgeTcpClient` construction
 - Vitest test suite with unit coverage for discovery, client lifecycle, and response parsers
 - Biome linter and formatter configuration
 
@@ -66,17 +71,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
-- `FiveMClient` — modern HTTP/JSON API client for Adventurer 5M and Adventurer 5M Pro
-- `FlashForgeClient` / `FlashForgeTcpClient` — legacy TCP G-code client base
-- `FlashForgePrinterDiscovery` — UDP multicast and broadcast discovery covering all FlashForge models
-- `Control`, `Files`, `Info`, `JobControl`, `TempControl` — modern API action classes for printer control
-- `Filament` — filament data accessor for modern printers
-- `GCodeController` — G-code command controller for legacy TCP printers
-- `GCodes`, `Commands`, `Endpoints` — G-code and HTTP API constant tables
-- `EndstopStatus`, `LocationInfo`, `PrintStatus`, `TempInfo`, `ThumbnailInfo` — TCP response parsers and models
-- `MachineInfo` — unified machine state model with AD5X material station support
-- `FNetCode`, `NetworkUtils` — network response code constants and HTTP utility helpers
-- `FFMachineInfo`, `FFPrinterDetail`, `MatlStationInfo`, `SlotInfo` — typed models for printer detail responses
+- `FiveMClient` â€” modern HTTP/JSON API client for Adventurer 5M and Adventurer 5M Pro
+- `FlashForgeClient` / `FlashForgeTcpClient` â€” legacy TCP G-code client base
+- `FlashForgePrinterDiscovery` â€” UDP multicast and broadcast discovery covering all FlashForge models
+- `Control`, `Files`, `Info`, `JobControl`, `TempControl` â€” modern API action classes for printer control
+- `Filament` â€” filament data accessor for modern printers
+- `GCodeController` â€” G-code command controller for legacy TCP printers
+- `GCodes`, `Commands`, `Endpoints` â€” G-code and HTTP API constant tables
+- `EndstopStatus`, `LocationInfo`, `PrintStatus`, `TempInfo`, `ThumbnailInfo` â€” TCP response parsers and models
+- `MachineInfo` â€” unified machine state model with AD5X material station support
+- `FNetCode`, `NetworkUtils` â€” network response code constants and HTTP utility helpers
+- `FFMachineInfo`, `FFPrinterDetail`, `MatlStationInfo`, `SlotInfo` â€” typed models for printer detail responses
 - AD5X material station support: `AD5XLocalJobParams`, `AD5XSingleColorJobParams`, `AD5XUploadParams`, `AD5XMaterialMapping`
 - `Product` enum for modern printer model identification
 - LED control for legacy TCP clients
@@ -85,14 +90,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
-- Homing command (`G28`) incorrectly triggering a short timeout — extended to 15 s
+- Homing command (`G28`) incorrectly triggering a short timeout â€” extended to 15 s
 - M661 local file list response parsing rewritten to handle varied firmware delimiter patterns
 - `Commands` / `Endpoints` constant lookup inconsistencies on initial port
 - `FlashForgeTcpClient` shutdown race condition
 - AD5X job info parsing returning incomplete data
 - `NetworkUtils.isOk` usage corrected across response handlers
 
-[Unreleased]: https://github.com/GhostTypes/ff-5mp-api-ts/compare/v1.2.0...HEAD
+[Unreleased]: https://github.com/GhostTypes/ff-5mp-api-ts/compare/v1.3.0...HEAD
+[1.3.0]: https://github.com/GhostTypes/ff-5mp-api-ts/compare/v1.2.0...v1.3.0
 [1.2.0]: https://github.com/GhostTypes/ff-5mp-api-ts/compare/v1.1.0...v1.2.0
 [1.1.0]: https://github.com/GhostTypes/ff-5mp-api-ts/compare/v1.0.0...v1.1.0
 [1.0.0]: https://github.com/GhostTypes/ff-5mp-api-ts/releases/tag/v1.0.0

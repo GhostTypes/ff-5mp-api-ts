@@ -167,6 +167,27 @@ export class FiveMClient {
   }
 
   /**
+   * Probes the printer's known OEM camera endpoint.
+   * Falls back to a short GET when HEAD is unsupported so MJPEG servers
+   * that reject HEAD requests are still detected.
+   * @param timeoutMs Timeout for each probe attempt in milliseconds.
+   * @returns The working camera stream URL, or an empty string if not detected.
+   */
+  public async detectCameraStream(timeoutMs: number = 3000): Promise<string> {
+    const probeUrl = `http://${this.ipAddress}:${Endpoints.CAMERA_STREAM_PORT}/?action=stream`;
+
+    if (await this.probeCameraStreamWithHead(probeUrl, timeoutMs)) {
+      return probeUrl;
+    }
+
+    if (await this.probeCameraStreamWithGet(probeUrl, timeoutMs)) {
+      return probeUrl;
+    }
+
+    return '';
+  }
+
+  /**
    * Caches machine details from the provided FFMachineInfo object.
    * @param info The FFMachineInfo object containing printer details.
    * @returns True if caching is successful, false otherwise.
@@ -198,6 +219,55 @@ export class FiveMClient {
    */
   public getEndpoint(endpoint: string): string {
     return `http://${this.ipAddress}:${this.PORT}${endpoint}`;
+  }
+
+  private async probeCameraStreamWithHead(probeUrl: string, timeoutMs: number): Promise<boolean> {
+    try {
+      const response = await this.httpClient.head(probeUrl, {
+        timeout: timeoutMs,
+        validateStatus: () => true,
+      });
+      return this.isValidCameraProbeResponse(response.status, response.headers);
+    } catch {
+      return false;
+    }
+  }
+
+  private async probeCameraStreamWithGet(probeUrl: string, timeoutMs: number): Promise<boolean> {
+    let responseData: { destroy?: () => void } | undefined;
+
+    try {
+      const response = await this.httpClient.get(probeUrl, {
+        timeout: timeoutMs,
+        responseType: 'stream',
+        validateStatus: () => true,
+      });
+      responseData =
+        response.data && typeof response.data === 'object' ? (response.data as { destroy?: () => void }) : undefined;
+      return this.isValidCameraProbeResponse(response.status, response.headers);
+    } catch {
+      return false;
+    } finally {
+      responseData?.destroy?.();
+    }
+  }
+
+  private isValidCameraProbeResponse(
+    status: number,
+    headers: Record<string, string | string[] | undefined>
+  ): boolean {
+    if (status !== 200) {
+      return false;
+    }
+
+    const rawContentType = headers['content-type'];
+    const contentType = (
+      Array.isArray(rawContentType) ? rawContentType.join(',') : rawContentType || ''
+    ).toLowerCase();
+
+    return (
+      contentType === '' || contentType.includes('multipart') || contentType.includes('video/x-mjpeg')
+    );
   }
 
   /**
