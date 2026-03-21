@@ -119,15 +119,16 @@ export class FlashForgeA3Client extends FlashForgeTcpClient {
   }
 
   /**
-   * Initializes control by sending M601.
+   * Initializes control by sending the legacy M601 S1 login command.
    */
   public async initControl(): Promise<boolean> {
     try {
       await new Promise((resolve) => setTimeout(resolve, 500));
 
-      const response = await this.sendCommandAsync('~M601');
+      const loginCommand = GCodes.CmdLogin;
+      const response = await this.sendCommandAsync(loginCommand);
       if (response === null) {
-        console.error('A3: Failed to send M601 connection command');
+        console.error('A3: Failed to send M601 S1 login command');
         return false;
       }
 
@@ -136,7 +137,7 @@ export class FlashForgeA3Client extends FlashForgeTcpClient {
         return true;
       }
 
-      return this.isSuccessfulCommandResponse('~M601', response);
+      return this.isSuccessfulCommandResponse(loginCommand, response);
     } catch (error) {
       console.error('A3: initControl error:', error);
       return false;
@@ -170,6 +171,8 @@ export class FlashForgeA3Client extends FlashForgeTcpClient {
         info.machineName = line.replace('Machine Name:', '').trim();
       } else if (line.startsWith('Firmware:')) {
         info.firmware = line.replace('Firmware:', '').trim();
+      } else if (line.startsWith('SN:')) {
+        info.serialNumber = line.replace('SN:', '').trim();
       } else if (line.startsWith('Serial Number:')) {
         info.serialNumber = line.replace('Serial Number:', '').trim();
       } else if (line.startsWith('Tool Count:')) {

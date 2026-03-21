@@ -2,7 +2,7 @@
  * @fileoverview TCP client for FlashForge Adventurer 4 printers.
  *
  * Adventurer 4 Lite and Pro share the same legacy TCP protocol on port 8899.
- * This client keeps the documented M601 and M115 behavior separate from the
+ * This client keeps the legacy M601 S1 login flow and M115 behavior separate from the
  * generic legacy client while reusing the shared TCP transport and parsers.
  */
 
@@ -73,13 +73,14 @@ export class FlashForgeA4Client
   }
 
   /**
-   * Initializes control by sending the documented M601 command.
+   * Initializes control by sending the legacy M601 S1 login command.
    */
   public async initControl(): Promise<boolean> {
     try {
-      const response = await this.sendCommandAsync('~M601');
+      const loginCommand = GCodes.CmdLogin;
+      const response = await this.sendCommandAsync(loginCommand);
       if (response === null) {
-        console.error('A4: Failed to send M601 connection command');
+        console.error('A4: Failed to send M601 S1 login command');
         return false;
       }
 
@@ -88,14 +89,14 @@ export class FlashForgeA4Client
         return true;
       }
 
-      if (!this.isSuccessfulCommandResponse('~M601', response)) {
+      if (!this.isSuccessfulCommandResponse(loginCommand, response)) {
         return false;
       }
 
       await new Promise((resolve) => setTimeout(resolve, 100));
       const info = await this.getPrinterInfo();
       if (!info) {
-        console.error('A4: Failed to retrieve printer info after M601');
+        console.error('A4: Failed to retrieve printer info after M601 S1');
         return false;
       }
 

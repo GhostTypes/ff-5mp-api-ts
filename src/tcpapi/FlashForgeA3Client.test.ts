@@ -24,13 +24,13 @@ describe('FlashForgeA3Client', () => {
       expect(client['port']).toBe(8899);
     });
 
-    it('should initialize connection with M601', async () => {
+    it('should initialize connection with M601 S1', async () => {
       const sendCommandSpy = vi.spyOn(client, 'sendCommandAsync');
       sendCommandSpy.mockResolvedValue('CMD M601 Received.\nok\n');
 
       const result = await client.initControl();
 
-      expect(sendCommandSpy).toHaveBeenCalledWith('~M601');
+      expect(sendCommandSpy).toHaveBeenCalledWith('~M601 S1');
       expect(result).toBe(true);
     });
 
@@ -71,6 +71,27 @@ describe('FlashForgeA3Client', () => {
       vi.spyOn(client, 'sendCommandAsync').mockResolvedValue('invalid response');
 
       await expect(client.getPrinterInfo()).resolves.toBeNull();
+    });
+
+    it('should parse SN-prefixed serial numbers and blank lines in M115', async () => {
+      const mockResponse = [
+        'echo: Machine Type: FlashForge Adventurer III',
+        'Machine Name: MyPrinter',
+        '',
+        'Firmware: v1.3.7',
+        'SN: SNADVA3M12345',
+        'X: 150 Y: 150 Z: 150',
+        'Tool Count: 1',
+        'Mac Address:00:11:22:33:44:55',
+        'ok',
+      ].join('\n');
+      vi.spyOn(client, 'sendCommandAsync').mockResolvedValue(mockResponse);
+
+      const info = await client.getPrinterInfo();
+
+      expect(info).not.toBeNull();
+      expect(info?.serialNumber).toBe('SNADVA3M12345');
+      expect(info?.firmware).toBe('v1.3.7');
     });
   });
 

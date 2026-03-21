@@ -23,7 +23,7 @@ describe('FlashForgeA4Client', () => {
       expect(client['port']).toBe(8899);
     });
 
-    it('should initialize connection with the documented M601 flow', async () => {
+    it('should initialize connection with the documented M601 S1 flow', async () => {
       const sendCommandSpy = vi.spyOn(client, 'sendCommandAsync');
       vi.spyOn(client, 'startKeepAlive').mockImplementation(() => {});
       sendCommandSpy
@@ -40,7 +40,7 @@ describe('FlashForgeA4Client', () => {
         ].join('\n'));
 
       await expect(client.initControl()).resolves.toBe(true);
-      expect(sendCommandSpy).toHaveBeenNthCalledWith(1, '~M601');
+      expect(sendCommandSpy).toHaveBeenNthCalledWith(1, '~M601 S1');
       expect(sendCommandSpy).toHaveBeenNthCalledWith(2, '~M115');
     });
 
@@ -112,6 +112,24 @@ describe('FlashForgeA4Client', () => {
       const info = await client.getPrinterInfo();
 
       expect(info?.serialNumber).toBe('A4SN12345');
+    });
+
+    it('should accept SN-prefixed serial numbers when firmware reports them', async () => {
+      vi.spyOn(client, 'sendCommandAsync').mockResolvedValue([
+        'CMD M115 Received.',
+        'Machine Type: Flashforge Adventurer 4',
+        'Machine Name: Serial Printer',
+        'Firmware: v2.0.5 20220527',
+        'SN: A4SN67890',
+        'X: 220 Y: 200 Z: 250',
+        'Tool Count: 1',
+        'Mac Address: 00:11:22:33:44:55',
+        'ok',
+      ].join('\n'));
+
+      const info = await client.getPrinterInfo();
+
+      expect(info?.serialNumber).toBe('A4SN67890');
     });
   });
 
