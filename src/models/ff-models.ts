@@ -89,7 +89,7 @@ export interface FFPrinterDetail {
   nozzleModel?: string;
   /** Style or type of the nozzle. */
   nozzleStyle?: number;
-  /** Process ID, possibly related to the current print job. */
+  /** Firmware-set Product ID identifying the printer model (e.g. 35=Adventurer 5M, 36=5M Pro, 38=AD5X). Stable across user renames. */
   pid?: number;
   /** Target temperature for the print bed (platform). */
   platTargetTemp?: number;
@@ -236,6 +236,8 @@ export interface FFMachineInfo {
   FirmwareVersion: string;
   /** User-configured name of the printer. */
   Name: string;
+  /** Firmware-set Product ID identifying the printer model (e.g. 35=Adventurer 5M, 36=5M Pro, 38=AD5X). Undefined on firmware that doesn't report it. */
+  Pid?: number;
   /** Indicates if the printer model is a "Pro" version. */
   IsPro: boolean;
   /** Indicates if the printer is an AD5X model. */

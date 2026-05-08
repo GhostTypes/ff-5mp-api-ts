@@ -215,6 +215,76 @@ describe('MachineInfo', () => {
       expect(result.IsPro).toBe(true);
     });
 
+    it('should detect AD5X from pid when renamed without matl_station fields', () => {
+      // Regression test for ff-5mp-hass#13: a user renamed their printer and
+      // the name+capability fallback could no longer recognize the model.
+      // The firmware-set integer pid is stable across renames.
+      const renamedAd5x: FFPrinterDetail = {
+        name: 'LegoTech82',
+        pid: 38,
+        firmwareVersion: '1.1.7-1.0.2',
+        ipAddr: '192.168.1.120',
+        status: 'ready',
+      };
+
+      const result = machineInfoConverter.fromDetail(renamedAd5x);
+
+      expect(result).not.toBeNull();
+      if (!result) return;
+      expect(result.Name).toBe('LegoTech82');
+      expect(result.Pid).toBe(38);
+      expect(result.IsAD5X).toBe(true);
+      expect(result.IsPro).toBe(false);
+    });
+
+    it('should detect 5M Pro from pid even when renamed', () => {
+      const renamedPro: FFPrinterDetail = {
+        ...GENERIC_PRINTER_DETAIL_JSON,
+        name: 'MyPrinter',
+        pid: 36,
+      };
+
+      const result = machineInfoConverter.fromDetail(renamedPro);
+
+      expect(result).not.toBeNull();
+      if (!result) return;
+      expect(result.Name).toBe('MyPrinter');
+      expect(result.Pid).toBe(36);
+      expect(result.IsPro).toBe(true);
+      expect(result.IsAD5X).toBe(false);
+    });
+
+    it('should treat pid 35 as a plain 5M even if name suggests Pro', () => {
+      const plain5M: FFPrinterDetail = {
+        ...GENERIC_PRINTER_DETAIL_JSON,
+        name: 'FlashForge 5M Pro',
+        pid: 35,
+      };
+
+      const result = machineInfoConverter.fromDetail(plain5M);
+
+      expect(result).not.toBeNull();
+      if (!result) return;
+      expect(result.Pid).toBe(35);
+      expect(result.IsPro).toBe(false);
+      expect(result.IsAD5X).toBe(false);
+    });
+
+    it('should fall back to name+capability when pid is absent', () => {
+      const noPidAd5x: FFPrinterDetail = {
+        ...AD5X_PRINTER_DETAIL_JSON,
+        pid: undefined,
+      };
+
+      const result = machineInfoConverter.fromDetail(noPidAd5x);
+
+      expect(result).not.toBeNull();
+      if (!result) return;
+      expect(result.Pid).toBeUndefined();
+      expect(result.IsAD5X).toBe(true); // detected via hasMatlStation fallback
+      expect(result.IsPro).toBe(false);
+    });
+
     it('should return null if detail is null', () => {
       const result = machineInfoConverter.fromDetail(null);
       expect(result).toBeNull();

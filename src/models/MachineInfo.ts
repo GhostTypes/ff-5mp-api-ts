@@ -3,6 +3,13 @@
  */
 import { type FFMachineInfo, type FFPrinterDetail, MachineState } from './ff-models';
 
+// Firmware-reported PIDs from FlashForge's /detail endpoint. These are stable
+// identifiers set by firmware, unlike the user-mutable `name` field.
+const PID_5M = 35;
+const PID_5M_PRO = 36;
+const PID_AD5X = 38;
+const KNOWN_HTTP_PIDS = new Set<number>([PID_5M, PID_5M_PRO, PID_AD5X]);
+
 /**
  * Transforms printer detail data from the API response format into a structured `FFMachineInfo` object.
  * This class centralizes the logic for mapping and calculating various properties of the printer's state
@@ -33,8 +40,19 @@ export class MachineInfo {
         detail.hasMatlStation === true ||
         (detail.matlStationInfo?.slotCnt ?? 0) > 0 ||
         (detail.matlStationInfo?.slotInfos?.length ?? 0) > 0;
-      const isAD5X = detail.name === 'AD5X' || hasMaterialStation;
-      const isPro = (detail.name || '').includes('Pro') && !isAD5X;
+      const pid = detail.pid;
+      let isAD5X: boolean;
+      let isPro: boolean;
+      if (pid !== undefined && KNOWN_HTTP_PIDS.has(pid)) {
+        isAD5X = pid === PID_AD5X;
+        isPro = pid === PID_5M_PRO;
+      } else {
+        // Fallback for firmware that doesn't report pid: legacy
+        // name+capability heuristic. Vulnerable to user renames, which
+        // is why pid-based detection is preferred when available.
+        isAD5X = detail.name === 'AD5X' || hasMaterialStation;
+        isPro = (detail.name || '').includes('Pro') && !isAD5X;
+      }
       const printEta = this.formatTimeFromSeconds(detail.estimatedTime || 0);
       const completionTime = new Date(Date.now() + (detail.estimatedTime || 0) * 1000);
       const formattedRunTime = this.formatTimeFromSeconds(detail.printDuration || 0);
@@ -99,6 +117,7 @@ export class MachineInfo {
         FillAmount: detail.fillAmount || 0,
         FirmwareVersion: detail.firmwareVersion || '',
         Name: detail.name || '',
+        Pid: pid,
         IsPro: isPro,
         IsAD5X: isAD5X,
         NozzleSize: detail.nozzleModel || '',

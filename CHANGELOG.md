@@ -7,6 +7,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.3.1] - 2026-05-08
+
+### Fixed
+
+- Printer model detection (`IsPro`, `IsAD5X` on `FFMachineInfo`) now reads the firmware-set integer `pid` field on `/detail` instead of string-matching the user-mutable `name` field. Renaming an Adventurer 5M / 5M Pro / AD5X via the LCD or cloud no longer breaks model detection in downstream consumers (Electron UI, Web UI). Falls back to the legacy name+capability heuristic when `pid` is absent so older firmware still works. Reported in [ff-5mp-hass#13](https://github.com/GhostTypes/ff-5mp-hass/issues/13).
+
+### Added
+
+- `FFMachineInfo.Pid: number | undefined` — the raw firmware PID exposed for consumers that want to do their own model-class gating. Known modern HTTP-capable PIDs: `35` (Adventurer 5M), `36` (5M Pro), `38` (AD5X).
+
+### Changed
+
+- Corrected misleading JSDoc on `FFPrinterDetail.pid` (was "Process ID, possibly related to the current print job"; it is in fact the firmware-set Product ID).
+
 ## [1.3.0] - 2026-03-21
 
 ### Added
