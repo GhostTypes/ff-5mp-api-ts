@@ -7,6 +7,7 @@
 import axios from 'axios';
 import type { FiveMClient } from '../../FiveMClient';
 import type { FlashForgeClient } from '../../tcpapi/FlashForgeClient';
+import type { SlotAction } from '../../models/ff-models';
 import type { Filament } from '../filament/Filament';
 import { NetworkUtils } from '../network/NetworkUtils';
 import { Commands } from '../server/Commands';
@@ -217,6 +218,58 @@ export class Control {
    */
   public async finishFilamentLoad(): Promise<boolean> {
     return await this.tcpClient.finishFilamentLoad();
+  }
+
+  // AD5X Intelligent Filament Station (IFS) slot operations
+
+  /**
+   * Configures the material name and color metadata for an AD5X material station slot.
+   * This information is shown on the printer UI and used for print validation; it does
+   * not move any filament. Only available on AD5X printers.
+   *
+   * The firmware accepts arbitrary material/color strings, but only the recognized
+   * materials and the 24-color UI palette render an icon on the printer — callers that
+   * want a clean display should map to the nearest recognized values first.
+   *
+   * @param slot The slot number (1-4).
+   * @param materialName The material type (e.g., "PLA", "PETG").
+   * @param hexRgb The color as a hex string; a leading "#" is stripped to match the wire format ("RRGGBB").
+   * @returns A Promise that resolves to true if the command is successful, false otherwise.
+   */
+  public async configureSlot(
+    slot: number,
+    materialName: string,
+    hexRgb: string
+  ): Promise<boolean> {
+    if (!this.client.isAD5X) {
+      console.log('configureSlot() error, material station only available on AD5X.');
+      return false;
+    }
+    return await this.sendControlCommand(Commands.MaterialStationConfigCmd, {
+      slot,
+      mt: materialName,
+      rgb: hexRgb.replace(/^#/, ''),
+    });
+  }
+
+  /**
+   * Performs a load, unload, or cancel operation on an AD5X material station slot.
+   * Only available on AD5X printers. Operations are asynchronous — poll
+   * `info.get()` / `matlStationInfo.stateAction` to monitor completion.
+   *
+   * @param slot The target slot number (1-4). For {@link SlotAction.Cancel} the slot is ignored by firmware.
+   * @param action The slot action to perform (load/unload/cancel).
+   * @returns A Promise that resolves to true if the command is successful, false otherwise.
+   */
+  public async slotAction(slot: number, action: SlotAction): Promise<boolean> {
+    if (!this.client.isAD5X) {
+      console.log('slotAction() error, material station only available on AD5X.');
+      return false;
+    }
+    return await this.sendControlCommand(Commands.MaterialStationCmd, {
+      slot,
+      action,
+    });
   }
 
   // Internal methods for sending commands

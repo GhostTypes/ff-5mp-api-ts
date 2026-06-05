@@ -7,6 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.3.2] - 2026-06-05
+
+### Added
+
+- AD5X Intelligent Filament Station (IFS) slot write commands, backported from `ff-5mp-api-kt`:
+  - `Control.configureSlot(slot, materialName, hexRgb)` — sends `msConfig_cmd` to set a slot's material name and color (a leading `#` on the color is stripped to match the `RRGGBB` wire format).
+  - `Control.slotAction(slot, action)` — sends `ms_cmd` to load / unload / cancel a slot.
+  - `SlotAction` enum (`Load = 0`, `Unload = 1`, `Cancel = 2`) exported from the package root.
+  - Both methods are gated on `isAD5X` and return `false` on non-AD5X printers.
+  - `Commands.MaterialStationConfigCmd` (`msConfig_cmd`) and `Commands.MaterialStationCmd` (`ms_cmd`) constants.
+
 ## [1.3.1] - 2026-05-08
 
 ### Fixed

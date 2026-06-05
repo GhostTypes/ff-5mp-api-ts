@@ -378,6 +378,18 @@ export interface FFGcodeFileEntry {
   // For now, focusing on AD5X structure.
 }
 
+/**
+ * AD5X material station (IFS) slot operation, carrying the on-wire `ms_cmd` action code.
+ * - `Load` (0): load filament from the slot into the extruder.
+ * - `Unload` (1): retract filament from the extruder back into the slot.
+ * - `Cancel` (2): cancel the current IFS operation.
+ */
+export enum SlotAction {
+  Load = 0,
+  Unload = 1,
+  Cancel = 2,
+}
+
 // --- AD5X Local Job Start Interfaces ---
 
 /**

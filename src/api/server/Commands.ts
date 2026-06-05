@@ -23,4 +23,8 @@ export class Commands {
   static readonly CameraControlCmd = 'streamCtrl_cmd';
   /** Command for controlling the printer's temperatures (e.g., setting extruder or bed temperature via HTTP, if supported). */
   static readonly TempControlCmd = 'temperatureCtl_cmd';
+  /** Command for configuring an AD5X material station slot's material name and color (IFS). */
+  static readonly MaterialStationConfigCmd = 'msConfig_cmd';
+  /** Command for AD5X material station slot load/unload/cancel actions (IFS). */
+  static readonly MaterialStationCmd = 'ms_cmd';
 }

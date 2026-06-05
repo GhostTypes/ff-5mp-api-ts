@@ -44,6 +44,7 @@ export {
   FFPrinterDetail,
   MachineState,
   MatlStationInfo,
+  SlotAction,
   SlotInfo,
   Temperature as TemperatureInterface,
 } from './models/ff-models';

@@ -6,6 +6,7 @@
 import axios from 'axios';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { FiveMClient } from '../../FiveMClient';
+import { SlotAction } from '../../models/ff-models';
 import type { FlashForgeClient } from '../../tcpapi/FlashForgeClient';
 import { Commands } from '../server/Commands';
 import { Endpoints } from '../server/Endpoints';
@@ -492,6 +493,100 @@ describe('Control', () => {
       await control.sendControlCommand('test_cmd', {});
 
       expect(mockFiveMClient.releaseHttpClient).toHaveBeenCalled();
+    });
+  });
+
+  describe('AD5X material station (IFS) slot operations', () => {
+    beforeEach(() => {
+      mockedAxios.post.mockResolvedValue({
+        status: 200,
+        data: { code: 0, message: 'Success' },
+      });
+      mockFiveMClient.isAD5X = true;
+    });
+
+    it('should configure a slot and strip the leading # from the color', async () => {
+      const result = await control.configureSlot(1, 'PLA', '#FF0000');
+
+      expect(result).toBe(true);
+      expect(mockedAxios.post).toHaveBeenCalledWith(
+        `http://printer:8898${Endpoints.Control}`,
+        expect.objectContaining({
+          payload: {
+            cmd: Commands.MaterialStationConfigCmd,
+            args: { slot: 1, mt: 'PLA', rgb: 'FF0000' },
+          },
+        }),
+        expect.any(Object)
+      );
+    });
+
+    it('should accept a color that already lacks a # prefix', async () => {
+      await control.configureSlot(2, 'PETG', '46328E');
+
+      expect(mockedAxios.post).toHaveBeenCalledWith(
+        `http://printer:8898${Endpoints.Control}`,
+        expect.objectContaining({
+          payload: {
+            cmd: Commands.MaterialStationConfigCmd,
+            args: { slot: 2, mt: 'PETG', rgb: '46328E' },
+          },
+        }),
+        expect.any(Object)
+      );
+    });
+
+    it('should send a load slot action', async () => {
+      const result = await control.slotAction(1, SlotAction.Load);
+
+      expect(result).toBe(true);
+      expect(mockedAxios.post).toHaveBeenCalledWith(
+        `http://printer:8898${Endpoints.Control}`,
+        expect.objectContaining({
+          payload: {
+            cmd: Commands.MaterialStationCmd,
+            args: { slot: 1, action: 0 },
+          },
+        }),
+        expect.any(Object)
+      );
+    });
+
+    it('should send unload and cancel slot actions with the correct codes', async () => {
+      await control.slotAction(3, SlotAction.Unload);
+      expect(mockedAxios.post).toHaveBeenLastCalledWith(
+        `http://printer:8898${Endpoints.Control}`,
+        expect.objectContaining({
+          payload: {
+            cmd: Commands.MaterialStationCmd,
+            args: { slot: 3, action: 1 },
+          },
+        }),
+        expect.any(Object)
+      );
+
+      await control.slotAction(0, SlotAction.Cancel);
+      expect(mockedAxios.post).toHaveBeenLastCalledWith(
+        `http://printer:8898${Endpoints.Control}`,
+        expect.objectContaining({
+          payload: {
+            cmd: Commands.MaterialStationCmd,
+            args: { slot: 0, action: 2 },
+          },
+        }),
+        expect.any(Object)
+      );
+    });
+
+    it('should refuse slot operations on non-AD5X printers', async () => {
+      mockFiveMClient.isAD5X = false;
+
+      const configResult = await control.configureSlot(1, 'PLA', '#FF0000');
+      const actionResult = await control.slotAction(1, SlotAction.Load);
+
+      expect(configResult).toBe(false);
+      expect(actionResult).toBe(false);
+      expect(mockedAxios.post).not.toHaveBeenCalled();
     });
   });
 
