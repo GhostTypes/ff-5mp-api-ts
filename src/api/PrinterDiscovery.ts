@@ -56,6 +56,21 @@ const LEGACY_PRODUCT_IDS = {
 } as const;
 
 /**
+ * Canonical USB Product IDs (offset 0x88 of the discovery packet) for modern
+ * printers. This is the same value space as the firmware `/detail` `pid` field
+ * and the FlashForge update-checker keys, so it is the authoritative model
+ * discriminator — unlike `productType` (0x5A02), which only identifies the 5M
+ * *family* and cannot distinguish 5M / 5M Pro / AD5X from one another.
+ */
+const MODERN_PRODUCT_IDS: Readonly<Record<number, PrinterModel>> = {
+    0x0023: PrinterModel.Adventurer5M,
+    0x0024: PrinterModel.Adventurer5MPro,
+    0x0026: PrinterModel.AD5X,
+    0x0028: PrinterModel.Creator5,
+    0x0029: PrinterModel.Creator5Pro,
+};
+
+/**
  * EventEmitter-based continuous discovery monitor.
  *
  * Emits 'discovered', 'end', and 'error' events during printer discovery.
@@ -522,7 +537,7 @@ export class PrinterDiscovery {
         const serialNumber = buffer.toString('utf8', 0x92, 0x92 + 128).replace(/\0.*$/, '');
 
         // Detect model
-        const model = this.detectModernModel(name, productType);
+        const model = this.detectModernModel(name, productType, productId);
 
         return {
             model,
@@ -593,32 +608,47 @@ export class PrinterDiscovery {
     }
 
     /**
-     * Detects printer model from modern protocol response.
+     * Detects printer model from a modern protocol response.
      *
-     * Uses both printer name and product type for accurate detection.
+     * Resolution order:
+     *  1. USB Product ID (offset 0x88) — the authoritative, user-immutable
+     *     discriminator (matches the firmware `/detail` pid and update-checker
+     *     keys). This is the only signal that distinguishes 5M / 5M Pro / AD5X /
+     *     Creator 5 / Creator 5 Pro from one another.
+     *  2. `productType` 0x5A02 (5M *family*) + name — fallback for firmware that
+     *     reports an unknown/zero product ID.
+     *  3. Name heuristics — last resort.
      *
-     * @param name Printer name from response
-     * @param productType Product type code (e.g., 0x5A02 for 5M series)
+     * @param name Printer name from response (user-mutable)
+     * @param productType Product type code (e.g., 0x5A02 for the 5M family)
+     * @param productId USB product ID from offset 0x88
      * @returns Detected printer model
      * @private
      */
-    protected detectModernModel(name: string, productType: number): PrinterModel {
-        const upperName = name.toUpperCase();
-
-        // Direct name matches (highest priority)
-        if (upperName === 'AD5X') {
-            return PrinterModel.AD5X;
+    protected detectModernModel(name: string, productType: number, productId?: number): PrinterModel {
+        // Product ID is authoritative (firmware-set, not user-mutable).
+        if (productId !== undefined && productId in MODERN_PRODUCT_IDS) {
+            return MODERN_PRODUCT_IDS[productId];
         }
 
-        // Product type-based detection (0x5A02 = 5M series)
+        const upperName = name.toUpperCase();
+
+        // Fallback: 0x5A02 identifies the 5M family but not the specific model,
+        // so we still need the name to separate base from Pro.
         if (productType === 0x5A02) {
+            if (upperName === 'AD5X') {
+                return PrinterModel.AD5X;
+            }
             if (upperName.includes('PRO')) {
                 return PrinterModel.Adventurer5MPro;
             }
             return PrinterModel.Adventurer5M;
         }
 
-        // Name-based fallback
+        // Last-resort name heuristics.
+        if (upperName === 'AD5X') {
+            return PrinterModel.AD5X;
+        }
         if (upperName.includes('ADVENTURER 5M') || upperName.includes('AD5M')) {
             if (upperName.includes('PRO')) {
                 return PrinterModel.Adventurer5MPro;

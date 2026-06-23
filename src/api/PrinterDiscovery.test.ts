@@ -421,6 +421,30 @@ describe('PrinterDiscovery', () => {
                     PrinterModel.Unknown
                 );
             });
+
+            it('should prefer USB product ID over name/productType', () => {
+                const discovery = createDiscovery();
+                // PID is authoritative even when the (user-mutable) name disagrees.
+                expect(discovery['detectModernModel']('My Renamed Printer', 0x5a02, 0x0024)).toBe(
+                    PrinterModel.Adventurer5MPro
+                );
+                expect(discovery['detectModernModel']('My Renamed Printer', 0x5a02, 0x0023)).toBe(
+                    PrinterModel.Adventurer5M
+                );
+                expect(discovery['detectModernModel']('whatever', 0x0000, 0x0026)).toBe(
+                    PrinterModel.AD5X
+                );
+            });
+
+            it('should detect Creator 5 / Creator 5 Pro by product ID', () => {
+                const discovery = createDiscovery();
+                expect(discovery['detectModernModel']('Creator 5', 0x0000, 0x0028)).toBe(
+                    PrinterModel.Creator5
+                );
+                expect(discovery['detectModernModel']('Creator 5 Pro', 0x0000, 0x0029)).toBe(
+                    PrinterModel.Creator5Pro
+                );
+            });
         });
 
         describe('Legacy Protocol', () => {

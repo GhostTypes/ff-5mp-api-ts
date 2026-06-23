@@ -242,6 +242,8 @@ export interface FFMachineInfo {
   IsPro: boolean;
   /** Indicates if the printer is an AD5X model. */
   IsAD5X: boolean;
+  /** Indicates if the printer is a Creator 5 / Creator 5 Pro (4-head tool-changer). */
+  IsCreator5: boolean;
   /** Nozzle size (e.g., "0.4mm"). */
   NozzleSize: string;
 

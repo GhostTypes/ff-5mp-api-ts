@@ -57,6 +57,7 @@ export class FiveMClient {
   public printerName: string = '';
   public isPro: boolean = false;
   public isAD5X: boolean = false;
+  public isCreator5: boolean = false;
   public firmwareVersion: string = '';
   public firmVer: string = '';
   public cameraStreamUrl: string = '';
@@ -199,6 +200,7 @@ export class FiveMClient {
     this.printerName = info.Name || '';
     this.isPro = info.IsPro; // Use the value from MachineInfo
     this.isAD5X = info.IsAD5X; // Cache the AD5X status
+    this.isCreator5 = info.IsCreator5; // Cache the Creator 5 status
     this.firmwareVersion = info.FirmwareVersion || '';
     this.firmVer = info.FirmwareVersion ? info.FirmwareVersion.split('-')[0] : '';
     this.cameraStreamUrl = info.CameraStreamUrl || '';

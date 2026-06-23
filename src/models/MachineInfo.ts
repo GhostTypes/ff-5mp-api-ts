@@ -8,7 +8,15 @@ import { type FFMachineInfo, type FFPrinterDetail, MachineState } from './ff-mod
 const PID_5M = 35;
 const PID_5M_PRO = 36;
 const PID_AD5X = 38;
-const KNOWN_HTTP_PIDS = new Set<number>([PID_5M, PID_5M_PRO, PID_AD5X]);
+const PID_CREATOR5 = 40;
+const PID_CREATOR5_PRO = 41;
+const KNOWN_HTTP_PIDS = new Set<number>([
+  PID_5M,
+  PID_5M_PRO,
+  PID_AD5X,
+  PID_CREATOR5,
+  PID_CREATOR5_PRO,
+]);
 
 /**
  * Transforms printer detail data from the API response format into a structured `FFMachineInfo` object.
@@ -43,15 +51,18 @@ export class MachineInfo {
       const pid = detail.pid;
       let isAD5X: boolean;
       let isPro: boolean;
+      let isCreator5: boolean;
       if (pid !== undefined && KNOWN_HTTP_PIDS.has(pid)) {
         isAD5X = pid === PID_AD5X;
         isPro = pid === PID_5M_PRO;
+        isCreator5 = pid === PID_CREATOR5 || pid === PID_CREATOR5_PRO;
       } else {
         // Fallback for firmware that doesn't report pid: legacy
         // name+capability heuristic. Vulnerable to user renames, which
         // is why pid-based detection is preferred when available.
         isAD5X = detail.name === 'AD5X' || hasMaterialStation;
         isPro = (detail.name || '').includes('Pro') && !isAD5X;
+        isCreator5 = (detail.name || '').includes('Creator 5');
       }
       const printEta = this.formatTimeFromSeconds(detail.estimatedTime || 0);
       const completionTime = new Date(Date.now() + (detail.estimatedTime || 0) * 1000);
@@ -120,6 +131,7 @@ export class MachineInfo {
         Pid: pid,
         IsPro: isPro,
         IsAD5X: isAD5X,
+        IsCreator5: isCreator5,
         NozzleSize: detail.nozzleModel || '',
 
         // Material Station Info

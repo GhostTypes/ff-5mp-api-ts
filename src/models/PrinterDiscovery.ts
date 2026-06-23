@@ -21,6 +21,10 @@ export enum PrinterModel {
     Adventurer4 = 'Adventurer4',
     /** Adventurer 3 model */
     Adventurer3 = 'Adventurer3',
+    /** Creator 5 tool-changer model */
+    Creator5 = 'Creator5',
+    /** Creator 5 Pro tool-changer model */
+    Creator5Pro = 'Creator5Pro',
     /** Unknown or unrecognized printer model */
     Unknown = 'Unknown'
 }
