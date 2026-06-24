@@ -18,6 +18,16 @@ const KNOWN_HTTP_PIDS = new Set<number>([
   PID_CREATOR5_PRO,
 ]);
 
+// Immutable model display names keyed by firmware PID. Used as a fallback for
+// `Model` when the printer doesn't report the `model` field (older firmware).
+const PID_MODEL_NAMES: Record<number, string> = {
+  [PID_5M]: 'Adventurer 5M',
+  [PID_5M_PRO]: 'Adventurer 5M Pro',
+  [PID_AD5X]: 'AD5X',
+  [PID_CREATOR5]: 'Creator 5',
+  [PID_CREATOR5_PRO]: 'Creator 5 Pro',
+};
+
 /**
  * Transforms printer detail data from the API response format into a structured `FFMachineInfo` object.
  * This class centralizes the logic for mapping and calculating various properties of the printer's state
@@ -52,10 +62,12 @@ export class MachineInfo {
       let isAD5X: boolean;
       let isPro: boolean;
       let isCreator5: boolean;
+      let isCreator5Pro: boolean;
       if (pid !== undefined && KNOWN_HTTP_PIDS.has(pid)) {
         isAD5X = pid === PID_AD5X;
         isPro = pid === PID_5M_PRO;
         isCreator5 = pid === PID_CREATOR5 || pid === PID_CREATOR5_PRO;
+        isCreator5Pro = pid === PID_CREATOR5_PRO;
       } else {
         // Fallback for firmware that doesn't report pid: legacy
         // name+capability heuristic. Vulnerable to user renames, which
@@ -63,7 +75,38 @@ export class MachineInfo {
         isAD5X = detail.name === 'AD5X' || hasMaterialStation;
         isPro = (detail.name || '').includes('Pro') && !isAD5X;
         isCreator5 = (detail.name || '').includes('Creator 5');
+        // `model` is the immutable factory name; prefer it over the user-mutable
+        // `name` when distinguishing the Pro variant without a pid.
+        isCreator5Pro =
+          isCreator5 && /Creator 5 Pro/i.test(detail.model || detail.name || '');
       }
+
+      // Per-tool temperatures. Creator 5 series report `nozzleTemps[]` /
+      // `nozzleTargetTemps[]`; single-nozzle models don't, so fall back to a
+      // 1-element array mirroring the right/main extruder.
+      const nozzleTemps = detail.nozzleTemps;
+      const nozzleTargetTemps = detail.nozzleTargetTemps;
+      let toolTemps: { current: number; set: number }[];
+      if (Array.isArray(nozzleTemps) && nozzleTemps.length > 0) {
+        toolTemps = nozzleTemps.map((t, i) => ({
+          current: t || 0,
+          set: nozzleTargetTemps?.[i] || 0,
+        }));
+      } else {
+        toolTemps = [{ current: detail.rightTemp || 0, set: detail.rightTargetTemp || 0 }];
+      }
+
+      // Capability flags. Derived from presence/value, never assumed from the
+      // model family alone. See creator5-capabilities: only the Creator 5 Pro
+      // has a confirmed door sensor; on every other model `doorStatus` is cosmetic.
+      const hasCamera = detail.camera === 1 || (detail.cameraStreamUrl || '') !== '';
+      const hasLidar = detail.lidar === 1;
+      const hasDoorSensor = isCreator5Pro;
+      const model =
+        detail.model ||
+        (pid !== undefined ? PID_MODEL_NAMES[pid] : undefined) ||
+        detail.name ||
+        '';
       const printEta = this.formatTimeFromSeconds(detail.estimatedTime || 0);
       const completionTime = new Date(Date.now() + (detail.estimatedTime || 0) * 1000);
       const formattedRunTime = this.formatTimeFromSeconds(detail.printDuration || 0);
@@ -132,7 +175,14 @@ export class MachineInfo {
         IsPro: isPro,
         IsAD5X: isAD5X,
         IsCreator5: isCreator5,
+        IsCreator5Pro: isCreator5Pro,
+        Model: model,
         NozzleSize: detail.nozzleModel || '',
+
+        // Capabilities (presence-derived)
+        HasCamera: hasCamera,
+        HasLidar: hasLidar,
+        HasDoorSensor: hasDoorSensor,
 
         // Material Station Info
         HasMatlStation: detail.hasMatlStation,
@@ -148,6 +198,7 @@ export class MachineInfo {
           current: detail.rightTemp || 0,
           set: detail.rightTargetTemp || 0,
         },
+        ToolTemps: toolTemps,
 
         // Current print stats
         PrintDuration: detail.printDuration || 0,

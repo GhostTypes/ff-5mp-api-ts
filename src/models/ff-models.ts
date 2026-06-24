@@ -31,8 +31,18 @@ export interface FFPrinterDetail {
   cumulativePrintTime?: number;
   /** Current printing speed, possibly as a percentage of the base speed. */
   currentPrintSpeed?: number;
-  /** Status of the printer's door (e.g., "open", "close"), if equipped with a sensor. */
+  /** Status of the printer's door (e.g., "open", "close"). NOTE: present on every model, but only backed by a real sensor on some (e.g. Creator 5 Pro). On models without a sensor the value is cosmetic. */
   doorStatus?: string;
+  /** Indicates whether a camera is present (1 = yes, 0 = no). Creator 5 series; other models signal presence via `cameraStreamUrl`. */
+  camera?: number;
+  /** Indicates whether a lidar/first-layer scanner is present (1 = yes, 0 = no). Creator 5 series. */
+  lidar?: number;
+  /** Immutable factory model name (e.g. "Creator 5 Pro"). Unlike `name`, this is not user-editable. Creator 5 series; may be absent on older models. */
+  model?: string;
+  /** Per-tool current nozzle temperatures (one entry per nozzle). Creator 5 series multi-nozzle; single-nozzle models use `rightTemp`/`leftTemp` instead. */
+  nozzleTemps?: number[];
+  /** Per-tool target nozzle temperatures (one entry per nozzle). Creator 5 series multi-nozzle. */
+  nozzleTargetTemps?: number[];
   /** Current error code reported by the printer, if any. */
   errorCode?: string;
   /** Estimated length of filament remaining for the left extruder for the current print job. */
@@ -244,13 +254,26 @@ export interface FFMachineInfo {
   IsAD5X: boolean;
   /** Indicates if the printer is a Creator 5 / Creator 5 Pro (4-head tool-changer). */
   IsCreator5: boolean;
+  /** Indicates if the printer is specifically a Creator 5 Pro (PID 41). Drives Pro-only capabilities (door sensor, filtration). */
+  IsCreator5Pro: boolean;
+  /** Immutable factory model name (e.g. "Creator 5 Pro"). Falls back to a PID-derived name, then `name`, when the printer doesn't report `model`. */
+  Model: string;
   /** Nozzle size (e.g., "0.4mm"). */
   NozzleSize: string;
 
+  /** Whether the printer has a built-in camera (capability flag, not just stream availability). */
+  HasCamera: boolean;
+  /** Whether the printer has a lidar/first-layer scanner. */
+  HasLidar: boolean;
+  /** Whether the printer has a real door sensor. Only true on models with confirmed hardware (e.g. Creator 5 Pro); when false, `DoorOpen` is cosmetic and should not be surfaced. */
+  HasDoorSensor: boolean;
+
   /** Current and target temperatures for the print bed. See {@link Temperature}. */
   PrintBed: Temperature;
-  /** Current and target temperatures for the extruder. See {@link Temperature}. */
+  /** Current and target temperatures for the extruder. For multi-nozzle models this is the first tool; see {@link ToolTemps} for all tools. */
   Extruder: Temperature;
+  /** Current and target temperatures for every tool/nozzle. Single-nozzle models report a 1-element array mirroring {@link Extruder}; Creator 5 series report one entry per nozzle. */
+  ToolTemps: Temperature[];
 
   /** Duration of the current print job so far (often in seconds). */
   PrintDuration: number;

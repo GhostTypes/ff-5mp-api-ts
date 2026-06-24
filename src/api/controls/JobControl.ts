@@ -227,7 +227,7 @@ export class JobControl {
    */
   public async uploadFileAD5X(params: AD5XUploadParams): Promise<boolean> {
     // Validate that this is an AD5X printer
-    if (!this.validateAD5XPrinter()) {
+    if (!this.validateMaterialStationPrinter()) {
       return false;
     }
 
@@ -400,7 +400,7 @@ export class JobControl {
    */
   public async startAD5XMultiColorJob(params: AD5XLocalJobParams): Promise<boolean> {
     // Validate that this is an AD5X printer
-    if (!this.validateAD5XPrinter()) {
+    if (!this.validateMaterialStationPrinter()) {
       return false;
     }
 
@@ -457,7 +457,7 @@ export class JobControl {
    */
   public async startAD5XSingleColorJob(params: AD5XSingleColorJobParams): Promise<boolean> {
     // Validate that this is an AD5X printer
-    if (!this.validateAD5XPrinter()) {
+    if (!this.validateMaterialStationPrinter()) {
       return false;
     }
 
@@ -498,14 +498,53 @@ export class JobControl {
     }
   }
 
+  // --- Model-neutral material-station aliases ---
+  // The Creator 5 series shares the AD5X material-mapping print flow, so these
+  // delegate to the AD5X implementations. Prefer these names in model-agnostic
+  // code (e.g. a Creator5 backend) so call sites aren't misleadingly "AD5X".
+
   /**
-   * Validates that the current printer is an AD5X model.
-   * @returns True if the printer is AD5X, false otherwise
+   * Uploads a file with material-station mappings (AD5X / Creator 5 series).
+   * @param params Upload parameters including material mappings.
+   * @returns Promise resolving to true on success.
+   */
+  public async uploadFileWithMaterialMappings(params: AD5XUploadParams): Promise<boolean> {
+    return this.uploadFileAD5X(params);
+  }
+
+  /**
+   * Starts a multi-color local job using material-station mappings (AD5X / Creator 5 series).
+   * @param params Job parameters including material mappings.
+   * @returns Promise resolving to true on success.
+   */
+  public async startMaterialMappingJob(params: AD5XLocalJobParams): Promise<boolean> {
+    return this.startAD5XMultiColorJob(params);
+  }
+
+  /**
+   * Starts a single-color local job on a material-station printer without using the
+   * station (AD5X / Creator 5 series).
+   * @param params Job parameters.
+   * @returns Promise resolving to true on success.
+   */
+  public async startSingleColorMaterialStationJob(
+    params: AD5XSingleColorJobParams
+  ): Promise<boolean> {
+    return this.startAD5XSingleColorJob(params);
+  }
+
+  /**
+   * Validates that the current printer has a material station and therefore
+   * supports material-mapping uploads/jobs. Covers AD5X and the Creator 5 series,
+   * which share the same material-mapping print flow (Creator 5 = "AD5X + more").
+   * @returns True if the printer supports material mappings, false otherwise
    * @private
    */
-  private validateAD5XPrinter(): boolean {
-    if (!this.client.isAD5X) {
-      console.error('AD5X Job error: This method can only be used with AD5X printers');
+  private validateMaterialStationPrinter(): boolean {
+    if (!this.client.isAD5X && !this.client.isCreator5) {
+      console.error(
+        'Material-station job error: this method requires an AD5X or Creator 5 series printer'
+      );
       return false;
     }
     return true;

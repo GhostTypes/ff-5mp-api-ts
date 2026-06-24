@@ -320,5 +320,105 @@ describe('MachineInfo', () => {
 
       expect(result.CameraStreamUrl).toBe('http://192.168.1.100:8080/?action=stream');
     });
+
+    // --- Creator 5 series ---
+
+    // Trimmed from a live Creator 5 Pro capture (firmware 1.9.2).
+    const CREATOR5_PRO_DETAIL_JSON: FFPrinterDetail = {
+      camera: 1,
+      cameraStreamUrl: 'http://10.0.0.14:8080/?action=stream',
+      doorStatus: 'close',
+      firmwareVersion: '1.9.2',
+      lidar: 1,
+      measure: '256X256X256',
+      model: 'Creator 5 Pro',
+      name: 'Creator 5 Pro',
+      nozzleCnt: 4,
+      nozzleModel: '0.4mm',
+      nozzleTargetTemps: [0, 0, 0, 0],
+      nozzleTemps: [25, 26, 27, 28],
+      pid: 41,
+      platTemp: 25,
+      platTargetTemp: 0,
+      status: 'ready',
+      matlStationInfo: {
+        currentLoadSlot: 0,
+        currentSlot: 0,
+        slotCnt: 4,
+        slotInfos: [
+          { hasFilament: true, materialColor: '#4CAAF8', materialName: 'PLA', slotId: 1 },
+          { hasFilament: true, materialColor: '#F435F6', materialName: 'PLA', slotId: 2 },
+          { hasFilament: true, materialColor: '#FFF245', materialName: 'PLA', slotId: 3 },
+          { hasFilament: true, materialColor: '#FFFFFF', materialName: 'PLA', slotId: 4 },
+        ],
+        stateAction: 0,
+        stateStep: 0,
+      },
+    };
+
+    it('parses Creator 5 Pro per-tool temps and Pro-only capabilities', () => {
+      const result = machineInfoConverter.fromDetail(CREATOR5_PRO_DETAIL_JSON);
+
+      expect(result).not.toBeNull();
+      if (!result) return;
+
+      expect(result.IsCreator5).toBe(true);
+      expect(result.IsCreator5Pro).toBe(true);
+      expect(result.IsAD5X).toBe(false);
+      expect(result.Model).toBe('Creator 5 Pro');
+
+      // Four tool temps, in order, paired with their targets.
+      expect(result.ToolTemps).toHaveLength(4);
+      expect(result.ToolTemps[0]).toEqual({ current: 25, set: 0 });
+      expect(result.ToolTemps[3]).toEqual({ current: 28, set: 0 });
+      // Extruder mirrors the first tool's source field (rightTemp absent -> 0).
+      expect(result.Extruder.current).toBe(0);
+
+      // Pro-only: real door sensor, camera + lidar present.
+      expect(result.HasDoorSensor).toBe(true);
+      expect(result.HasCamera).toBe(true);
+      expect(result.HasLidar).toBe(true);
+
+      // Material station passes through.
+      expect(result.MatlStationInfo?.slotCnt).toBe(4);
+    });
+
+    it('treats a plain Creator 5 as having no door sensor and derives its model name', () => {
+      const plainC5: FFPrinterDetail = {
+        ...CREATOR5_PRO_DETAIL_JSON,
+        pid: 40,
+        model: undefined, // older/plain firmware may omit `model`
+        name: 'Shop C5',
+        doorStatus: 'close',
+      };
+
+      const result = machineInfoConverter.fromDetail(plainC5);
+
+      expect(result).not.toBeNull();
+      if (!result) return;
+
+      expect(result.IsCreator5).toBe(true);
+      expect(result.IsCreator5Pro).toBe(false);
+      // No real sensor on the plain C5: door must not be surfaced as meaningful.
+      expect(result.HasDoorSensor).toBe(false);
+      // Model falls back to the PID-derived immutable name, not the user name.
+      expect(result.Model).toBe('Creator 5');
+      expect(result.Name).toBe('Shop C5');
+    });
+
+    it('produces a single-element ToolTemps for single-nozzle models', () => {
+      const result = machineInfoConverter.fromDetail({
+        ...GENERIC_PRINTER_DETAIL_JSON,
+        rightTemp: 210.3,
+        rightTargetTemp: 210,
+      });
+
+      expect(result).not.toBeNull();
+      if (!result) return;
+
+      expect(result.ToolTemps).toHaveLength(1);
+      expect(result.ToolTemps[0]).toEqual({ current: 210.3, set: 210 });
+      expect(result.HasDoorSensor).toBe(false);
+    });
   });
 });

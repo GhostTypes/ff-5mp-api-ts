@@ -31,7 +31,12 @@ export {
 // Server constants
 export { Commands } from './api/server/Commands';
 export { Endpoints } from './api/server/Endpoints';
-export { FiveMClient, type FiveMClientConnectionOptions, Product } from './FiveMClient';
+export {
+  FiveMClient,
+  type FiveMClientConnectionOptions,
+  Product,
+  type ProductCapabilities,
+} from './FiveMClient';
 // Models
 export {
   AD5XLocalJobParams,

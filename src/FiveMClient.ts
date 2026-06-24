@@ -10,7 +10,7 @@ import { JobControl } from './api/controls/JobControl';
 import { TempControl } from './api/controls/TempControl';
 import { NetworkUtils } from './api/network/NetworkUtils';
 import { Endpoints } from './api/server/Endpoints';
-import type { FFMachineInfo } from './models/ff-models';
+import type { FFMachineInfo, Temperature } from './models/ff-models';
 import { MachineInfo } from './models/MachineInfo';
 import { FlashForgeClient } from './tcpapi/FlashForgeClient';
 
@@ -58,9 +58,22 @@ export class FiveMClient {
   public isPro: boolean = false;
   public isAD5X: boolean = false;
   public isCreator5: boolean = false;
+  public isCreator5Pro: boolean = false;
+  /** Immutable factory model name (e.g. "Creator 5 Pro"); not user-editable. */
+  public model: string = '';
   public firmwareVersion: string = '';
   public firmVer: string = '';
   public cameraStreamUrl: string = '';
+
+  // Hardware capability flags (presence-derived, see MachineInfo.fromDetail).
+  /** Whether the printer has a built-in camera. */
+  public hasCamera: boolean = false;
+  /** Whether the printer has a lidar/first-layer scanner. */
+  public hasLidar: boolean = false;
+  /** Whether the printer has a real door sensor (only then is door status meaningful). */
+  public hasDoorSensor: boolean = false;
+  /** Current/target temperatures for every tool/nozzle (1 entry for single-nozzle models). */
+  public toolTemps: Temperature[] = [];
 
   public ipAddress: string;
   public macAddress: string = '';
@@ -78,6 +91,14 @@ export class FiveMClient {
   public filtrationControl: boolean = false;
   /** Raw product info containing all control states */
   public productInfo: Product | null = null;
+  /** Capabilities derived from the /product control states (1 = available). */
+  public capabilities: ProductCapabilities = {
+    hasLed: false,
+    hasFiltration: false,
+    hasChamberControl: false,
+    hasNozzleControl: false,
+    hasPlatformControl: false,
+  };
 
   /**
    * Creates an instance of FiveMClient.
@@ -201,6 +222,12 @@ export class FiveMClient {
     this.isPro = info.IsPro; // Use the value from MachineInfo
     this.isAD5X = info.IsAD5X; // Cache the AD5X status
     this.isCreator5 = info.IsCreator5; // Cache the Creator 5 status
+    this.isCreator5Pro = info.IsCreator5Pro; // Cache the Creator 5 Pro status
+    this.model = info.Model || '';
+    this.hasCamera = info.HasCamera;
+    this.hasLidar = info.HasLidar;
+    this.hasDoorSensor = info.HasDoorSensor;
+    this.toolTemps = info.ToolTemps || [];
     this.firmwareVersion = info.FirmwareVersion || '';
     this.firmVer = info.FirmwareVersion ? info.FirmwareVersion.split('-')[0] : '';
     this.cameraStreamUrl = info.CameraStreamUrl || '';
@@ -319,6 +346,31 @@ export class FiveMClient {
   }
 
   /**
+   * Derives capability flags from a /product response. Polarity is
+   * `1 = available, 0 = not available`; any missing field is treated as 0.
+   *
+   * NOTE: `hasFiltration` requires BOTH internal and external fan controls to be
+   * available, matching the 5M Pro charcoal-filtration behavior. This is a pure
+   * read of what /product advertises. The Creator 5 Pro under-reports it (both
+   * fans 0 despite having the hardware), so its filtration is force-enabled by
+   * model in `sendProductCommand` rather than here.
+   *
+   * @param product Raw (possibly sparse) product control-state object.
+   * @returns Derived {@link ProductCapabilities}.
+   */
+  public static deriveCapabilities(product: Partial<Product>): ProductCapabilities {
+    const avail = (v: number | undefined): boolean => v === 1;
+    return {
+      hasLed: avail(product.lightCtrlState),
+      hasFiltration:
+        avail(product.internalFanCtrlState) && avail(product.externalFanCtrlState),
+      hasChamberControl: avail(product.chamberTempCtrlState),
+      hasNozzleControl: avail(product.nozzleTempCtrlState),
+      hasPlatformControl: avail(product.platformTempCtrlState),
+    };
+  }
+
+  /**
    * Sends a product command to the printer to retrieve control states.
    * This method sets the `httpClientBusy` flag while the request is in progress.
    * @returns A Promise that resolves to true if the product command is sent successfully and valid data is received, false otherwise.
@@ -341,13 +393,20 @@ export class FiveMClient {
       try {
         const productResponse = response.data as ProductResponse;
         if (productResponse && NetworkUtils.isOk(productResponse)) {
-          // Parse & set control states
-          const product = productResponse.product;
+          // Parse & set control states. /product polarity is 1 = available,
+          // 0 = not available. Fields may be absent on some models, so default
+          // missing values to 0 (treat as not-available) rather than assume.
+          const product = productResponse.product ?? {};
           this.productInfo = product; // Store raw product data
-          this.ledControl = product.lightCtrlState !== 0;
-          this.filtrationControl = !(
-            product.internalFanCtrlState === 0 || product.externalFanCtrlState === 0
-          );
+          this.capabilities = FiveMClient.deriveCapabilities(product);
+          // Creator 5 Pro has 5M-Pro-style filtration/aux fan per FlashForge
+          // specs, but its /product under-reports it (both fan states 0), so
+          // enable by model. The 5M Pro advertises it correctly and needs no
+          // override. isCreator5Pro is already set here (verifyConnection ->
+          // cacheDetails runs before initControl -> sendProductCommand).
+          if (this.isCreator5Pro) this.capabilities.hasFiltration = true;
+          this.ledControl = this.capabilities.hasLed;
+          this.filtrationControl = this.capabilities.hasFiltration;
           //console.log("LedControl: " + this.ledControl);
           //console.log("FiltrationControl: " + this.filtrationControl);
           return true;
@@ -388,16 +447,33 @@ interface ProductResponse extends GenericResponse {
  * while other numbers (typically 1) mean on/available or a specific mode.
  */
 export interface Product {
-  /** State of the chamber temperature control. */
-  chamberTempCtrlState: number;
-  /** State of the external fan control. */
-  externalFanCtrlState: number;
-  /** State of the internal fan control. */
-  internalFanCtrlState: number;
-  /** State of the light control. */
-  lightCtrlState: number;
-  /** State of the nozzle temperature control. */
-  nozzleTempCtrlState: number;
-  /** State of the platform (bed) temperature control. */
-  platformTempCtrlState: number;
+  /** State of the chamber temperature control (1 = available). */
+  chamberTempCtrlState?: number;
+  /** State of the external fan control (1 = available). */
+  externalFanCtrlState?: number;
+  /** State of the internal fan control (1 = available). */
+  internalFanCtrlState?: number;
+  /** State of the light control (1 = available). */
+  lightCtrlState?: number;
+  /** State of the nozzle temperature control (1 = available). */
+  nozzleTempCtrlState?: number;
+  /** State of the platform (bed) temperature control (1 = available). */
+  platformTempCtrlState?: number;
+}
+
+/**
+ * Capability flags derived from a printer's /product control states.
+ * Each is true only when the corresponding control is reported as available.
+ */
+export interface ProductCapabilities {
+  /** LED light control is available. */
+  hasLed: boolean;
+  /** Air-filtration control (both internal and external fans) is available. */
+  hasFiltration: boolean;
+  /** Chamber temperature control is available. */
+  hasChamberControl: boolean;
+  /** Nozzle temperature control is available. */
+  hasNozzleControl: boolean;
+  /** Platform (bed) temperature control is available. */
+  hasPlatformControl: boolean;
 }

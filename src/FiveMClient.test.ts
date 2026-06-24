@@ -131,4 +131,54 @@ describe('FiveMClient', () => {
     expect(httpGet).toHaveBeenCalledTimes(1);
     expect(destroy).toHaveBeenCalledTimes(1);
   });
+
+  describe('deriveCapabilities', () => {
+    it('maps 1=available control states to capability flags', () => {
+      const caps = FiveMClient.deriveCapabilities({
+        chamberTempCtrlState: 1,
+        externalFanCtrlState: 1,
+        internalFanCtrlState: 1,
+        lightCtrlState: 1,
+        nozzleTempCtrlState: 1,
+        platformTempCtrlState: 1,
+      });
+
+      expect(caps).toEqual({
+        hasLed: true,
+        hasFiltration: true,
+        hasChamberControl: true,
+        hasNozzleControl: true,
+        hasPlatformControl: true,
+      });
+    });
+
+    it('requires BOTH fans for filtration (Creator 5 Pro reports 0/0)', () => {
+      // Live C5 Pro /product: light + chamber + nozzle + platform available,
+      // but internal/external fans reported 0 -> filtration must be false here.
+      const caps = FiveMClient.deriveCapabilities({
+        chamberTempCtrlState: 1,
+        externalFanCtrlState: 0,
+        internalFanCtrlState: 0,
+        lightCtrlState: 1,
+        nozzleTempCtrlState: 1,
+        platformTempCtrlState: 1,
+      });
+
+      expect(caps.hasFiltration).toBe(false);
+      expect(caps.hasLed).toBe(true);
+      expect(caps.hasChamberControl).toBe(true);
+    });
+
+    it('treats missing control states as not-available', () => {
+      const caps = FiveMClient.deriveCapabilities({});
+
+      expect(caps).toEqual({
+        hasLed: false,
+        hasFiltration: false,
+        hasChamberControl: false,
+        hasNozzleControl: false,
+        hasPlatformControl: false,
+      });
+    });
+  });
 });
