@@ -7,6 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.3.6] - 2026-06-24
+
+### Changed
+
+- **`Control.configureSlot(slot, materialName, hexRgb)` now works on the Creator 5 / Creator 5 Pro**, not just the AD5X. The `msConfig_cmd` handler (`OrcaServer::doMsConfig`) is firmware-confirmed present on the Creator 5 (Ghidra RE of `firmwareExe` 1.9.2), and both models share the same `OrcaServer` command path and wire format (`{ slot, mt, rgb }`). The Creator 5 has no removable filament station — it surfaces its 4 tool heads as the 4 slots — so this sets per-tool material name/color metadata shown on the printer UI. The gate is now `isAD5X || isCreator5`.
+
+### Notes
+
+- **`Control.slotAction(slot, action)` remains AD5X-only by design.** The Creator 5 firmware has **no `ms_cmd`** (filament load/unload/cancel over the LAN API) — only the metadata-setting `msConfig_cmd`. Confirmed by RE: the only material command exposed on the Creator 5's HTTP API is `msConfig_cmd`. Tool selection on the Creator 5 is internal (Klipper `SDCARD_SET_CHANNEL`), not LAN-controllable.
+- This release closes out the Creator 5 `/control` command-set verification (Ghidra, 2026-06-24): the full confirmed LAN command set is `temperatureCtl_cmd`, `printerCtl_cmd`, `lightControl_cmd`, `circulateCtl_cmd`, `jobCtl_cmd`, `stateCtrl_cmd`, `calibration_cmd`, `reName_cmd`, `streamCtrl_cmd`, `delayClose_cmd`, and `msConfig_cmd`. There is **no** axis homing/jog/move, **no** raw G-code/M-code passthrough, and **no** legacy TCP server (port 8899) on the Creator 5 — all already reflected in the HTTP-only handling (see 1.3.5) and the TCP-only methods returning `false` in HTTP-only mode.
+
 ## [1.3.5] - 2026-06-24
 
 ### Added

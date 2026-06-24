@@ -578,14 +578,44 @@ describe('Control', () => {
       );
     });
 
-    it('should refuse slot operations on non-AD5X printers', async () => {
+    it('should refuse slot operations on non-AD5X / non-Creator 5 printers', async () => {
       mockFiveMClient.isAD5X = false;
+      mockFiveMClient.isCreator5 = false;
 
       const configResult = await control.configureSlot(1, 'PLA', '#FF0000');
       const actionResult = await control.slotAction(1, SlotAction.Load);
 
       expect(configResult).toBe(false);
       expect(actionResult).toBe(false);
+      expect(mockedAxios.post).not.toHaveBeenCalled();
+    });
+
+    it('should allow configureSlot on a Creator 5 (msConfig_cmd is shared firmware)', async () => {
+      mockFiveMClient.isAD5X = false;
+      mockFiveMClient.isCreator5 = true;
+
+      const result = await control.configureSlot(2, 'PETG', '#46328E');
+
+      expect(result).toBe(true);
+      expect(mockedAxios.post).toHaveBeenCalledWith(
+        `http://printer:8898${Endpoints.Control}`,
+        expect.objectContaining({
+          payload: {
+            cmd: Commands.MaterialStationConfigCmd,
+            args: { slot: 2, mt: 'PETG', rgb: '46328E' },
+          },
+        }),
+        expect.any(Object)
+      );
+    });
+
+    it('should still refuse slotAction (load/unload) on a Creator 5 — no ms_cmd in firmware', async () => {
+      mockFiveMClient.isAD5X = false;
+      mockFiveMClient.isCreator5 = true;
+
+      const result = await control.slotAction(1, SlotAction.Load);
+
+      expect(result).toBe(false);
       expect(mockedAxios.post).not.toHaveBeenCalled();
     });
   });

@@ -247,9 +247,16 @@ export class Control {
   // AD5X Intelligent Filament Station (IFS) slot operations
 
   /**
-   * Configures the material name and color metadata for an AD5X material station slot.
+   * Configures the material name and color metadata for a material-station slot.
    * This information is shown on the printer UI and used for print validation; it does
-   * not move any filament. Only available on AD5X printers.
+   * not move any filament. Available on the AD5X and the Creator 5 / Creator 5 Pro.
+   *
+   * The `msConfig_cmd` handler is firmware-confirmed present on the Creator 5 (Ghidra
+   * RE of `firmwareExe` 1.9.2 — see creator5-analysis §5). The Creator 5 has no removable
+   * IFS; it surfaces its 4 tool heads as the 4 "slots", so this sets per-tool material
+   * metadata. Both models share the same `OrcaServer` command path and wire format. Note
+   * that **filament load/unload (`slotAction`) remains AD5X-only** — the Creator 5 firmware
+   * has no `ms_cmd`, so {@link slotAction} stays gated to the AD5X.
    *
    * The firmware accepts arbitrary material/color strings, but only the recognized
    * materials and the 24-color UI palette render an icon on the printer — callers that
@@ -265,8 +272,8 @@ export class Control {
     materialName: string,
     hexRgb: string
   ): Promise<boolean> {
-    if (!this.client.isAD5X) {
-      console.log('configureSlot() error, material station only available on AD5X.');
+    if (!this.client.isAD5X && !this.client.isCreator5) {
+      console.log('configureSlot() error, material station only available on AD5X / Creator 5.');
       return false;
     }
     return await this.sendControlCommand(Commands.MaterialStationConfigCmd, {
@@ -278,7 +285,10 @@ export class Control {
 
   /**
    * Performs a load, unload, or cancel operation on an AD5X material station slot.
-   * Only available on AD5X printers. Operations are asynchronous — poll
+   * Only available on AD5X printers — this is **not** a Creator 5 capability: the
+   * Creator 5 firmware has no `ms_cmd` (filament load/unload over the LAN API), only the
+   * metadata-setting `msConfig_cmd` (see {@link configureSlot}). Confirmed by Ghidra RE
+   * (creator5-analysis §5). Operations are asynchronous — poll
    * `info.get()` / `matlStationInfo.stateAction` to monitor completion.
    *
    * @param slot The target slot number (1-4). For {@link SlotAction.Cancel} the slot is ignored by firmware.
