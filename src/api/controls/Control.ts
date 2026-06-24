@@ -41,10 +41,28 @@ export class Control {
   }
 
   /**
+   * Guards a TCP-only operation. HTTP-only printers (Creator 5 / 5 Pro) have no
+   * legacy TCP control channel, so these operations cannot run. Logs and returns
+   * false rather than hanging on a dead socket. The Creator 5 exposes some of
+   * these via its HTTP API (Klipper g-code), but the request schemas are not yet
+   * confirmed; route them here once they are.
+   * @param op Human-readable operation name for the log message.
+   * @returns True if a TCP operation may proceed, false if it must be skipped.
+   */
+  private canUseTcp(op: string): boolean {
+    if (this.client.httpOnly) {
+      console.log(`${op}() unavailable: printer has no TCP control channel (HTTP-only).`);
+      return false;
+    }
+    return true;
+  }
+
+  /**
    * Homes the X, Y, and Z axes of the printer.
    * @returns A Promise that resolves to true if the command is successful, false otherwise.
    */
   public async homeAxes(): Promise<boolean> {
+    if (!this.canUseTcp('homeAxes')) return false;
     return await this.tcpClient.homeAxes();
   }
 
@@ -53,6 +71,7 @@ export class Control {
    * @returns A Promise that resolves to true if the command is successful, false otherwise.
    */
   public async homeAxesRapid(): Promise<boolean> {
+    if (!this.canUseTcp('homeAxesRapid')) return false;
     return await this.tcpClient.rapidHome();
   }
 
@@ -182,6 +201,7 @@ export class Control {
    * @returns A Promise that resolves to true if the command is successful, false otherwise.
    */
   public async turnRunoutSensorOn(): Promise<boolean> {
+    if (!this.canUseTcp('turnRunoutSensorOn')) return false;
     return await this.tcpClient.turnRunoutSensorOn();
   }
 
@@ -190,6 +210,7 @@ export class Control {
    * @returns A Promise that resolves to true if the command is successful, false otherwise.
    */
   public async turnRunoutSensorOff(): Promise<boolean> {
+    if (!this.canUseTcp('turnRunoutSensorOff')) return false;
     return await this.tcpClient.turnRunoutSensorOff();
   }
 
@@ -201,6 +222,7 @@ export class Control {
    * @returns A Promise that resolves to true if the command is successful, false otherwise.
    */
   public async prepareFilamentLoad(filament: Filament): Promise<boolean> {
+    if (!this.canUseTcp('prepareFilamentLoad')) return false;
     return await this.tcpClient.prepareFilamentLoad(filament);
   }
 
@@ -209,6 +231,7 @@ export class Control {
    * @returns A Promise that resolves to true if the command is successful, false otherwise.
    */
   public async loadFilament(): Promise<boolean> {
+    if (!this.canUseTcp('loadFilament')) return false;
     return await this.tcpClient.loadFilament();
   }
 
@@ -217,6 +240,7 @@ export class Control {
    * @returns A Promise that resolves to true if the command is successful, false otherwise.
    */
   public async finishFilamentLoad(): Promise<boolean> {
+    if (!this.canUseTcp('finishFilamentLoad')) return false;
     return await this.tcpClient.finishFilamentLoad();
   }
 

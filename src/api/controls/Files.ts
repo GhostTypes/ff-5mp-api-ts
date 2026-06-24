@@ -27,10 +27,17 @@ export class Files {
   }
 
   /**
-   * Retrieves a list of all G-code files stored locally on the printer via TCP.
+   * Retrieves a list of G-code files stored locally on the printer.
+   * Dual-API printers use the TCP file list; HTTP-only printers (Creator 5 /
+   * 5 Pro) have no TCP channel, so this falls back to the HTTP `/gcodeList`
+   * (the 10 most-recent files) and returns their names.
    * @returns A Promise that resolves to an array of file names (strings).
    */
   public async getLocalFileList(): Promise<string[]> {
+    if (this.client.httpOnly) {
+      const recent = await this.getRecentFileList();
+      return recent.map((entry) => entry.gcodeFileName);
+    }
     return await this.client.tcpClient.getFileListAsync();
   }
 

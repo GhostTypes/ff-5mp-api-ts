@@ -157,4 +157,72 @@ describe('TempControl', () => {
       expect(mockGCodeController.waitForBedTemp).toHaveBeenCalledWith(25, true);
     });
   });
+
+  // HTTP-only printers (Creator 5 / 5 Pro) have no TCP channel; temperature
+  // control must go through the HTTP `temperatureCtl_cmd` instead of G-code.
+  describe('HTTP-only mode (Creator 5)', () => {
+    let mockSendControlCommand: ReturnType<typeof vi.fn>;
+    let httpTempControl: TempControl;
+
+    beforeEach(() => {
+      mockSendControlCommand = vi.fn().mockResolvedValue(true);
+      const httpClient = {
+        httpOnly: true,
+        tcpClient: mockTcpClient,
+        control: { sendControlCommand: mockSendControlCommand },
+      } as unknown as FiveMClient;
+      httpTempControl = new TempControl(httpClient);
+    });
+
+    it('setExtruderTemp sends temperatureCtl_cmd with rightNozzle, leaving others unchanged (-200)', async () => {
+      const result = await httpTempControl.setExtruderTemp(215);
+
+      expect(result).toBe(true);
+      expect(mockTcpClient.setExtruderTemp).not.toHaveBeenCalled();
+      expect(mockSendControlCommand).toHaveBeenCalledWith('temperatureCtl_cmd', {
+        rightNozzle: 215,
+        leftNozzle: -200,
+        platform: -200,
+        chamber: -200,
+      });
+    });
+
+    it('setBedTemp sends temperatureCtl_cmd with platform set', async () => {
+      await httpTempControl.setBedTemp(60);
+
+      expect(mockTcpClient.setBedTemp).not.toHaveBeenCalled();
+      expect(mockSendControlCommand).toHaveBeenCalledWith('temperatureCtl_cmd', {
+        rightNozzle: -200,
+        leftNozzle: -200,
+        platform: 60,
+        chamber: -200,
+      });
+    });
+
+    it('cancelExtruderTemp turns the right nozzle off (-100)', async () => {
+      await httpTempControl.cancelExtruderTemp();
+
+      expect(mockTcpClient.cancelExtruderTemp).not.toHaveBeenCalled();
+      expect(mockSendControlCommand).toHaveBeenCalledWith(
+        'temperatureCtl_cmd',
+        expect.objectContaining({ rightNozzle: -100, platform: -200 })
+      );
+    });
+
+    it('cancelBedTemp turns the platform off (-100)', async () => {
+      await httpTempControl.cancelBedTemp();
+
+      expect(mockTcpClient.cancelBedTemp).not.toHaveBeenCalled();
+      expect(mockSendControlCommand).toHaveBeenCalledWith(
+        'temperatureCtl_cmd',
+        expect.objectContaining({ platform: -100, rightNozzle: -200 })
+      );
+    });
+
+    it('waitForPartCool is a no-op (no TCP polling)', async () => {
+      await httpTempControl.waitForPartCool(40);
+
+      expect(mockTcpClient.gCode).not.toHaveBeenCalled();
+    });
+  });
 });

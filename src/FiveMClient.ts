@@ -22,6 +22,15 @@ export interface FiveMClientConnectionOptions {
   httpPort?: number;
   /** Legacy TCP command port override used by the embedded tcp client (defaults to 8899). */
   tcpPort?: number;
+  /**
+   * Force HTTP-only mode: never open or use the legacy TCP control channel.
+   * Required for the Creator 5 / 5 Pro, which run no TCP server on 8899 (HTTP
+   * `OrcaServer` on 8898 only). When omitted, HTTP-only mode is auto-enabled
+   * once the printer is detected as a Creator 5 during {@link FiveMClient.verifyConnection}.
+   * Pass `true` up-front (e.g. when the model is already known from discovery's
+   * USB product ID) to skip the TCP probe entirely and avoid its connect timeout.
+   */
+  httpOnly?: boolean;
 }
 
 /**
@@ -45,6 +54,15 @@ export class FiveMClient {
   public tempControl: TempControl;
   /** Instance for lower-level TCP communication with the printer. */
   public tcpClient: FlashForgeClient;
+
+  /**
+   * When true, the legacy TCP control channel is never used (HTTP API only).
+   * Set from the `httpOnly` constructor option, and auto-enabled for the
+   * Creator 5 / 5 Pro during {@link verifyConnection}. TCP-only operations
+   * (homing, jog, direct g-code, runout sensor, filament load) are unavailable
+   * while this is true.
+   */
+  public httpOnly: boolean = false;
 
   public serialNumber: string;
   public checkCode: string;
@@ -117,6 +135,7 @@ export class FiveMClient {
     this.serialNumber = serialNumber;
     this.checkCode = checkCode;
     this.PORT = options?.httpPort ?? 8898;
+    this.httpOnly = options?.httpOnly ?? false;
 
     this.httpClient = axios.create({
       timeout: 5000,
@@ -168,12 +187,17 @@ export class FiveMClient {
 
   /**
    * Initializes the control interface with the printer.
-   * This involves sending a product command and initializing TCP control.
+   * Sends the product command (HTTP) and, unless in HTTP-only mode, initializes
+   * the legacy TCP control channel. HTTP-only printers (Creator 5 / 5 Pro) have
+   * no TCP server, so success is determined solely by the product command.
    * @returns A Promise that resolves to true if control initialization is successful, false otherwise.
    */
   public async initControl(): Promise<boolean> {
     //console.log("InitControl()");
     if (await this.sendProductCommand()) {
+      // Creator 5 / 5 Pro expose no TCP control channel; verifyConnection runs
+      // before initControl and sets httpOnly when such a model is detected.
+      if (this.httpOnly) return true;
       return await this.tcpClient.initControl();
     }
     console.log('New API control failed!');
@@ -185,6 +209,8 @@ export class FiveMClient {
    */
   public async dispose(): Promise<void> {
     this.cameraStreamUrl = '';
+    // No TCP channel was opened in HTTP-only mode, so nothing to tear down.
+    if (this.httpOnly) return;
     await this.tcpClient.dispose();
   }
 
@@ -317,24 +343,34 @@ export class FiveMClient {
         return false;
       }
 
+      // The Creator 5 / 5 Pro run no legacy TCP server, so auto-enable HTTP-only
+      // mode here (before any TCP probe) once the model is detected from /detail.
+      // initControl() runs after this and relies on the flag being set.
+      if (machineInfo.IsCreator5 || machineInfo.IsCreator5Pro) {
+        this.httpOnly = true;
+      }
+
       // Check for Pro model with the machine TypeName (can't be changed by user)
       // We now rely on MachineInfo.fromDetail to set IsPro and IsAD5X based on detail.name
       // So, the TCP check for "Pro" might be redundant or could be a fallback.
       // For now, let's keep it but prioritize what's in machineInfo.
-      const tcpInfo = await this.tcpClient.getPrinterInfo();
-      if (tcpInfo) {
-        // If machineInfo hasn't already set isPro, we can use TCP info as a fallback.
-        // However, machineInfo.IsPro (derived from detail.name) should be more reliable.
-        // This line effectively gets overridden by cacheDetails if machineInfo.IsPro is set.
-        if (tcpInfo.TypeName.includes('Pro') && !machineInfo.IsPro && !machineInfo.IsAD5X) {
-          // Only set this if not already determined by machineInfo, and it's not an AD5X
-          this.isPro = true;
+      // HTTP-only printers have no TCP API to probe — skip it (avoids a connect timeout).
+      if (!this.httpOnly) {
+        const tcpInfo = await this.tcpClient.getPrinterInfo();
+        if (tcpInfo) {
+          // If machineInfo hasn't already set isPro, we can use TCP info as a fallback.
+          // However, machineInfo.IsPro (derived from detail.name) should be more reliable.
+          // This line effectively gets overridden by cacheDetails if machineInfo.IsPro is set.
+          if (tcpInfo.TypeName.includes('Pro') && !machineInfo.IsPro && !machineInfo.IsAD5X) {
+            // Only set this if not already determined by machineInfo, and it's not an AD5X
+            this.isPro = true;
+          }
+        } else {
+          console.error('Unable to get PrinterInfo from TcpAPI, some details might be incomplete');
         }
-      } else {
-        console.error('Unable to get PrinterInfo from TcpAPI, some details might be incomplete');
+        // we should probably return false if tcpInfo is null here, like we do for machineInfo,
+        // but for now, we'll let cacheDetails be the primary source of truth for these flags.
       }
-      // we should probably return false if tcpInfo is null here, like we do for machineInfo,
-      // but for now, we'll let cacheDetails be the primary source of truth for these flags.
 
       return this.cacheDetails(machineInfo);
     } catch (error: unknown) {

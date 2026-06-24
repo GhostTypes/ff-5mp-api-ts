@@ -181,4 +181,38 @@ describe('FiveMClient', () => {
       });
     });
   });
+
+  // Creator 5 / 5 Pro run no legacy TCP server; initControl must succeed on the
+  // HTTP product command alone and never touch the TCP client.
+  describe('HTTP-only mode', () => {
+    const okProduct = { status: 200, data: { code: 0, message: 'Success', product: {} } };
+
+    it('initControl skips TCP init when constructed with httpOnly: true', async () => {
+      httpPost.mockResolvedValue(okProduct);
+      const client = new FiveMClient('192.168.1.10', 'SN-1', 'CHK-1', { httpOnly: true });
+
+      await expect(client.initControl()).resolves.toBe(true);
+      expect(client.httpOnly).toBe(true);
+      expect((client.tcpClient as unknown as { initControl: ReturnType<typeof vi.fn> }).initControl)
+        .not.toHaveBeenCalled();
+    });
+
+    it('initControl still initializes TCP for dual-API printers (default)', async () => {
+      httpPost.mockResolvedValue(okProduct);
+      const client = new FiveMClient('192.168.1.10', 'SN-1', 'CHK-1');
+
+      await expect(client.initControl()).resolves.toBe(true);
+      expect(client.httpOnly).toBe(false);
+      expect((client.tcpClient as unknown as { initControl: ReturnType<typeof vi.fn> }).initControl)
+        .toHaveBeenCalled();
+    });
+
+    it('dispose does not touch the TCP client in HTTP-only mode', async () => {
+      const client = new FiveMClient('192.168.1.10', 'SN-1', 'CHK-1', { httpOnly: true });
+
+      await client.dispose();
+      expect((client.tcpClient as unknown as { dispose: ReturnType<typeof vi.fn> }).dispose)
+        .not.toHaveBeenCalled();
+    });
+  });
 });

@@ -615,4 +615,48 @@ describe('Control', () => {
       );
     });
   });
+
+  // HTTP-only printers (Creator 5 / 5 Pro) have no TCP control channel, so the
+  // TCP-bound operations must fail cleanly (return false) without touching the
+  // dead socket, rather than hang.
+  describe('HTTP-only mode (no TCP channel)', () => {
+    let httpControl: Control;
+
+    beforeEach(() => {
+      const httpClient = { ...mockFiveMClient, httpOnly: true } as any;
+      httpControl = new Control(httpClient);
+    });
+
+    it('homeAxes returns false without calling the TCP client', async () => {
+      const result = await httpControl.homeAxes();
+      expect(result).toBe(false);
+      expect(mockTcpClient.homeAxes).not.toHaveBeenCalled();
+    });
+
+    it('homeAxesRapid returns false without calling the TCP client', async () => {
+      const result = await httpControl.homeAxesRapid();
+      expect(result).toBe(false);
+      expect(mockTcpClient.rapidHome).not.toHaveBeenCalled();
+    });
+
+    it('turnRunoutSensorOn/Off return false without calling the TCP client', async () => {
+      expect(await httpControl.turnRunoutSensorOn()).toBe(false);
+      expect(await httpControl.turnRunoutSensorOff()).toBe(false);
+      expect(mockTcpClient.turnRunoutSensorOn).not.toHaveBeenCalled();
+      expect(mockTcpClient.turnRunoutSensorOff).not.toHaveBeenCalled();
+    });
+
+    it('filament load operations return false without calling the TCP client', async () => {
+      expect(await httpControl.loadFilament()).toBe(false);
+      expect(await httpControl.finishFilamentLoad()).toBe(false);
+      expect(mockTcpClient.loadFilament).not.toHaveBeenCalled();
+      expect(mockTcpClient.finishFilamentLoad).not.toHaveBeenCalled();
+    });
+
+    it('HTTP-based controls (LED) still dispatch over HTTP', async () => {
+      mockedAxios.post.mockResolvedValue({ status: 200, data: { code: 0, message: 'ok' } });
+      await httpControl.setLedOn();
+      expect(mockedAxios.post).toHaveBeenCalled();
+    });
+  });
 });

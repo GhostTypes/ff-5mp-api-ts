@@ -7,6 +7,31 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.3.5] - 2026-06-24
+
+### Added
+
+- **HTTP-only mode for the Creator 5 / Creator 5 Pro.** These printers run no legacy TCP server (no port 8899) — they are HTTP-only (`OrcaServer` on 8898). `FiveMClient` now supports an `httpOnly` connection so it can drive them:
+  - New `FiveMClientConnectionOptions.httpOnly?: boolean` and public `FiveMClient.httpOnly`. Set it explicitly (e.g. when the model is known from discovery's USB product ID), or let `verifyConnection()` auto-enable it when a Creator 5 / 5 Pro is detected from `/detail`.
+  - In HTTP-only mode `initControl()` succeeds on the HTTP product command alone (never opens the TCP control channel), `verifyConnection()` skips the TCP `getPrinterInfo()` probe (no connect timeout), and `dispose()` skips TCP teardown.
+  - `TempControl` set/cancel extruder/bed temperatures route through the HTTP `temperatureCtl_cmd` (args `rightNozzle`/`leftNozzle`/`platform`/`chamber`; `-200` = leave unchanged, `-100` = off) instead of TCP G-code. `waitForPartCool()` is a no-op in HTTP-only mode (poll `info.get()` instead).
+  - `Files.getLocalFileList()` falls back to the HTTP `/gcodeList` (10 most-recent files) when there is no TCP channel.
+  - `Control` TCP-only operations (`homeAxes`, `homeAxesRapid`, `turnRunoutSensorOn/Off`, `prepareFilamentLoad`/`loadFilament`/`finishFilamentLoad`) return `false` with a clear log in HTTP-only mode rather than hanging on a dead socket.
+
+## [1.3.4] - 2026-06-22
+
+### Added
+
+- `JobControl.startCreator5Job(params)` — Creator 5 native print start via `POST /printGcode` (the Creator 5 does material matching at print-start, not at upload time), with optional per-tool `materialMappings` (`{ toolId, slotId, materialName }`). `Creator5JobParams` / `Creator5MaterialMapping` types exported.
+
+## [1.3.3] - 2026-06-22
+
+### Added
+
+- Creator 5 / Creator 5 Pro `/detail` model support: `nozzleTemps[]` / `nozzleTargetTemps[]` (per-tool arrays), `lidar`, `model`, and `FFMachineInfo` fields `IsCreator5`, `IsCreator5Pro`, `Model`, `HasCamera`, `HasLidar`, `HasDoorSensor`, `ToolTemps`.
+- `FiveMClient` Creator 5 flags (`isCreator5`, `isCreator5Pro`, `model`, `hasCamera`, `hasLidar`, `hasDoorSensor`, `toolTemps`) and capability derivation (`deriveCapabilities`, `ProductCapabilities`) from `/product` (polarity `1` = available), with a Creator 5 Pro filtration force-enable (its `/product` under-reports the fan control states).
+- Creator 5 PIDs added to model detection (`0x28` Creator 5, `0x29` Creator 5 Pro).
+
 ## [1.3.2] - 2026-06-05
 
 ### Added
