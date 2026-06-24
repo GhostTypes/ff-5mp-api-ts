@@ -43,6 +43,8 @@ export {
   AD5XMaterialMapping,
   AD5XSingleColorJobParams,
   AD5XUploadParams,
+  Creator5JobParams,
+  Creator5MaterialMapping,
   FFGcodeFileEntry,
   FFGcodeToolData,
   FFMachineInfo,

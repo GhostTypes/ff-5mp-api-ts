@@ -14,6 +14,8 @@ import type {
   AD5XMaterialMapping,
   AD5XSingleColorJobParams,
   AD5XUploadParams,
+  Creator5JobParams,
+  Creator5MaterialMapping,
 } from '../../models/ff-models';
 import { NetworkUtils } from '../network/NetworkUtils';
 import { Endpoints } from '../server/Endpoints';
@@ -498,14 +500,18 @@ export class JobControl {
     }
   }
 
-  // --- Model-neutral material-station aliases ---
-  // The Creator 5 series shares the AD5X material-mapping print flow, so these
-  // delegate to the AD5X implementations. Prefer these names in model-agnostic
-  // code (e.g. a Creator5 backend) so call sites aren't misleadingly "AD5X".
+  // --- Creator 5 / Creator 5 Pro ---
+  // The Creator 5 uploads files the same way as the AD5X (the extra IFS headers
+  // are simply ignored by its firmware), but it performs material matching at
+  // print-start via POST /printGcode rather than at upload time. So upload reuses
+  // the AD5X path, while starting a job uses the Creator 5-native body below.
 
   /**
-   * Uploads a file with material-station mappings (AD5X / Creator 5 series).
-   * @param params Upload parameters including material mappings.
+   * Uploads a file to a Creator 5 / Creator 5 Pro. Reuses the AD5X upload path;
+   * the Creator 5 firmware ignores the IFS-specific headers. To run a multi-tool
+   * print, upload with `startPrint = false`, then call {@link startCreator5Job}
+   * with material mappings.
+   * @param params Upload parameters (material mappings are ignored by the C5 firmware).
    * @returns Promise resolving to true on success.
    */
   public async uploadFileWithMaterialMappings(params: AD5XUploadParams): Promise<boolean> {
@@ -513,24 +519,100 @@ export class JobControl {
   }
 
   /**
-   * Starts a multi-color local job using material-station mappings (AD5X / Creator 5 series).
-   * @param params Job parameters including material mappings.
-   * @returns Promise resolving to true on success.
+   * Starts a local print on a Creator 5 / Creator 5 Pro via `POST /printGcode`.
+   *
+   * This is the Creator 5's print-start material-matching command (distinct from
+   * the AD5X, which maps materials at upload time). The file must already be on the
+   * printer. Provide `materialMappings` for a multi-tool print, or omit them for a
+   * single-tool print. Sends only the fields the Creator 5 firmware reads.
+   *
+   * @param params File name, leveling flag, and optional flags / material mappings.
+   * @returns Promise resolving to true if the printer accepts the print command.
+   * @throws Error if there's a network issue sending the command.
    */
-  public async startMaterialMappingJob(params: AD5XLocalJobParams): Promise<boolean> {
-    return this.startAD5XMultiColorJob(params);
+  public async startCreator5Job(params: Creator5JobParams): Promise<boolean> {
+    if (!this.validateMaterialStationPrinter()) {
+      return false;
+    }
+
+    if (!params.fileName || params.fileName.trim() === '') {
+      console.error('Creator 5 Job error: fileName cannot be empty');
+      return false;
+    }
+
+    const hasMappings = !!params.materialMappings && params.materialMappings.length > 0;
+    if (hasMappings && !this.validateCreator5MaterialMappings(params.materialMappings ?? [])) {
+      return false;
+    }
+
+    // Only the fields the /printGcode handler actually reads. fileName and
+    // levelingBeforePrint are required; the rest are optional.
+    const payload: Record<string, unknown> = {
+      serialNumber: this.client.serialNumber,
+      checkCode: this.client.checkCode,
+      fileName: params.fileName,
+      levelingBeforePrint: params.levelingBeforePrint,
+    };
+    if (params.flowCalibration !== undefined) payload.flowCalibration = params.flowCalibration;
+    if (params.timeLapseVideo !== undefined) payload.timeLapseVideo = params.timeLapseVideo;
+    if (hasMappings) payload.materialMappings = params.materialMappings;
+
+    try {
+      const response = await axios.post(this.client.getEndpoint(Endpoints.GCodePrint), payload, {
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      });
+
+      if (response.status !== 200) return false;
+
+      const result = response.data as GenericResponse;
+      return NetworkUtils.isOk(result);
+    } catch (error) {
+      console.error(`Creator 5 Job error: ${(error as Error).message}`);
+      throw error;
+    }
   }
 
   /**
-   * Starts a single-color local job on a material-station printer without using the
-   * station (AD5X / Creator 5 series).
-   * @param params Job parameters.
-   * @returns Promise resolving to true on success.
+   * Validates Creator 5 material mappings: toolId 0-3, slotId 1-4, non-empty
+   * materialName. (No color fields, unlike AD5X.)
+   * @param materialMappings Array of Creator 5 mappings to validate.
+   * @returns True if all mappings are valid, false otherwise.
+   * @private
    */
-  public async startSingleColorMaterialStationJob(
-    params: AD5XSingleColorJobParams
-  ): Promise<boolean> {
-    return this.startAD5XSingleColorJob(params);
+  private validateCreator5MaterialMappings(materialMappings: Creator5MaterialMapping[]): boolean {
+    if (materialMappings.length > 4) {
+      console.error('Creator 5 material mappings error: Maximum 4 material mappings allowed');
+      return false;
+    }
+
+    for (let i = 0; i < materialMappings.length; i++) {
+      const mapping = materialMappings[i];
+
+      if (mapping.toolId < 0 || mapping.toolId > 3) {
+        console.error(
+          `Creator 5 material mappings error: toolId must be between 0-3, got ${mapping.toolId} at index ${i}`
+        );
+        return false;
+      }
+
+      if (mapping.slotId < 1 || mapping.slotId > 4) {
+        console.error(
+          `Creator 5 material mappings error: slotId must be between 1-4, got ${mapping.slotId} at index ${i}`
+        );
+        return false;
+      }
+
+      if (!mapping.materialName || mapping.materialName.trim() === '') {
+        console.error(
+          `Creator 5 material mappings error: materialName cannot be empty at index ${i}`
+        );
+        return false;
+      }
+    }
+
+    return true;
   }
 
   /**

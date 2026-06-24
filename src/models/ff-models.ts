@@ -459,6 +459,42 @@ export interface AD5XSingleColorJobParams {
 }
 
 /**
+ * Material mapping for a Creator 5 / Creator 5 Pro multi-tool print.
+ *
+ * Unlike {@link AD5XMaterialMapping}, the Creator 5 performs material matching at
+ * print-start (`POST /printGcode`) and its mapping carries only three fields — no
+ * tool/slot colors. The firmware stores `toolId + 1` internally.
+ */
+export interface Creator5MaterialMapping {
+  /** Gcode tool / extruder index, 0-based (T0–T3). */
+  toolId: number;
+  /** Physical material-station slot to source from, 1-based (1–4). */
+  slotId: number;
+  /** Material name (e.g. "PLA"). */
+  materialName: string;
+}
+
+/**
+ * Parameters for starting a local print on a Creator 5 / Creator 5 Pro via
+ * `POST /printGcode`. The file must already be on the printer (upload first).
+ *
+ * For a single-tool print, omit `materialMappings`. For a multi-tool print, map
+ * each gcode tool to a slot + material.
+ */
+export interface Creator5JobParams {
+  /** Name of the file already stored on the printer. */
+  fileName: string;
+  /** Whether to bed-level before printing (required by the firmware). */
+  levelingBeforePrint: boolean;
+  /** Optional: enable flow calibration. */
+  flowCalibration?: boolean;
+  /** Optional: record a time-lapse video. */
+  timeLapseVideo?: boolean;
+  /** Optional per-tool material mappings (1–4). Omit for a single-tool print. */
+  materialMappings?: Creator5MaterialMapping[];
+}
+
+/**
  * Parameters for uploading a file to AD5X printer with material station support.
  * Extends basic upload functionality with AD5X-specific features like material mappings,
  * flow calibration, and first layer inspection.

@@ -475,4 +475,78 @@ describe('JobControl', () => {
       expect(result).toBe(false);
     });
   });
+
+  describe('startCreator5Job', () => {
+    beforeEach(() => {
+      // Creator 5 printer
+      (mockFiveMClient as { isCreator5: boolean }).isCreator5 = true;
+    });
+
+    it('POSTs the Creator 5-native /printGcode body with 3-field mappings', async () => {
+      mockedAxios.post.mockResolvedValue({ status: 200, data: { code: 0, message: 'Success' } });
+
+      const result = await jobControl.startCreator5Job({
+        fileName: 'multi.3mf',
+        levelingBeforePrint: true,
+        materialMappings: [
+          { toolId: 0, slotId: 1, materialName: 'PLA' },
+          { toolId: 1, slotId: 3, materialName: 'PETG' },
+        ],
+      });
+
+      expect(result).toBe(true);
+      expect(mockedAxios.post).toHaveBeenCalledTimes(1);
+      const [url, body] = mockedAxios.post.mock.calls[0];
+      expect(url).toBe(`http://printer:8898${Endpoints.GCodePrint}`);
+      // Only Creator 5 fields — no AD5X-only useMatlStation/gcodeToolCnt/colors.
+      expect(body).toEqual({
+        serialNumber: 'SN123456',
+        checkCode: 'CC123456',
+        fileName: 'multi.3mf',
+        levelingBeforePrint: true,
+        materialMappings: [
+          { toolId: 0, slotId: 1, materialName: 'PLA' },
+          { toolId: 1, slotId: 3, materialName: 'PETG' },
+        ],
+      });
+      expect(body).not.toHaveProperty('useMatlStation');
+      expect(body).not.toHaveProperty('gcodeToolCnt');
+    });
+
+    it('omits materialMappings for a single-tool print', async () => {
+      mockedAxios.post.mockResolvedValue({ status: 200, data: { code: 0, message: 'Success' } });
+
+      const result = await jobControl.startCreator5Job({
+        fileName: 'single.gcode',
+        levelingBeforePrint: false,
+      });
+
+      expect(result).toBe(true);
+      const [, body] = mockedAxios.post.mock.calls[0];
+      expect(body).not.toHaveProperty('materialMappings');
+    });
+
+    it('rejects an invalid slotId (must be 1-4) without calling the printer', async () => {
+      const result = await jobControl.startCreator5Job({
+        fileName: 'bad.3mf',
+        levelingBeforePrint: true,
+        materialMappings: [{ toolId: 0, slotId: 0, materialName: 'PLA' }],
+      });
+
+      expect(result).toBe(false);
+      expect(mockedAxios.post).not.toHaveBeenCalled();
+    });
+
+    it('refuses to run on a non-material-station printer', async () => {
+      (mockFiveMClient as { isCreator5: boolean }).isCreator5 = false;
+
+      const result = await jobControl.startCreator5Job({
+        fileName: 'x.gcode',
+        levelingBeforePrint: true,
+      });
+
+      expect(result).toBe(false);
+      expect(mockedAxios.post).not.toHaveBeenCalled();
+    });
+  });
 });
