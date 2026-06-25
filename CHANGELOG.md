@@ -7,6 +7,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.4.0] - 2026-06-25
+
+### Added
+
+- **Per-tool temperature control for the Creator 5 series.** `TempControl.setToolTemp(toolIndex, temp)`, `setToolTemps([t0, t1, t2, t3])`, and `cancelToolTemp(toolIndex)` set individual tool-head temperatures via the `temperatureCtl_cmd` `nozzles[]` array. The firmware requires exactly four entries (Ghidra-confirmed `size() == 4` check), so the array is always sent with four values, using `-200` (no change) for the tools left alone; the scalar path (`setExtruderTemp`) still drives `rightNozzle`. Verified against both the C5 firmware parser and the FlashForge slicer's `FlashNetwork.dll`.
+- **Chamber temperature control.** `TempControl.setChamberTemp(temp)` / `cancelChamberTemp()` via the `temperatureCtl_cmd` `chamber` field (firmware caps the chamber at 80°C). Chamber temperature is now surfaced on `FFMachineInfo.Chamber`.
+- **`FFMachineInfo.NozzleCount`** from `detail.nozzleCnt` (Creator 5 = 4; single-nozzle models = 1).
+
+### Changed
+
+- **`hasChamberControl` is now model-based** (true for both the Creator 5 and Creator 5 Pro) rather than derived from the unreliable `/product` `chamberTempCtrlState` flag. Both models have an identical, firmware-confirmed `[heater_generic chamber_heater]` (max 80°C); chamber is not a Pro-only feature.
+- **`isNewFirmwareVersion` no longer trips on the Creator 5 / AD5X firmware version strings.** The 3.1.3 threshold only applies to the 5M family; the AD5X and Creator 5 always use the new payload/header format (the C5 reports `1.9.2`, which the numeric check would otherwise read as "old" and drop the material-station fields).
+
 ## [1.3.6] - 2026-06-24
 
 ### Changed
