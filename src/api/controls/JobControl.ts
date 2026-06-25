@@ -71,6 +71,14 @@ export class JobControl {
    * @private
    */
   private isNewFirmwareVersion(): boolean {
+    // The 3.1.3 threshold only applies to the 5M family. The AD5X and Creator 5
+    // series always use the new payload/header format, and their firmware
+    // versioning isn't comparable to the 5M's 3.x line (e.g. the C5 reports
+    // 1.9.2, which the numeric check below would wrongly read as "old"), so
+    // short-circuit to the new format for them.
+    if (this.client.isAD5X || this.client.isCreator5 || this.client.isCreator5Pro) {
+      return true;
+    }
     try {
       const currentVersion = this.client.firmVer.split('.');
       const minVersion = [3, 1, 3];

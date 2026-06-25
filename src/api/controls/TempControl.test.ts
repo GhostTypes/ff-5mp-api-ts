@@ -224,5 +224,47 @@ describe('TempControl', () => {
 
       expect(mockTcpClient.gCode).not.toHaveBeenCalled();
     });
+
+    it('setToolTemp sets one tool and leaves the others at -200', async () => {
+      const result = await httpTempControl.setToolTemp(2, 230);
+
+      expect(result).toBe(true);
+      expect(mockSendControlCommand).toHaveBeenCalledWith(
+        'temperatureCtl_cmd',
+        expect.objectContaining({ nozzles: [-200, -200, 230, -200] })
+      );
+    });
+
+    it('setToolTemps sends all four per-tool targets', async () => {
+      await httpTempControl.setToolTemps([200, 210, 220, 230]);
+
+      expect(mockSendControlCommand).toHaveBeenCalledWith(
+        'temperatureCtl_cmd',
+        expect.objectContaining({ nozzles: [200, 210, 220, 230] })
+      );
+    });
+
+    it('cancelToolTemp turns a single tool off (-100)', async () => {
+      await httpTempControl.cancelToolTemp(0);
+
+      expect(mockSendControlCommand).toHaveBeenCalledWith(
+        'temperatureCtl_cmd',
+        expect.objectContaining({ nozzles: [-100, -200, -200, -200] })
+      );
+    });
+
+    it('setToolTemp rejects an out-of-range index without sending', async () => {
+      const result = await httpTempControl.setToolTemp(5, 200);
+
+      expect(result).toBe(false);
+      expect(mockSendControlCommand).not.toHaveBeenCalled();
+    });
+
+    it('setToolTemps rejects a wrong-length array without sending', async () => {
+      const result = await httpTempControl.setToolTemps([200, 210]);
+
+      expect(result).toBe(false);
+      expect(mockSendControlCommand).not.toHaveBeenCalled();
+    });
   });
 });

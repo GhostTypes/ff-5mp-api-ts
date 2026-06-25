@@ -175,6 +175,42 @@ describe('JobControl', () => {
       );
     });
 
+    it('should use new firmware format for Creator 5 despite a low version string', async () => {
+      // The C5 reports a 1.x version that the numeric 3.1.3 check would read as
+      // "old"; the model flag must override that so material-station fields are sent.
+      (mockFiveMClient as { isCreator5: boolean }).isCreator5 = true;
+      mockFiveMClient.firmVer = '1.9.2';
+
+      mockedAxios.post.mockResolvedValue({
+        status: 200,
+        data: { code: 0, message: 'Success' },
+      });
+
+      const result = await jobControl.printLocalFile('test.gcode', true);
+
+      expect(result).toBe(true);
+      const body = mockedAxios.post.mock.calls[0][1] as Record<string, unknown>;
+      expect(body).toHaveProperty('useMatlStation', false);
+      expect(body).toHaveProperty('gcodeToolCnt', 0);
+      expect(body).toHaveProperty('materialMappings');
+    });
+
+    it('should use new firmware format for AD5X despite a low version string', async () => {
+      mockFiveMClient.isAD5X = true;
+      mockFiveMClient.firmVer = '1.1.7';
+
+      mockedAxios.post.mockResolvedValue({
+        status: 200,
+        data: { code: 0, message: 'Success' },
+      });
+
+      const result = await jobControl.printLocalFile('test.gcode', true);
+
+      expect(result).toBe(true);
+      const body = mockedAxios.post.mock.calls[0][1] as Record<string, unknown>;
+      expect(body).toHaveProperty('useMatlStation', false);
+    });
+
     it('should return false for non-200 status', async () => {
       mockedAxios.post.mockResolvedValue({
         status: 500,

@@ -260,6 +260,8 @@ export interface FFMachineInfo {
   Model: string;
   /** Nozzle size (e.g., "0.4mm"). */
   NozzleSize: string;
+  /** Number of tools/nozzles the printer reports (`detail.nozzleCnt`). Creator 5 series = 4 (tool-changer); single-nozzle models = 1. Mirrors the length of {@link ToolTemps}. */
+  NozzleCount: number;
 
   /** Whether the printer has a built-in camera (capability flag, not just stream availability). */
   HasCamera: boolean;

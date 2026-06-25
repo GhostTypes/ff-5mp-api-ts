@@ -16,6 +16,12 @@ import { Commands } from '../server/Commands';
 const TEMP_NO_CHANGE = -200;
 /** `temperatureCtl_cmd` value that turns a heater off. */
 const TEMP_OFF = -100;
+/**
+ * Number of tool/nozzle entries the Creator 5 firmware requires in the
+ * `nozzles` array. The firmware ignores the array unless its length is exactly
+ * this (confirmed via Ghidra: `size() == 4` check in the temp parser).
+ */
+const NOZZLE_COUNT = 4;
 
 /**
  * Provides methods for controlling the temperatures of various components of the FlashForge 3D printer,
@@ -46,13 +52,83 @@ export class TempControl {
     leftNozzle?: number;
     platform?: number;
     chamber?: number;
+    nozzles?: number[];
   }): Promise<boolean> {
-    return await this.client.control.sendControlCommand(Commands.TempControlCmd, {
+    const payload: {
+      rightNozzle: number;
+      leftNozzle: number;
+      platform: number;
+      chamber: number;
+      nozzles?: number[];
+    } = {
       rightNozzle: args.rightNozzle ?? TEMP_NO_CHANGE,
       leftNozzle: args.leftNozzle ?? TEMP_NO_CHANGE,
       platform: args.platform ?? TEMP_NO_CHANGE,
       chamber: args.chamber ?? TEMP_NO_CHANGE,
-    });
+    };
+    // Per-tool targets for Creator 5 tool-changers. Only included when supplied so
+    // the firmware's `size() == 4` check doesn't reject a partial/absent array.
+    if (args.nozzles !== undefined) {
+      payload.nozzles = args.nozzles;
+    }
+    return await this.client.control.sendControlCommand(Commands.TempControlCmd, payload);
+  }
+
+  /**
+   * Builds a {@link NOZZLE_COUNT}-length `nozzles` array of {@link TEMP_NO_CHANGE}
+   * placeholders with a single tool set to `value`.
+   * @returns The array, or null if `toolIndex` is out of range.
+   */
+  private buildNozzleArray(toolIndex: number, value: number): number[] | null {
+    if (!Number.isInteger(toolIndex) || toolIndex < 0 || toolIndex >= NOZZLE_COUNT) {
+      console.error(`TempControl: toolIndex ${toolIndex} out of range (0-${NOZZLE_COUNT - 1}).`);
+      return null;
+    }
+    const nozzles = new Array<number>(NOZZLE_COUNT).fill(TEMP_NO_CHANGE);
+    nozzles[toolIndex] = value;
+    return nozzles;
+  }
+
+  /**
+   * Sets the target temperature for a single tool/nozzle on a Creator 5 series
+   * tool-changer, leaving the other tools unchanged. Sent as a `nozzles` array
+   * (Creator 5 / 5 Pro, HTTP-only); see {@link setToolTemps} to set all at once.
+   * @param toolIndex Zero-based tool index (0-3 for T0-T3).
+   * @param temp Target temperature in Celsius.
+   * @returns A Promise resolving to true if the command is acknowledged.
+   */
+  public async setToolTemp(toolIndex: number, temp: number): Promise<boolean> {
+    const nozzles = this.buildNozzleArray(toolIndex, temp);
+    if (nozzles === null) return false;
+    return await this.sendHttpTempCommand({ nozzles });
+  }
+
+  /**
+   * Sets the target temperatures for all tools/nozzles on a Creator 5 series
+   * tool-changer in one command. Use {@link TEMP_NO_CHANGE} (-200) to leave a
+   * tool unchanged or {@link TEMP_OFF} (-100) to turn one off. Must contain
+   * exactly {@link NOZZLE_COUNT} entries.
+   * @param temps Per-tool target temperatures, ordered T0..T3.
+   * @returns A Promise resolving to true if the command is acknowledged.
+   */
+  public async setToolTemps(temps: number[]): Promise<boolean> {
+    if (temps.length !== NOZZLE_COUNT) {
+      console.error(`setToolTemps: expected ${NOZZLE_COUNT} temps, got ${temps.length}.`);
+      return false;
+    }
+    return await this.sendHttpTempCommand({ nozzles: [...temps] });
+  }
+
+  /**
+   * Cancels heating for a single tool/nozzle on a Creator 5 series tool-changer
+   * (sets its target to 0), leaving the other tools unchanged.
+   * @param toolIndex Zero-based tool index (0-3 for T0-T3).
+   * @returns A Promise resolving to true if the command is acknowledged.
+   */
+  public async cancelToolTemp(toolIndex: number): Promise<boolean> {
+    const nozzles = this.buildNozzleArray(toolIndex, TEMP_OFF);
+    if (nozzles === null) return false;
+    return await this.sendHttpTempCommand({ nozzles });
   }
 
   /**
@@ -112,7 +188,9 @@ export class TempControl {
    */
   public async waitForPartCool(temp: number): Promise<void> {
     if (this.client.httpOnly) {
-      console.log('waitForPartCool() unavailable over HTTP-only connection; poll info.get() instead.');
+      console.log(
+        'waitForPartCool() unavailable over HTTP-only connection; poll info.get() instead.'
+      );
       return;
     }
     await this.tcpClient.gCode().waitForBedTemp(temp, true);

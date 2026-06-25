@@ -77,8 +77,7 @@ export class MachineInfo {
         isCreator5 = (detail.name || '').includes('Creator 5');
         // `model` is the immutable factory name; prefer it over the user-mutable
         // `name` when distinguishing the Pro variant without a pid.
-        isCreator5Pro =
-          isCreator5 && /Creator 5 Pro/i.test(detail.model || detail.name || '');
+        isCreator5Pro = isCreator5 && /Creator 5 Pro/i.test(detail.model || detail.name || '');
       }
 
       // Per-tool temperatures. Creator 5 series report `nozzleTemps[]` /
@@ -103,10 +102,7 @@ export class MachineInfo {
       const hasLidar = detail.lidar === 1;
       const hasDoorSensor = isCreator5Pro;
       const model =
-        detail.model ||
-        (pid !== undefined ? PID_MODEL_NAMES[pid] : undefined) ||
-        detail.name ||
-        '';
+        detail.model || (pid !== undefined ? PID_MODEL_NAMES[pid] : undefined) || detail.name || '';
       const printEta = this.formatTimeFromSeconds(detail.estimatedTime || 0);
       const completionTime = new Date(Date.now() + (detail.estimatedTime || 0) * 1000);
       const formattedRunTime = this.formatTimeFromSeconds(detail.printDuration || 0);
@@ -178,6 +174,9 @@ export class MachineInfo {
         IsCreator5Pro: isCreator5Pro,
         Model: model,
         NozzleSize: detail.nozzleModel || '',
+        // Prefer the firmware-reported count; fall back to the parsed per-tool
+        // array length so single-nozzle models still report 1.
+        NozzleCount: detail.nozzleCnt || toolTemps.length,
 
         // Capabilities (presence-derived)
         HasCamera: hasCamera,

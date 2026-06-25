@@ -371,6 +371,8 @@ describe('MachineInfo', () => {
       expect(result.ToolTemps).toHaveLength(4);
       expect(result.ToolTemps[0]).toEqual({ current: 25, set: 0 });
       expect(result.ToolTemps[3]).toEqual({ current: 28, set: 0 });
+      // Tool-changer reports its real nozzle count, not 1.
+      expect(result.NozzleCount).toBe(4);
       // Extruder mirrors the first tool's source field (rightTemp absent -> 0).
       expect(result.Extruder.current).toBe(0);
 
@@ -418,6 +420,7 @@ describe('MachineInfo', () => {
 
       expect(result.ToolTemps).toHaveLength(1);
       expect(result.ToolTemps[0]).toEqual({ current: 210.3, set: 210 });
+      expect(result.NozzleCount).toBe(1);
       expect(result.HasDoorSensor).toBe(false);
     });
   });
