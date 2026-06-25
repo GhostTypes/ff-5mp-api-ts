@@ -272,6 +272,8 @@ export interface FFMachineInfo {
 
   /** Current and target temperatures for the print bed. See {@link Temperature}. */
   PrintBed: Temperature;
+  /** Current and target temperatures for the heated chamber. Only the Creator 5 series has one; other models report 0/0. */
+  Chamber: Temperature;
   /** Current and target temperatures for the extruder. For multi-nozzle models this is the first tool; see {@link ToolTemps} for all tools. */
   Extruder: Temperature;
   /** Current and target temperatures for every tool/nozzle. Single-nozzle models report a 1-element array mirroring {@link Extruder}; Creator 5 series report one entry per nozzle. */

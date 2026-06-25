@@ -253,6 +253,25 @@ describe('TempControl', () => {
       );
     });
 
+    it('setChamberTemp sends temperatureCtl_cmd with the chamber set', async () => {
+      const result = await httpTempControl.setChamberTemp(50);
+
+      expect(result).toBe(true);
+      expect(mockSendControlCommand).toHaveBeenCalledWith(
+        'temperatureCtl_cmd',
+        expect.objectContaining({ chamber: 50, rightNozzle: -200, platform: -200 })
+      );
+    });
+
+    it('cancelChamberTemp turns the chamber off (-100)', async () => {
+      await httpTempControl.cancelChamberTemp();
+
+      expect(mockSendControlCommand).toHaveBeenCalledWith(
+        'temperatureCtl_cmd',
+        expect.objectContaining({ chamber: -100 })
+      );
+    });
+
     it('setToolTemp rejects an out-of-range index without sending', async () => {
       const result = await httpTempControl.setToolTemp(5, 200);
 

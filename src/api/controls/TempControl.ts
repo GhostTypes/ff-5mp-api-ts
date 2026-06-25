@@ -178,6 +178,26 @@ export class TempControl {
   }
 
   /**
+   * Sets the target temperature for the printer's heated chamber. Only the
+   * Creator 5 series has a chamber heater, and those printers are HTTP-only, so
+   * this always goes over the HTTP `temperatureCtl_cmd`. Printers without a
+   * chamber ignore the field. The firmware caps the chamber at 80°C.
+   * @param temp The target temperature in Celsius.
+   * @returns A Promise that resolves to true if the command is acknowledged.
+   */
+  public async setChamberTemp(temp: number): Promise<boolean> {
+    return await this.sendHttpTempCommand({ chamber: temp });
+  }
+
+  /**
+   * Cancels any ongoing chamber heating and sets its target temperature to 0.
+   * @returns A Promise that resolves to true if the command is acknowledged.
+   */
+  public async cancelChamberTemp(): Promise<boolean> {
+    return await this.sendHttpTempCommand({ chamber: TEMP_OFF });
+  }
+
+  /**
    * Waits for the print bed (platform) to cool down to or below a specified temperature.
    * This is typically used after a print finishes to ensure the part can be safely removed.
    *

@@ -385,6 +385,18 @@ describe('MachineInfo', () => {
       expect(result.MatlStationInfo?.slotCnt).toBe(4);
     });
 
+    it('maps chamber temperature for the Creator 5', () => {
+      const result = machineInfoConverter.fromDetail({
+        ...CREATOR5_PRO_DETAIL_JSON,
+        chamberTemp: 30,
+        chamberTargetTemp: 40,
+      });
+
+      expect(result).not.toBeNull();
+      if (!result) return;
+      expect(result.Chamber).toEqual({ current: 30, set: 40 });
+    });
+
     it('treats a plain Creator 5 as having no door sensor and derives its model name', () => {
       const plainC5: FFPrinterDetail = {
         ...CREATOR5_PRO_DETAIL_JSON,

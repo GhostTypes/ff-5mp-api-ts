@@ -193,6 +193,10 @@ export class MachineInfo {
           current: detail.platTemp || 0,
           set: detail.platTargetTemp || 0,
         },
+        Chamber: {
+          current: detail.chamberTemp || 0,
+          set: detail.chamberTargetTemp || 0,
+        },
         Extruder: {
           current: detail.rightTemp || 0,
           set: detail.rightTargetTemp || 0,

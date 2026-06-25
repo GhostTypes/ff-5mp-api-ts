@@ -88,7 +88,9 @@ describe('FiveMClient', () => {
       },
     });
 
-    await expect(client.detectCameraStream()).resolves.toBe('http://192.168.1.10:8080/?action=stream');
+    await expect(client.detectCameraStream()).resolves.toBe(
+      'http://192.168.1.10:8080/?action=stream'
+    );
     expect(httpHead).toHaveBeenCalledTimes(1);
     expect(httpGet).not.toHaveBeenCalled();
   });
@@ -107,7 +109,9 @@ describe('FiveMClient', () => {
       data: { destroy },
     });
 
-    await expect(client.detectCameraStream()).resolves.toBe('http://192.168.1.10:8080/?action=stream');
+    await expect(client.detectCameraStream()).resolves.toBe(
+      'http://192.168.1.10:8080/?action=stream'
+    );
     expect(httpHead).toHaveBeenCalledTimes(1);
     expect(httpGet).toHaveBeenCalledTimes(1);
     expect(destroy).toHaveBeenCalledTimes(1);
@@ -193,8 +197,9 @@ describe('FiveMClient', () => {
 
       await expect(client.initControl()).resolves.toBe(true);
       expect(client.httpOnly).toBe(true);
-      expect((client.tcpClient as unknown as { initControl: ReturnType<typeof vi.fn> }).initControl)
-        .not.toHaveBeenCalled();
+      expect(
+        (client.tcpClient as unknown as { initControl: ReturnType<typeof vi.fn> }).initControl
+      ).not.toHaveBeenCalled();
     });
 
     it('initControl still initializes TCP for dual-API printers (default)', async () => {
@@ -203,16 +208,32 @@ describe('FiveMClient', () => {
 
       await expect(client.initControl()).resolves.toBe(true);
       expect(client.httpOnly).toBe(false);
-      expect((client.tcpClient as unknown as { initControl: ReturnType<typeof vi.fn> }).initControl)
-        .toHaveBeenCalled();
+      expect(
+        (client.tcpClient as unknown as { initControl: ReturnType<typeof vi.fn> }).initControl
+      ).toHaveBeenCalled();
     });
 
     it('dispose does not touch the TCP client in HTTP-only mode', async () => {
       const client = new FiveMClient('192.168.1.10', 'SN-1', 'CHK-1', { httpOnly: true });
 
       await client.dispose();
-      expect((client.tcpClient as unknown as { dispose: ReturnType<typeof vi.fn> }).dispose)
-        .not.toHaveBeenCalled();
+      expect(
+        (client.tcpClient as unknown as { dispose: ReturnType<typeof vi.fn> }).dispose
+      ).not.toHaveBeenCalled();
+    });
+
+    it('forces chamber control on by model for the Creator 5 even when /product reports 0', async () => {
+      // /product is unreliable for the chamber; both C5 and C5 Pro have one, so the
+      // capability is enabled by model regardless of chamberTempCtrlState.
+      httpPost.mockResolvedValue({
+        status: 200,
+        data: { code: 0, message: 'Success', product: { chamberTempCtrlState: 0 } },
+      });
+      const client = new FiveMClient('192.168.1.10', 'SN-1', 'CHK-1', { httpOnly: true });
+      client.isCreator5 = true;
+
+      await expect(client.sendProductCommand()).resolves.toBe(true);
+      expect(client.capabilities.hasChamberControl).toBe(true);
     });
   });
 });

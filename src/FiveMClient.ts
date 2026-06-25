@@ -298,7 +298,9 @@ export class FiveMClient {
         validateStatus: () => true,
       });
       responseData =
-        response.data && typeof response.data === 'object' ? (response.data as { destroy?: () => void }) : undefined;
+        response.data && typeof response.data === 'object'
+          ? (response.data as { destroy?: () => void })
+          : undefined;
       return this.isValidCameraProbeResponse(response.status, response.headers);
     } catch {
       return false;
@@ -321,7 +323,9 @@ export class FiveMClient {
     ).toLowerCase();
 
     return (
-      contentType === '' || contentType.includes('multipart') || contentType.includes('video/x-mjpeg')
+      contentType === '' ||
+      contentType.includes('multipart') ||
+      contentType.includes('video/x-mjpeg')
     );
   }
 
@@ -398,8 +402,7 @@ export class FiveMClient {
     const avail = (v: number | undefined): boolean => v === 1;
     return {
       hasLed: avail(product.lightCtrlState),
-      hasFiltration:
-        avail(product.internalFanCtrlState) && avail(product.externalFanCtrlState),
+      hasFiltration: avail(product.internalFanCtrlState) && avail(product.externalFanCtrlState),
       hasChamberControl: avail(product.chamberTempCtrlState),
       hasNozzleControl: avail(product.nozzleTempCtrlState),
       hasPlatformControl: avail(product.platformTempCtrlState),
@@ -441,6 +444,11 @@ export class FiveMClient {
           // override. isCreator5Pro is already set here (verifyConnection ->
           // cacheDetails runs before initControl -> sendProductCommand).
           if (this.isCreator5Pro) this.capabilities.hasFiltration = true;
+          // Both the Creator 5 and Creator 5 Pro have a heated chamber (firmware
+          // Klipper config defines `[heater_generic chamber_heater]` identically on
+          // both), but /product's chamberTempCtrlState is an unreliable signal for
+          // it. Enable chamber control by model so it doesn't depend on that flag.
+          if (this.isCreator5 || this.isCreator5Pro) this.capabilities.hasChamberControl = true;
           this.ledControl = this.capabilities.hasLed;
           this.filtrationControl = this.capabilities.hasFiltration;
           //console.log("LedControl: " + this.ledControl);
