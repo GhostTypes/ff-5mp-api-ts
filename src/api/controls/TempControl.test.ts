@@ -335,5 +335,35 @@ describe('TempControl', () => {
         nozzles: [-100, -200, -200, -200],
       });
     });
+
+    // The confirmed C5 payload always carries a 4-entry `nozzles` array, even on a
+    // bed- or chamber-only command. Unspecified tools default to TEMP_NO_CHANGE so
+    // the tools are left untouched.
+    it('setBedTemp still includes a 4-entry nozzles[] array (all unchanged)', async () => {
+      const result = await c5TempControl.setBedTemp(60);
+
+      expect(result).toBe(true);
+      expect(mockTcpClient.setBedTemp).not.toHaveBeenCalled();
+      expect(mockSendControlCommand).toHaveBeenCalledWith('temperatureCtl_cmd', {
+        rightNozzle: -200,
+        leftNozzle: -200,
+        platform: 60,
+        chamber: -200,
+        nozzles: [-200, -200, -200, -200],
+      });
+    });
+
+    it('setChamberTemp still includes a 4-entry nozzles[] array (all unchanged)', async () => {
+      const result = await c5TempControl.setChamberTemp(50);
+
+      expect(result).toBe(true);
+      expect(mockSendControlCommand).toHaveBeenCalledWith('temperatureCtl_cmd', {
+        rightNozzle: -200,
+        leftNozzle: -200,
+        platform: -200,
+        chamber: 50,
+        nozzles: [-200, -200, -200, -200],
+      });
+    });
   });
 });

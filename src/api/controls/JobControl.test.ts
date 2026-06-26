@@ -518,15 +518,27 @@ describe('JobControl', () => {
       (mockFiveMClient as { isCreator5: boolean }).isCreator5 = true;
     });
 
-    it('POSTs the Creator 5-native /printGcode body with 3-field mappings', async () => {
+    it('POSTs the Creator 5-native /printGcode body matching the captured shape', async () => {
       mockedAxios.post.mockResolvedValue({ status: 200, data: { code: 0, message: 'Success' } });
 
       const result = await jobControl.startCreator5Job({
         fileName: 'multi.3mf',
         levelingBeforePrint: true,
         materialMappings: [
-          { toolId: 0, slotId: 1, materialName: 'PLA' },
-          { toolId: 1, slotId: 3, materialName: 'PETG' },
+          {
+            toolId: 0,
+            slotId: 2,
+            materialName: 'PLA',
+            toolMaterialColor: '#2E54DD',
+            slotMaterialColor: '#2E54DD',
+          },
+          {
+            toolId: 1,
+            slotId: 3,
+            materialName: 'PETG',
+            toolMaterialColor: '#FF0000',
+            slotMaterialColor: '#FF0000',
+          },
         ],
       });
 
@@ -534,19 +546,36 @@ describe('JobControl', () => {
       expect(mockedAxios.post).toHaveBeenCalledTimes(1);
       const [url, body] = mockedAxios.post.mock.calls[0];
       expect(url).toBe(`http://printer:8898${Endpoints.GCodePrint}`);
-      // Only Creator 5 fields — no AD5X-only useMatlStation/gcodeToolCnt/colors.
+      // Confirmed C5 capture: flowCalibration/timeLapseVideo always present, mappings
+      // carry colors (same shape as AD5X), and no useMatlStation/gcodeToolCnt (those
+      // live on the upload) or firstLayerInspection (doesn't exist on the C5).
       expect(body).toEqual({
         serialNumber: 'SN123456',
         checkCode: 'CC123456',
         fileName: 'multi.3mf',
         levelingBeforePrint: true,
+        flowCalibration: false,
+        timeLapseVideo: false,
         materialMappings: [
-          { toolId: 0, slotId: 1, materialName: 'PLA' },
-          { toolId: 1, slotId: 3, materialName: 'PETG' },
+          {
+            toolId: 0,
+            slotId: 2,
+            materialName: 'PLA',
+            toolMaterialColor: '#2E54DD',
+            slotMaterialColor: '#2E54DD',
+          },
+          {
+            toolId: 1,
+            slotId: 3,
+            materialName: 'PETG',
+            toolMaterialColor: '#FF0000',
+            slotMaterialColor: '#FF0000',
+          },
         ],
       });
       expect(body).not.toHaveProperty('useMatlStation');
       expect(body).not.toHaveProperty('gcodeToolCnt');
+      expect(body).not.toHaveProperty('firstLayerInspection');
     });
 
     it('omits materialMappings for a single-tool print', async () => {
@@ -566,7 +595,15 @@ describe('JobControl', () => {
       const result = await jobControl.startCreator5Job({
         fileName: 'bad.3mf',
         levelingBeforePrint: true,
-        materialMappings: [{ toolId: 0, slotId: 0, materialName: 'PLA' }],
+        materialMappings: [
+          {
+            toolId: 0,
+            slotId: 0,
+            materialName: 'PLA',
+            toolMaterialColor: '#2E54DD',
+            slotMaterialColor: '#2E54DD',
+          },
+        ],
       });
 
       expect(result).toBe(false);

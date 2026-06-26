@@ -7,6 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.6.0] - 2026-06-26
+
+### Added
+
+- **`JobControl.uploadFileCreator5(params)`** — Creator 5 / Creator 5 Pro file upload (`POST /uploadGcode`) with the C5-specific material-station headers. Unlike the AD5X, the C5 splits the multi-material workflow across two requests: the upload carries `useMatlStation` / `gcodeToolCnt` (the firmware reads them here to register a multi-tool job), and the per-tool mapping is sent separately at print-start via `startCreator5Job` (`POST /printGcode`). This path sends **no** `firstLayerInspection` header (the field doesn't exist on the C5) and **no** `materialMappings` header (mappings go on the print-start call), and the booleans are sent as the string `"true"`/`"false"` (the firmware checks for `"true"`, not `"1"`). `Creator5UploadParams` type exported.
+
+### Changed
+
+- **`Creator5MaterialMapping` now carries `toolMaterialColor` / `slotMaterialColor`.** A live C5 `/printGcode` capture confirmed the mapping shape is identical to the AD5X (it includes the tool/slot colors), not the 3-field `{ toolId, slotId, materialName }` we previously assumed. `startCreator5Job` validates the colors (`#RRGGBB`) like the AD5X path. **Breaking** for callers constructing `Creator5MaterialMapping` by hand — add the two color fields.
+- **`startCreator5Job` `/printGcode` body now always includes `flowCalibration` and `timeLapseVideo`** (default `false`), matching the exact body the FlashForge app sends. It still omits `useMatlStation` / `gcodeToolCnt` (those live on the upload) and `firstLayerInspection` (absent on the C5).
+- **Creator 5 `temperatureCtl_cmd` now always carries the 4-entry `nozzles` array**, even on a bed- or chamber-only command (unspecified tools default to `-200`/no-change). The confirmed C5 payload always includes the array; previously bed/chamber-only commands omitted it, which the firmware's `size() == 4` check could reject.
+
 ## [1.4.0] - 2026-06-25
 
 ### Added

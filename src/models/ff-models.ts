@@ -476,6 +476,10 @@ export interface Creator5MaterialMapping {
   slotId: number;
   /** Material name (e.g. "PLA"). */
   materialName: string;
+  /** Hex color code for the tool material (e.g. "#2E54DD"). */
+  toolMaterialColor: string;
+  /** Hex color code for the slot material (e.g. "#2E54DD"). */
+  slotMaterialColor: string;
 }
 
 /**
@@ -496,6 +500,34 @@ export interface Creator5JobParams {
   timeLapseVideo?: boolean;
   /** Optional per-tool material mappings (1–4). Omit for a single-tool print. */
   materialMappings?: Creator5MaterialMapping[];
+}
+
+/**
+ * Parameters for uploading a file to a Creator 5 / Creator 5 Pro.
+ *
+ * Unlike the AD5X — which performs material matching at upload time and carries the
+ * full `materialMappings` on the upload — the Creator 5 only needs the upload to flag
+ * whether the file is a material-station job (`useMatlStation`) and how many tools it
+ * uses (`gcodeToolCnt`). The actual per-tool mapping is sent later via `POST /printGcode`
+ * (see {@link Creator5JobParams}). There is no `firstLayerInspection` field on the C5.
+ */
+export interface Creator5UploadParams {
+  /** Local file path to upload (.gcode or .3mf). */
+  filePath: string;
+  /** Whether to start printing immediately after upload (`printNow`). For a
+   * multi-tool job, upload with this false and then call `startCreator5Job` with
+   * the material mappings. */
+  startPrint: boolean;
+  /** Whether to perform bed leveling before printing. */
+  levelingBeforePrint: boolean;
+  /** Whether the file is a material-station (multi-tool) job. */
+  useMatlStation: boolean;
+  /** Number of gcode tools the file uses (1 for a single-tool file). */
+  gcodeToolCnt: number;
+  /** Optional: enable flow calibration (default false). */
+  flowCalibration?: boolean;
+  /** Optional: record a time-lapse video (default false). */
+  timeLapseVideo?: boolean;
 }
 
 /**

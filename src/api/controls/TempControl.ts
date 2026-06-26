@@ -66,10 +66,14 @@ export class TempControl {
       platform: args.platform ?? TEMP_NO_CHANGE,
       chamber: args.chamber ?? TEMP_NO_CHANGE,
     };
-    // Per-tool targets for Creator 5 tool-changers. Only included when supplied so
-    // the firmware's `size() == 4` check doesn't reject a partial/absent array.
+    // The `nozzles` array is Creator 5-only (its 4-nozzle tool changer). The
+    // confirmed C5 payload ALWAYS carries a 4-entry array, even on a bed- or
+    // chamber-only command, so always include it on the C5 — defaulting unspecified
+    // tools to TEMP_NO_CHANGE so a bed/chamber adjustment leaves the tools untouched.
     if (args.nozzles !== undefined) {
       payload.nozzles = args.nozzles;
+    } else if (this.client.isCreator5) {
+      payload.nozzles = new Array<number>(NOZZLE_COUNT).fill(TEMP_NO_CHANGE);
     }
     return await this.client.control.sendControlCommand(Commands.TempControlCmd, payload);
   }

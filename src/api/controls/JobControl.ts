@@ -16,6 +16,7 @@ import type {
   AD5XUploadParams,
   Creator5JobParams,
   Creator5MaterialMapping,
+  Creator5UploadParams,
 } from '../../models/ff-models';
 import { NetworkUtils } from '../network/NetworkUtils';
 import { Endpoints } from '../server/Endpoints';
@@ -509,21 +510,113 @@ export class JobControl {
   }
 
   // --- Creator 5 / Creator 5 Pro ---
-  // The Creator 5 uploads files the same way as the AD5X (the extra IFS headers
-  // are simply ignored by its firmware), but it performs material matching at
-  // print-start via POST /printGcode rather than at upload time. So upload reuses
-  // the AD5X path, while starting a job uses the Creator 5-native body below.
+  // The Creator 5 splits the material-station workflow across two requests, unlike
+  // the AD5X (which maps materials at upload time). On the C5:
+  //   1. Upload the file (POST /uploadGcode). The firmware reads `useMatlStation`
+  //      and `gcodeToolCnt` here to register the file as a multi-tool job. There is
+  //      NO `firstLayerInspection` header (the field doesn't exist on the C5), and
+  //      the booleans are checked as the string "true"/"false" (not "1"/"0").
+  //   2. Start the print (POST /printGcode) with the per-tool `materialMappings`.
+  // See {@link startCreator5Job} for step 2.
 
   /**
-   * Uploads a file to a Creator 5 / Creator 5 Pro. Reuses the AD5X upload path;
-   * the Creator 5 firmware ignores the IFS-specific headers. To run a multi-tool
-   * print, upload with `startPrint = false`, then call {@link startCreator5Job}
-   * with material mappings.
-   * @param params Upload parameters (material mappings are ignored by the C5 firmware).
+   * Uploads a file (.gcode or .3mf) to a Creator 5 / Creator 5 Pro via
+   * `POST /uploadGcode`, with the C5-specific material-station headers.
+   *
+   * For a multi-tool print, set `useMatlStation = true` and `gcodeToolCnt` to the
+   * tool count, upload with `startPrint = false`, then call {@link startCreator5Job}
+   * with the material mappings. For a single-tool print, `useMatlStation = false`
+   * and `gcodeToolCnt = 1`; `startPrint = true` will auto-start it.
+   *
+   * Unlike {@link uploadFileAD5X} this sends no `firstLayerInspection` header (the
+   * C5 has no such field) and no `materialMappings` header (the C5 maps materials at
+   * print-start, not upload).
+   * @param params Creator 5 upload parameters.
    * @returns Promise resolving to true on success.
    */
-  public async uploadFileWithMaterialMappings(params: AD5XUploadParams): Promise<boolean> {
-    return this.uploadFileAD5X(params);
+  public async uploadFileCreator5(params: Creator5UploadParams): Promise<boolean> {
+    if (!fs.existsSync(params.filePath)) {
+      console.error(`uploadFileCreator5 error: File not found at ${params.filePath}`);
+      return false;
+    }
+
+    const stats = fs.statSync(params.filePath);
+    const fileSize = stats.size;
+    const fileName = path.basename(params.filePath);
+
+    console.log(
+      `Starting Creator 5 upload for ${fileName}, Size: ${fileSize}, Start: ${params.startPrint}, ` +
+        `Level: ${params.levelingBeforePrint}, MatlStation: ${params.useMatlStation}, Tools: ${params.gcodeToolCnt}`
+    );
+
+    try {
+      const form = new FormData();
+      form.append('gcodeFile', fs.createReadStream(params.filePath), {
+        filename: fileName,
+        contentType: 'application/octet-stream',
+      });
+
+      // C5 upload headers. No firstLayerInspection (absent on the C5); booleans are
+      // sent as the string "true"/"false" (the firmware checks for "true", not "1").
+      const customHeaders: Record<string, string> = {
+        serialNumber: this.client.serialNumber,
+        checkCode: this.client.checkCode,
+        fileSize: fileSize.toString(),
+        printNow: params.startPrint.toString().toLowerCase(),
+        levelingBeforePrint: params.levelingBeforePrint.toString().toLowerCase(),
+        flowCalibration: (params.flowCalibration ?? false).toString().toLowerCase(),
+        timeLapseVideo: (params.timeLapseVideo ?? false).toString().toLowerCase(),
+        useMatlStation: params.useMatlStation.toString().toLowerCase(),
+        gcodeToolCnt: params.gcodeToolCnt.toString(),
+        Expect: '100-continue',
+      };
+
+      const formHeaders = form.getHeaders();
+      const requestHeaders = {
+        ...customHeaders,
+        'Content-Type': formHeaders['content-type'],
+      };
+
+      console.log('Creator 5 Upload Request Headers:', requestHeaders);
+
+      const response = await axios.post(
+        this.client.getEndpoint(Endpoints.UploadFile),
+        form,
+        { headers: requestHeaders }
+      );
+
+      console.log(`Creator 5 Upload Response Status: ${response.status}`);
+      console.log('Creator 5 Upload Response Data:', response.data);
+
+      if (response.status !== 200) {
+        console.error(`Creator 5 Upload failed: Printer responded with status ${response.status}`);
+        return false;
+      }
+
+      const result = response.data as GenericResponse;
+      if (NetworkUtils.isOk(result)) {
+        console.log('Creator 5 Upload successful according to printer response.');
+        return true;
+      }
+      console.error(
+        `Creator 5 Upload failed: Printer response code=${result.code}, message=${result.message}`
+      );
+      return false;
+    } catch (error) {
+      const err = error as Error & {
+        response?: { status: number; data: GenericResponse };
+        request?: unknown;
+      };
+      console.error(`uploadFileCreator5 error: ${err.message}`);
+      if (err.response) {
+        console.error(`Error Status: ${err.response.status}`);
+        console.error('Error Response Data:', err.response.data);
+      } else if (err.request) {
+        console.error('Error Request:', err.request);
+      }
+      console.error(err.stack);
+      return false;
+    }
   }
 
   /**
@@ -553,16 +646,19 @@ export class JobControl {
       return false;
     }
 
-    // Only the fields the /printGcode handler actually reads. fileName and
-    // levelingBeforePrint are required; the rest are optional.
+    // Fields the /printGcode handler reads, matching the exact body the FlashForge
+    // app sends (confirmed via a live C5 capture). The firmware does NOT read
+    // useMatlStation, gcodeToolCnt, or firstLayerInspection here — those live on the
+    // upload request (firstLayerInspection doesn't exist on the C5 at all). flowCalibration
+    // and timeLapseVideo are always present (default false) to mirror the captured body.
     const payload: Record<string, unknown> = {
       serialNumber: this.client.serialNumber,
       checkCode: this.client.checkCode,
       fileName: params.fileName,
       levelingBeforePrint: params.levelingBeforePrint,
+      flowCalibration: params.flowCalibration ?? false,
+      timeLapseVideo: params.timeLapseVideo ?? false,
     };
-    if (params.flowCalibration !== undefined) payload.flowCalibration = params.flowCalibration;
-    if (params.timeLapseVideo !== undefined) payload.timeLapseVideo = params.timeLapseVideo;
     if (hasMappings) payload.materialMappings = params.materialMappings;
 
     try {
@@ -584,7 +680,9 @@ export class JobControl {
 
   /**
    * Validates Creator 5 material mappings: toolId 0-3, slotId 1-4, non-empty
-   * materialName. (No color fields, unlike AD5X.)
+   * materialName, and #RRGGBB tool/slot colors. The C5 mapping shape is identical
+   * to the AD5X (confirmed via a live /printGcode capture — it carries the same
+   * toolMaterialColor / slotMaterialColor fields).
    * @param materialMappings Array of Creator 5 mappings to validate.
    * @returns True if all mappings are valid, false otherwise.
    * @private
@@ -594,6 +692,8 @@ export class JobControl {
       console.error('Creator 5 material mappings error: Maximum 4 material mappings allowed');
       return false;
     }
+
+    const hexColorRegex = /^#[0-9A-Fa-f]{6}$/;
 
     for (let i = 0; i < materialMappings.length; i++) {
       const mapping = materialMappings[i];
@@ -615,6 +715,20 @@ export class JobControl {
       if (!mapping.materialName || mapping.materialName.trim() === '') {
         console.error(
           `Creator 5 material mappings error: materialName cannot be empty at index ${i}`
+        );
+        return false;
+      }
+
+      if (!hexColorRegex.test(mapping.toolMaterialColor)) {
+        console.error(
+          `Creator 5 material mappings error: toolMaterialColor must be in #RRGGBB format, got ${mapping.toolMaterialColor} at index ${i}`
+        );
+        return false;
+      }
+
+      if (!hexColorRegex.test(mapping.slotMaterialColor)) {
+        console.error(
+          `Creator 5 material mappings error: slotMaterialColor must be in #RRGGBB format, got ${mapping.slotMaterialColor} at index ${i}`
         );
         return false;
       }
