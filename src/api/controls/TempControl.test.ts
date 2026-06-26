@@ -286,4 +286,54 @@ describe('TempControl', () => {
       expect(mockSendControlCommand).not.toHaveBeenCalled();
     });
   });
+
+  // Creator 5 (isCreator5) drives its tools ONLY via the `nozzles` array; the
+  // firmware's doTemperatureControl handler never reads rightNozzle/leftNozzle.
+  // The generic setExtruderTemp/cancelExtruderTemp must therefore emit a 4-element
+  // `nozzles` array targeting the primary tool (T0) rather than rightNozzle.
+  // The describe above (httpOnly without isCreator5) covers the AD5X / 5M path,
+  // which keeps rightNozzle — a deliberate regression guard.
+  describe('Creator 5 extruder temp (httpOnly, per-tool nozzles[])', () => {
+    let mockSendControlCommand: ReturnType<typeof vi.fn>;
+    let c5TempControl: TempControl;
+
+    beforeEach(() => {
+      mockSendControlCommand = vi.fn().mockResolvedValue(true);
+      const httpClient = {
+        httpOnly: true,
+        isCreator5: true,
+        tcpClient: mockTcpClient,
+        control: { sendControlCommand: mockSendControlCommand },
+      } as unknown as FiveMClient;
+      c5TempControl = new TempControl(httpClient);
+    });
+
+    it('setExtruderTemp drives T0 via nozzles[] and does NOT send rightNozzle', async () => {
+      const result = await c5TempControl.setExtruderTemp(215);
+
+      expect(result).toBe(true);
+      expect(mockTcpClient.setExtruderTemp).not.toHaveBeenCalled();
+      expect(mockSendControlCommand).toHaveBeenCalledWith('temperatureCtl_cmd', {
+        rightNozzle: -200, // TEMP_NO_CHANGE — not set
+        leftNozzle: -200,
+        platform: -200,
+        chamber: -200,
+        nozzles: [215, -200, -200, -200],
+      });
+    });
+
+    it('cancelExtruderTemp turns T0 off via nozzles[] and does NOT send rightNozzle', async () => {
+      const result = await c5TempControl.cancelExtruderTemp();
+
+      expect(result).toBe(true);
+      expect(mockTcpClient.cancelExtruderTemp).not.toHaveBeenCalled();
+      expect(mockSendControlCommand).toHaveBeenCalledWith('temperatureCtl_cmd', {
+        rightNozzle: -200, // TEMP_NO_CHANGE — not set
+        leftNozzle: -200,
+        platform: -200,
+        chamber: -200,
+        nozzles: [-100, -200, -200, -200],
+      });
+    });
+  });
 });

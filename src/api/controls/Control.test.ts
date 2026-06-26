@@ -596,13 +596,16 @@ describe('Control', () => {
 
       const result = await control.configureSlot(2, 'PETG', '#46328E');
 
+      // Creator 5: color must be an exact firmware palette match — uppercase
+      // "#RRGGBB" WITH the leading "#". #46328E is off-palette and snaps to the
+      // nearest C5 entry, Purple (#48358C). NOT the stripped AD5X value.
       expect(result).toBe(true);
       expect(mockedAxios.post).toHaveBeenCalledWith(
         `http://printer:8898${Endpoints.Control}`,
         expect.objectContaining({
           payload: {
             cmd: Commands.MaterialStationConfigCmd,
-            args: { slot: 2, mt: 'PETG', rgb: '46328E' },
+            args: { slot: 2, mt: 'PETG', rgb: '#48358C' },
           },
         }),
         expect.any(Object)
@@ -617,6 +620,73 @@ describe('Control', () => {
 
       expect(result).toBe(false);
       expect(mockedAxios.post).not.toHaveBeenCalled();
+    });
+  });
+
+  // Creator 5 / Creator 5 Pro slot color: the firmware renders an icon ONLY on a
+  // byte-for-byte, case-sensitive match against its 24-entry palette (WITH the
+  // "#"). configureSlot must snap the caller's color to the nearest palette entry
+  // and emit uppercase "#RRGGBB" — never an off-list or stripped value.
+  describe('Creator 5 material-station slot color (palette snapping)', () => {
+    const paletteHexes = [
+      '#FFFFFF', '#FFF245', '#DEF578', '#21CC3D', '#167A4B', '#156682', '#24E4A0',
+      '#7BD9F0', '#4CAAF8', '#2E54DD', '#48358C', '#A341F7', '#F435F6', '#D5B4DE',
+      '#FA6173', '#F82D29', '#805003', '#F9903B', '#FCEBD7', '#D5C5A1', '#B17C38',
+      '#8C8C89', '#BEBEBE', '#1B1B1B',
+    ];
+
+    const captureRgb = async (hexRgb: string): Promise<string> => {
+      mockedAxios.post.mockClear();
+      await control.configureSlot(1, 'PLA', hexRgb);
+      const call = mockedAxios.post.mock.calls[0];
+      const payload = call[1] as { payload: { args: { rgb: string } } };
+      return payload.payload.args.rgb;
+    };
+
+    beforeEach(() => {
+      mockedAxios.post.mockResolvedValue({ status: 200, data: { code: 0, message: 'Success' } });
+      mockFiveMClient.isAD5X = false;
+      mockFiveMClient.isCreator5 = true;
+    });
+
+    it('always snaps to a value from the 24-entry C5 palette (never off-list)', async () => {
+      const inputs = ['#FF0000', '#123456', '#00FF00', '#ABCDEF', '#A341F7', '#112233', '#FEDCBA'];
+      for (const input of inputs) {
+        const rgb = await captureRgb(input);
+        expect(paletteHexes).toContain(rgb);
+      }
+    });
+
+    it('always emits uppercase hex with a leading "#"', async () => {
+      const rgb = await captureRgb('#ff0000');
+      expect(rgb.startsWith('#')).toBe(true);
+      expect(rgb).toBe(rgb.toUpperCase());
+      expect(rgb).toMatch(/^#[0-9A-F]{6}$/);
+    });
+
+    it('snaps #FF0000 (pure red) to #F82D29 (nearest palette red)', async () => {
+      expect(await captureRgb('#FF0000')).toBe('#F82D29');
+    });
+
+    it('snaps an exact palette entry to itself (case-normalized)', async () => {
+      expect(await captureRgb('#4CAAF8')).toBe('#4CAAF8');
+      expect(await captureRgb('#4caaf8')).toBe('#4CAAF8');
+      expect(await captureRgb('4caaF8')).toBe('#4CAAF8');
+    });
+
+    it('snaps white to #FFFFFF', async () => {
+      expect(await captureRgb('#FFFFFF')).toBe('#FFFFFF');
+      expect(await captureRgb('#FFF')).toBe('#FFFFFF');
+    });
+
+    // REGRESSION GUARD: the AD5X path must remain unchanged — freeform hex with
+    // the leading "#" stripped, no palette snapping.
+    it('AD5X path is unchanged: strips "#" and keeps freeform hex (no snapping)', async () => {
+      mockFiveMClient.isAD5X = true;
+      mockFiveMClient.isCreator5 = false;
+
+      expect(await captureRgb('#FF0000')).toBe('FF0000');
+      expect(await captureRgb('#46328E')).toBe('46328E');
     });
   });
 

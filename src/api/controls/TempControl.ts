@@ -138,6 +138,17 @@ export class TempControl {
    */
   public async setExtruderTemp(temp: number): Promise<boolean> {
     if (this.client.httpOnly) {
+      // Creator 5 tools are driven ONLY via the `nozzles` array — the firmware's
+      // doTemperatureControl handler never reads rightNozzle/leftNozzle. Target
+      // the primary tool (T0): the active tool isn't reliably known over HTTP, so
+      // callers that need a specific tool should use setToolTemp(index, temp).
+      if (this.client.isCreator5) {
+        const nozzles = this.buildNozzleArray(0, temp);
+        if (nozzles === null) return false;
+        return await this.sendHttpTempCommand({ nozzles });
+      }
+      // Single-tool AD5X / 5M only reachable here if forced into httpOnly mode;
+      // they keep the rightNozzle field (unchanged).
       return await this.sendHttpTempCommand({ rightNozzle: temp });
     }
     return await this.tcpClient.setExtruderTemp(temp);
@@ -161,6 +172,14 @@ export class TempControl {
    */
   public async cancelExtruderTemp(): Promise<boolean> {
     if (this.client.httpOnly) {
+      // See setExtruderTemp: Creator 5 tools are driven only via `nozzles`. Turn
+      // the primary tool (T0) off while leaving the other tools unchanged.
+      if (this.client.isCreator5) {
+        const nozzles = this.buildNozzleArray(0, TEMP_OFF);
+        if (nozzles === null) return false;
+        return await this.sendHttpTempCommand({ nozzles });
+      }
+      // Single-tool AD5X / 5M (forced httpOnly) keep rightNozzle (unchanged).
       return await this.sendHttpTempCommand({ rightNozzle: TEMP_OFF });
     }
     return await this.tcpClient.cancelExtruderTemp();

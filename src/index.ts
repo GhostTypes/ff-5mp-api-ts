@@ -10,6 +10,11 @@ export { Files } from './api/controls/Files';
 export { DetailResponse, Info } from './api/controls/Info';
 export { JobControl } from './api/controls/JobControl';
 export { TempControl } from './api/controls/TempControl';
+export {
+  CREATOR5_PALETTE,
+  snapToCreator5Palette,
+  type Creator5PaletteColor,
+} from './api/controls/creator5Palette';
 // Filament
 export { Filament } from './api/filament/Filament';
 // Misc
