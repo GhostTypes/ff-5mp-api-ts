@@ -14,8 +14,18 @@ import { Commands } from '../server/Commands';
  * (partial update). Sending a real 0 / -100 would turn the heater off.
  */
 const TEMP_NO_CHANGE = -200;
-/** `temperatureCtl_cmd` value that turns a heater off. */
+/**
+ * `temperatureCtl_cmd` value that turns a SCALAR heater (platform / chamber /
+ * rightNozzle) off.
+ */
 const TEMP_OFF = -100;
+/**
+ * Value that turns a tool/nozzle OFF inside the `nozzles` array. Unlike the scalar
+ * heater fields (which accept {@link TEMP_OFF} = -100), the Creator 5 firmware's
+ * per-nozzle parser only treats a literal 0 as "off" — it ignores -100 in the
+ * `nozzles` array and the tool keeps heating. (Firmware-confirmed via tester report.)
+ */
+const NOZZLE_OFF = 0;
 /**
  * Number of tool/nozzle entries the Creator 5 firmware requires in the
  * `nozzles` array. The firmware ignores the array unless its length is exactly
@@ -110,8 +120,9 @@ export class TempControl {
   /**
    * Sets the target temperatures for all tools/nozzles on a Creator 5 series
    * tool-changer in one command. Use {@link TEMP_NO_CHANGE} (-200) to leave a
-   * tool unchanged or {@link TEMP_OFF} (-100) to turn one off. Must contain
-   * exactly {@link NOZZLE_COUNT} entries.
+   * tool unchanged or {@link NOZZLE_OFF} (0) to turn one off (the firmware ignores
+   * the -100 sentinel inside the `nozzles` array). Must contain exactly
+   * {@link NOZZLE_COUNT} entries.
    * @param temps Per-tool target temperatures, ordered T0..T3.
    * @returns A Promise resolving to true if the command is acknowledged.
    */
@@ -130,7 +141,7 @@ export class TempControl {
    * @returns A Promise resolving to true if the command is acknowledged.
    */
   public async cancelToolTemp(toolIndex: number): Promise<boolean> {
-    const nozzles = this.buildNozzleArray(toolIndex, TEMP_OFF);
+    const nozzles = this.buildNozzleArray(toolIndex, NOZZLE_OFF);
     if (nozzles === null) return false;
     return await this.sendHttpTempCommand({ nozzles });
   }
@@ -177,9 +188,10 @@ export class TempControl {
   public async cancelExtruderTemp(): Promise<boolean> {
     if (this.client.httpOnly) {
       // See setExtruderTemp: Creator 5 tools are driven only via `nozzles`. Turn
-      // the primary tool (T0) off while leaving the other tools unchanged.
+      // the primary tool (T0) off (target 0, not the -100 sentinel the nozzles array
+      // ignores) while leaving the other tools unchanged.
       if (this.client.isCreator5) {
-        const nozzles = this.buildNozzleArray(0, TEMP_OFF);
+        const nozzles = this.buildNozzleArray(0, NOZZLE_OFF);
         if (nozzles === null) return false;
         return await this.sendHttpTempCommand({ nozzles });
       }

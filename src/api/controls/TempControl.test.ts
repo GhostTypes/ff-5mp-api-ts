@@ -244,12 +244,12 @@ describe('TempControl', () => {
       );
     });
 
-    it('cancelToolTemp turns a single tool off (-100)', async () => {
+    it('cancelToolTemp turns a single tool off via 0 (firmware ignores -100 in nozzles[])', async () => {
       await httpTempControl.cancelToolTemp(0);
 
       expect(mockSendControlCommand).toHaveBeenCalledWith(
         'temperatureCtl_cmd',
-        expect.objectContaining({ nozzles: [-100, -200, -200, -200] })
+        expect.objectContaining({ nozzles: [0, -200, -200, -200] })
       );
     });
 
@@ -332,7 +332,7 @@ describe('TempControl', () => {
         leftNozzle: -200,
         platform: -200,
         chamber: -200,
-        nozzles: [-100, -200, -200, -200],
+        nozzles: [0, -200, -200, -200], // NOZZLE_OFF — firmware ignores -100 in nozzles[]
       });
     });
 
