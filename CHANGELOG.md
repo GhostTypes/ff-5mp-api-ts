@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.6.1] - 2026-06-28
+
+### Fixed
+
+- **Creator 5 tool heads now turn off when cancelled.** `TempControl.cancelToolTemp(toolIndex)` and the Creator 5 path of `cancelExtruderTemp()` wrote the `-100` "off" sentinel into the `temperatureCtl_cmd` `nozzles[]` array, but the firmware's per-nozzle parser only treats a literal `0` as off (it ignores `-100` inside the array, leaving the tool heating). Both now write `0` to the targeted nozzle. The scalar off-paths (`cancelBedTemp`, `cancelChamberTemp`, and the non-Creator-5 `rightNozzle` cancel) still use `-100`, which those fields accept. Confirmed by a Creator 5 Pro tester.
+
 ## [1.6.0] - 2026-06-26
 
 ### Added
