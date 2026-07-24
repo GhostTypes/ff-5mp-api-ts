@@ -35,6 +35,12 @@ const DEFAULT_DISCOVERY_OPTIONS: Required<DiscoveryOptions> = {
 const MULTICAST_ADDRESS = '225.0.0.9';
 
 /**
+ * Loopback address probed on every discovery pass so printers/simulators running
+ * on the local host are found (broadcast/multicast traffic never reaches it).
+ */
+const LOOPBACK_ADDRESS = '127.0.0.1';
+
+/**
  * Modern protocol: 276-byte responses (AD5X, 5M, 5M Pro)
  */
 const MODERN_PROTOCOL_SIZE = 276;
@@ -381,6 +387,19 @@ export class PrinterDiscovery {
                 } catch (error) {
                     console.warn(`Discovery: Failed to send to broadcast 255.255.255.255:${port} - ${(error as Error).message}`);
                 }
+            }
+        }
+
+        // Loopback probe (local simulators / printer bridges running on this host).
+        // Always on: broadcast and multicast sends do not reach 127.0.0.1, so a local
+        // responder is invisible without an explicit unicast probe. Harmless because the
+        // response parser requires a strict 140/276-byte FlashForge packet, so a stray
+        // localhost responder cannot produce a false printer.
+        for (const port of options.ports) {
+            try {
+                socket.send(emptyPacket, 0, 0, port, LOOPBACK_ADDRESS);
+            } catch (error) {
+                console.warn(`Discovery: Failed to send to loopback ${LOOPBACK_ADDRESS}:${port} - ${(error as Error).message}`);
             }
         }
     }

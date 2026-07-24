@@ -910,7 +910,7 @@ describe('DiscoveryOptions', () => {
         expect(printers).toHaveLength(0);
     });
 
-    it('should not send packets when multicast and broadcast are both disabled', async () => {
+    it('should only send loopback packets when multicast and broadcast are both disabled', async () => {
         const discovery = new TestPrinterDiscovery();
 
         const options: DiscoveryOptions = {
@@ -925,6 +925,29 @@ describe('DiscoveryOptions', () => {
         const printers = await discovery.discover(options);
         expect(printers).toHaveLength(0);
         expect(discovery.mockSocket).not.toBeNull();
-        expect((discovery.mockSocket?.send as ReturnType<typeof vi.fn>)).not.toHaveBeenCalled();
+
+        // Loopback probing is unconditional, so the only sends should target 127.0.0.1.
+        const send = discovery.mockSocket?.send as ReturnType<typeof vi.fn>;
+        const addresses = send.mock.calls.map((call) => call[4]);
+        expect(addresses).toEqual(['127.0.0.1', '127.0.0.1', '127.0.0.1']);
+    });
+
+    it('should probe loopback on every configured port', async () => {
+        const discovery = new TestPrinterDiscovery();
+
+        const options: DiscoveryOptions = {
+            timeout: 50,
+            idleTimeout: 25,
+            maxRetries: 1,
+            ports: [8899, 19000, 48899],
+        };
+
+        await discovery.discover(options);
+
+        const send = discovery.mockSocket?.send as ReturnType<typeof vi.fn>;
+        const loopbackPorts = send.mock.calls
+            .filter((call) => call[4] === '127.0.0.1')
+            .map((call) => call[3]);
+        expect(loopbackPorts).toEqual([8899, 19000, 48899]);
     });
 });
