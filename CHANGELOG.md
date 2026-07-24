@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.7.0] - 2026-07-24
+
+### Added
+
+- **`PrinterDiscovery` now probes loopback (`127.0.0.1`) on every discovery pass**, on each configured port (8899 / 19000 / 48899). Broadcast and multicast sends never reach the local host, so a printer simulator or bridge running on the same machine was previously undiscoverable through the library — consumers had to fork the discovery engine to add it. The probe is unconditional (no opt-in option) and additive: the response parser still requires a strict 140- or 276-byte FlashForge packet, so an unrelated localhost UDP responder cannot produce a false printer. No signature or return-shape change.
+
 ## [1.6.1] - 2026-06-28
 
 ### Fixed
