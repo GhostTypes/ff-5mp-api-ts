@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- **`FFMachineInfo.HasMatlStation` no longer misses the Material Station on the Creator 5 series.** It was a straight copy of the raw `hasMatlStation` value from `/detail`, which is an AD5X-only field — a Creator 5 Pro omits it entirely (verified on real hardware, pid 41) while reporting a fully populated `matlStationInfo` with four loaded slots. It therefore arrived `undefined`, and consumers gating on it saw no station on exactly the models that have one. `fromDetail` already computed the correct value for its own AD5X heuristic (flag `=== true` OR `slotCnt > 0` OR non-empty `slotInfos`) and then discarded it; that derived value is now what the field exposes.
+
+### Changed
+
+- **`FFMachineInfo.HasMatlStation` is now a required `boolean`** rather than `boolean | undefined`. A capability has no "unknown" state, and offering one is the mechanism of the bug above: firmware omits what does not apply, so an absent field reads as `undefined`, and `undefined` reads as "no". `FFPrinterDetail.hasMatlStation` keeps the untouched firmware value and stays optional, because there the absence *is* the information. Only `fromDetail` constructs an `FFMachineInfo`, so consumers reading the field are unaffected.
+
 ## [1.7.0] - 2026-07-24
 
 ### Added

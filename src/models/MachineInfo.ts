@@ -183,8 +183,11 @@ export class MachineInfo {
         HasLidar: hasLidar,
         HasDoorSensor: hasDoorSensor,
 
-        // Material Station Info
-        HasMatlStation: detail.hasMatlStation,
+        // Material Station Info. The DERIVED value, not detail.hasMatlStation:
+        // that field is AD5X-only and the Creator 5 series omits it entirely
+        // even with four loaded slots, so the raw value is undefined on exactly
+        // the models that have a station.
+        HasMatlStation: hasMaterialStation,
         MatlStationInfo: detail.matlStationInfo, // Assign directly
         IndepMatlInfo: detail.indepMatlInfo, // Assign directly
 
