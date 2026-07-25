@@ -321,8 +321,17 @@ export interface FFMachineInfo {
   /** Formatted string of the printer's total accumulated run time (e.g., "Xh:Ym"). */
   FormattedTotalRunTime: string;
 
-  /** Indicates if the printer has a material station. */
-  HasMatlStation?: boolean;
+  /**
+   * Indicates if the printer has a material station.
+   *
+   * Derived by {@link MachineInfo.fromDetail} from the station data, NOT copied
+   * from the raw `hasMatlStation` field - that one is AD5X-only and the Creator 5
+   * series never reports it, station attached or not. Required and never
+   * undefined on purpose: a capability has no unknown state, and offering one is
+   * what let an unreported flag read as absent hardware. For the untouched
+   * firmware value, read {@link FFPrinterDetail.hasMatlStation}.
+   */
+  HasMatlStation: boolean;
   /** Detailed information about the material station, if present. */
   MatlStationInfo?: MatlStationInfo; // Using the raw type directly for now
   /** Information about independent material loading. */

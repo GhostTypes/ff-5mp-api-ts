@@ -188,7 +188,8 @@ describe('MachineInfo', () => {
       expect(result.FirmwareVersion).toBe('1.0.0');
       expect(result.CameraStreamUrl).toBe('');
 
-      expect(result.HasMatlStation).toBeUndefined();
+      // False, not undefined: the capability is answered, not passed through.
+      expect(result.HasMatlStation).toBe(false);
       expect(result.MatlStationInfo).toBeUndefined();
       expect(result.IndepMatlInfo).toBeUndefined();
       expect(result.CoolingFanLeftSpeed).toBeUndefined();
@@ -355,6 +356,27 @@ describe('MachineInfo', () => {
         stateStep: 0,
       },
     };
+
+    it('reports the material station on a Creator 5 Pro, which never sends the flag', () => {
+      // Regression test: HasMatlStation used to be a copy of detail.hasMatlStation,
+      // which the Creator 5 series does not send at all - note its absence from
+      // CREATOR5_PRO_DETAIL_JSON above, exactly as the hardware reports it. The
+      // flag arrived undefined, and every consumer gating on it concluded there
+      // was no station while matlStationInfo listed four loaded slots.
+      expect(CREATOR5_PRO_DETAIL_JSON.hasMatlStation).toBeUndefined();
+
+      const result = machineInfoConverter.fromDetail(CREATOR5_PRO_DETAIL_JSON);
+
+      expect(result).not.toBeNull();
+      if (!result) return;
+
+      expect(result.HasMatlStation).toBe(true);
+      expect(result.MatlStationInfo?.slotCnt).toBe(4);
+      expect(result.MatlStationInfo?.slotInfos).toHaveLength(4);
+      // Deriving the station must not drag a Creator 5 into AD5X detection.
+      expect(result.IsAD5X).toBe(false);
+      expect(result.IsCreator5Pro).toBe(true);
+    });
 
     it('parses Creator 5 Pro per-tool temps and Pro-only capabilities', () => {
       const result = machineInfoConverter.fromDetail(CREATOR5_PRO_DETAIL_JSON);
