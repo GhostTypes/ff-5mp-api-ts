@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-A TypeScript API library (`@ghosttypes/ff-api`) for controlling FlashForge 3D printers, reverse-engineered from FlashForge software communication. Supports Adventurer 5M/5M Pro, AD5X, and legacy Adventurer 3/4 printers. Published to GitHub Packages (npm).
+A TypeScript API library (`@ghosttypes/ff-api`) for controlling FlashForge 3D printers, reverse-engineered from FlashForge software communication. Supports Adventurer 5M/5M Pro, AD5X, Creator 5 / Creator 5 Pro, and legacy Adventurer 3/4 printers. Published to GitHub Packages (npm).
 
 ## Build & Test Commands
 
@@ -22,7 +22,7 @@ The API uses two communication layers that work together:
 
 1. **HTTP API** (port 8898) — Modern REST-like API for 5M/5M Pro/AD5X printers. Uses `axios` with JSON payloads authenticated via `serialNumber` + `checkCode`. Endpoints defined in `src/api/server/Endpoints.ts`, command types in `src/api/server/Commands.ts`.
 
-2. **TCP API** (port 8899) — Legacy G-code/M-code protocol over raw TCP sockets. Used for all printer models and also embedded within `FiveMClient` for operations not available over HTTP (direct G-code, homing, temperature control). Commands defined in `src/tcpapi/client/GCodes.ts`.
+2. **TCP API** (port 8899) — Legacy G-code/M-code protocol over raw TCP sockets. Used for the 5M family, AD5X, and legacy Adventurer 3/4 printers, and embedded within `FiveMClient` for operations not available over HTTP (direct G-code, homing, temperature control). The **Creator 5 / Creator 5 Pro run no TCP server** (no port 8899) and are HTTP-only — see *HTTP-Only Mode* below. Commands defined in `src/tcpapi/client/GCodes.ts`.
 
 ### Client Hierarchy
 
@@ -31,12 +31,22 @@ The API uses two communication layers that work together:
   - `jobControl` (JobControl) — Start/stop/pause/resume print jobs
   - `info` (Info) — Printer details, machine state
   - `files` (Files) — File listing, upload, thumbnails
-  - `tempControl` (TempControl) — Temperature control via HTTP
+  - `tempControl` (TempControl) — Extruder/bed temperature via HTTP; on Creator 5 also per-tool temps (`setToolTemps` / `setToolTemp` / `cancelToolTemp`) and chamber heater (`setChamberTemp` / `cancelChamberTemp`)
   - `tcpClient` (FlashForgeClient) — Direct G-code access
 
 - **`FlashForgeClient`** (`src/tcpapi/FlashForgeClient.ts`) — High-level TCP client for legacy printers. Extends `FlashForgeTcpClient` with parsed G-code commands. Only requires IP address.
 
 - **`FlashForgeTcpClient`** (`src/tcpapi/FlashForgeTcpClient.ts`) — Low-level TCP socket management with keep-alive, command serialization, and multi-line response parsing.
+
+### HTTP-Only Mode (Creator 5 / 5 Pro)
+
+The Creator 5 / Creator 5 Pro ship **no legacy TCP server** (no port 8899) and are driven entirely over HTTP via `OrcaServer` on 8898. `FiveMClient` models this with an `httpOnly` flag:
+
+- **`FiveMClientConnectionOptions.httpOnly?: boolean`** and the public `FiveMClient.httpOnly`. It is **auto-enabled** in `verifyConnection()` when a Creator 5 / 5 Pro is detected from `/detail`, and can also be set explicitly up front (e.g. from `PrinterDiscovery`'s USB PID).
+- In HTTP-only mode: `initControl()` succeeds on the HTTP `/product` command alone (never opens TCP); `verifyConnection()` skips the TCP `getPrinterInfo()` probe; `dispose()` skips TCP teardown.
+- TCP-only `Control` operations (`homeAxes`, `homeAxesRapid`, runout sensor, and the filament load/unload family) return `false` with a log instead of hanging on a dead socket. `files.getLocalFileList()` falls back to HTTP `/gcodeList` (10 most-recent files).
+
+There is **no raw G/M-code passthrough and no axis move/jog** for Creator 5 — its LAN command set is HTTP-only (verified by Ghidra against firmware `firmwareExe` 1.9.2).
 
 ### Data Flow
 
@@ -54,6 +64,10 @@ The HTTP `/detail` endpoint requires authentication (`serialNumber` + `checkCode
 2. After a check code is provided, `FiveMClient.initialize()` runs an authenticated `/detail` call alongside an unauthenticated TCP `M115` via `tcpClient.getPrinterInfo()`. M115 returns `TypeName` (firmware-controlled, e.g. `"FlashForge Adventurer 5M Pro"`) which is safe to substring-match; do NOT use M115's `Name` field for capability inference — like `detail.name` it is user-set.
 3. Once `verifyConnection()` finishes, `FFMachineInfo.Pid` / `IsPro` / `IsAD5X` are authoritative. All later capability gating should read those, not re-parse strings.
 
+**Never expose a raw `/detail` field as a capability, and never give a capability an `undefined` state.** Firmware omits what does not apply to a model, so an absent value means "not reported", not "no" — and an optional boolean invites a consumer to read the two as the same thing. `hasMatlStation` is the case that bit us: AD5X-only, absent from a Creator 5 Pro that has four loaded slots, so `HasMatlStation` arrived `undefined` and consumers gating on it saw no station on exactly the models that have one. `MachineInfo.fromDetail` therefore **derives** it (`=== true` OR `slotCnt > 0` OR non-empty `slotInfos`) and the field is a required `boolean`; the raw value stays on `FFPrinterDetail`, where its absence *is* the information. Apply this to any new capability: derive it from the data the capability actually produces, give it no unknown state, and cover it with a fixture built from a real payload.
+
+> **Exception — Creator 5 / 5 Pro:** these models have no TCP server at all, so there is no M115 probe and no TCP bootstrap step. They are HTTP-only from the first connection (see *HTTP-Only Mode* above).
+
 ### Network Layer
 
 - `NetworkUtils` (`src/api/network/NetworkUtils.ts`) — Response validation helpers; checks `GenericResponse.code` for success.
@@ -70,7 +84,7 @@ The AD5X (Adventurer 5X) extends the 5M API with Intelligent Filament Station (I
 
 ### Creator 5 / Creator 5 Pro Support
 
-The Creator 5 series is "AD5X + per-tool temps". It shares the 4-slot material station and reuses the AD5X upload path, but **material matching happens at print-start** (`POST /printGcode`) rather than at upload time. Use `startCreator5Job(Creator5JobParams)` — its `materialMappings` are the 3-field `Creator5MaterialMapping` (`toolId` 0-based, `slotId` 1-based, `materialName`; no colors). Per-tool temps are in `FFMachineInfo.ToolTemps[]` (single-nozzle models report a 1-element array). Capability flags: `IsCreator5Pro`, `HasCamera`, `HasLidar`, `HasDoorSensor` (Pro only — plain C5 `doorStatus` is cosmetic). Filtration is force-enabled by model for the C5 Pro in `FiveMClient.sendProductCommand` because its `/product` under-reports the fan states.
+The Creator 5 series is "AD5X + per-tool temps + chamber heater". It shares the 4-slot material station and reuses the AD5X upload path (`uploadFileCreator5`), but **material matching happens at print-start** (`POST /printGcode`, via `startCreator5Job(Creator5JobParams)`) rather than at upload time. `Creator5MaterialMapping` matches the AD5X shape — `toolId` (0-based), `slotId` (1-based), `materialName`, plus **required** `toolMaterialColor` / `slotMaterialColor` (`#RRGGBB`); the colorless 3-field form used in early 1.3.x builds was replaced in 1.6.0. Per-tool temps are read from `FFMachineInfo.ToolTemps[]` and set via `tempControl.setToolTemps()` / `setToolTemp()` / `cancelToolTemp()`; nozzle count is `FFMachineInfo.NozzleCount` (C5 = 4, single-nozzle = 1) and the heated chamber is `FFMachineInfo.Chamber`, controlled via `tempControl.setChamberTemp()` / `cancelChamberTemp()`. `Control.configureSlot()` runs on `isAD5X || isCreator5` — on C5 (no removable IFS) it sets per-tool material name/color metadata, with RGB handling model-split: AD5X accepts freeform hex, Creator 5 snaps through `snapToCreator5Palette()` (see `src/api/controls/creator5Palette.ts`) because the `msConfig_cmd` icon only renders on a byte-for-byte, case-sensitive match to one of 24 firmware palette strings. Capability flags: `IsCreator5Pro`, `HasCamera`, `HasLidar`, `HasDoorSensor` (Pro only — plain C5 `doorStatus` is cosmetic; "close" means lid **and** front door closed). Filtration is force-enabled by model for the C5 Pro in `FiveMClient.sendProductCommand` because its `/product` under-reports the fan states.
 
 ## Architecture Note — Organization Axis (future cleanup, NOT urgent)
 
