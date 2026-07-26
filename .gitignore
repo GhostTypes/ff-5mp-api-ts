@@ -5,3 +5,6 @@ package-lock.json
 .kiro/coverage/
 coverage/
 nul
+
+# Local codegraph index (tooling artifact)
+.codegraph/
