@@ -14,6 +14,12 @@ A TypeScript API library (`@ghosttypes/ff-api`) for controlling FlashForge 3D pr
 - **Test watch:** `pnpm test:watch`
 - **Test coverage:** `pnpm test:coverage`
 
+## Releasing
+
+Publishing to GitHub Packages fires on a `v*` **tag push only** — never on a merge to `main`. To cut a release: bump `version` in `package.json`, date the `[Unreleased]` heading in `CHANGELOG.md`, merge to `main`, then `git tag -a vX.Y.Z && git push origin vX.Y.Z`. The tag's version is what gets published, so it must match `package.json`.
+
+`workflow_dispatch` publishes a `<version>-<timestamp>` prerelease instead — use it only for handing someone an off-tag build to test. A `^X.Y.Z` range will not resolve to those, by design. Until 2026-07-26 the workflow also ran on every push to `main`, so each merge silently published one of these; if you see stray timestamped versions in the registry, that is where they came from.
+
 ## Architecture
 
 ### Dual Communication Protocol

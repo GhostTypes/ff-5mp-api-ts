@@ -1,8 +1,15 @@
 name: Build and Publish Package
 
+# Tags only. This used to also fire on every push to main, which published a
+# throwaway `<version>-<timestamp>` prerelease on each merge - one real release
+# and one junk version per bump, accumulating in the registry forever. Cutting a
+# release is now exactly one action: push a `v*` tag.
+#
+# workflow_dispatch is kept for deliberate off-tag builds (e.g. handing someone a
+# prerelease to test); run from a branch and the timestamped version below is
+# what gets published, which is the only place that path is still wanted.
 on:
   push:
-    branches: [ main ]
     tags: [ 'v*' ]
   workflow_dispatch:
 
