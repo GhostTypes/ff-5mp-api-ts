@@ -11,10 +11,17 @@ export { DetailResponse, Info } from './api/controls/Info';
 export { JobControl } from './api/controls/JobControl';
 export { TempControl } from './api/controls/TempControl';
 export {
+  AD5X_MATERIALS,
+  AD5X_PALETTE,
+  snapToAD5XPalette,
+  type AD5XPaletteColor,
+} from './api/controls/ad5xPalette';
+export {
   CREATOR5_PALETTE,
   snapToCreator5Palette,
   type Creator5PaletteColor,
 } from './api/controls/creator5Palette';
+export type { PaletteColor } from './api/controls/paletteSnap';
 // Filament
 export { Filament } from './api/filament/Filament';
 // Misc

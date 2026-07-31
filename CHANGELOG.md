@@ -5,6 +5,25 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.8.0] - 2026-07-31
+
+### Fixed
+
+- **`Control.configureSlot()` no longer strips the leading `#` on the AD5X, and now snaps the color to the AD5X's own firmware palette.** The AD5X path previously sent freeform hex with the `#` removed (`"FF0000"`), on the assumption that the two models had mutually exclusive wire formats. They do not: both render a slot icon only on a byte-for-byte match against that model's 24-entry palette, and both take the value as uppercase `#RRGGBB`. Stripping had two consequences. The obvious one is cosmetic — an off-palette value leaves the slot with no icon on the printer UI. The damaging one is that the stripped value is what the printer then *stores* and reports back in `matlStationInfo.slotInfos[].materialColor`, so a slot configured through this library came back as bare `"161616"`. Feeding that value into a later `uploadFileAD5X` / `startAD5XMultiColorJob` mapping fails `validateMaterialMappings`, which requires `#RRGGBB` — the call returns `false` before any request is sent, so a 3MF upload targeting such a slot could never succeed. Both models now snap against their own palette and send the `#`.
+
+### Added
+
+- **`AD5X_PALETTE`, `AD5X_MATERIALS`, `snapToAD5XPalette()`, and the `AD5XPaletteColor` type** (`api/controls/ad5xPalette`). The AD5X's 24 colors and 14 material names, with CIEDE2000 nearest-color snapping. The color values differ from the Creator 5's — Blue is `#45A8F9` here vs `#4CAAF8` there, Black `#161616` vs `#1B1B1B` — so callers building a slot color for an AD5X must snap against this list, not the Creator 5's.
+- **`PaletteColor` type** (`api/controls/paletteSnap`), the shared palette entry shape now used by both models.
+
+### Changed
+
+- **The palette snapping machinery is shared between the two models** (`api/controls/paletteSnap`): the sRGB → CIE L\*a\*b\* conversion, the CIEDE2000 distance, hex parsing, and the nearest-entry search live in one module instead of being duplicated per palette. `CREATOR5_PALETTE`, `snapToCreator5Palette()`, and `Creator5PaletteColor` keep their exact public shape and values; `Creator5PaletteColor` is now an alias of the shared `PaletteColor`, which is structurally identical.
+
+### Upgrade note
+
+Slots that an earlier version configured still hold the bare, unprefixed value on the printer until something rewrites them — this release corrects what is *sent*, it cannot retroactively fix what a printer already stored. Consumers that build material mappings from `slotInfos[].materialColor` should keep normalizing that value (or re-run `configureSlot` for the affected slots) until those slots have been rewritten.
+
 ## [1.7.1] - 2026-07-26
 
 ### Fixed

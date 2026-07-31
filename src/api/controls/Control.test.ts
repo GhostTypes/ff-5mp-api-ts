@@ -505,7 +505,7 @@ describe('Control', () => {
       mockFiveMClient.isAD5X = true;
     });
 
-    it('should configure a slot and strip the leading # from the color', async () => {
+    it('should configure a slot, snapping the color to the AD5X palette with its "#"', async () => {
       const result = await control.configureSlot(1, 'PLA', '#FF0000');
 
       expect(result).toBe(true);
@@ -514,14 +514,15 @@ describe('Control', () => {
         expect.objectContaining({
           payload: {
             cmd: Commands.MaterialStationConfigCmd,
-            args: { slot: 1, mt: 'PLA', rgb: 'FF0000' },
+            // Pure red snaps to the AD5X's Red, sent with the leading "#".
+            args: { slot: 1, mt: 'PLA', rgb: '#F72224' },
           },
         }),
         expect.any(Object)
       );
     });
 
-    it('should accept a color that already lacks a # prefix', async () => {
+    it('should accept a color that lacks a # prefix and send it back prefixed', async () => {
       await control.configureSlot(2, 'PETG', '46328E');
 
       expect(mockedAxios.post).toHaveBeenCalledWith(
@@ -529,7 +530,7 @@ describe('Control', () => {
         expect.objectContaining({
           payload: {
             cmd: Commands.MaterialStationConfigCmd,
-            args: { slot: 2, mt: 'PETG', rgb: '46328E' },
+            args: { slot: 2, mt: 'PETG', rgb: '#46328E' },
           },
         }),
         expect.any(Object)
@@ -679,14 +680,40 @@ describe('Control', () => {
       expect(await captureRgb('#FFF')).toBe('#FFFFFF');
     });
 
-    // REGRESSION GUARD: the AD5X path must remain unchanged — freeform hex with
-    // the leading "#" stripped, no palette snapping.
-    it('AD5X path is unchanged: strips "#" and keeps freeform hex (no snapping)', async () => {
+    // The AD5X snaps against its OWN palette and keeps the "#", exactly like the
+    // Creator 5. Stripping the "#" left slots holding bare "RRGGBB" values, which
+    // then failed the '#RRGGBB' validation on every later material-mapping upload.
+    it('AD5X snaps to its own palette and keeps the leading "#"', async () => {
       mockFiveMClient.isAD5X = true;
       mockFiveMClient.isCreator5 = false;
 
-      expect(await captureRgb('#FF0000')).toBe('FF0000');
-      expect(await captureRgb('#46328E')).toBe('46328E');
+      // Pure red -> AD5X Red, which is #F72224 (the Creator 5's is #F82D29).
+      expect(await captureRgb('#FF0000')).toBe('#F72224');
+      // An exact AD5X palette entry survives untouched, with its "#".
+      expect(await captureRgb('#46328E')).toBe('#46328E');
+    });
+
+    it('AD5X accepts a bare hex read back from a slot and re-prefixes it', async () => {
+      mockFiveMClient.isAD5X = true;
+      mockFiveMClient.isCreator5 = false;
+
+      expect(await captureRgb('161616')).toBe('#161616');
+      expect(await captureRgb('7C4B00')).toBe('#7C4B00');
+    });
+
+    it('AD5X and Creator 5 snap the same input to their own palettes', async () => {
+      mockFiveMClient.isAD5X = true;
+      mockFiveMClient.isCreator5 = false;
+      const ad5xBlue = await captureRgb('#4AA9FA');
+
+      mockedAxios.post.mockClear();
+      mockFiveMClient.isAD5X = false;
+      mockFiveMClient.isCreator5 = true;
+      const creator5Blue = await captureRgb('#4AA9FA');
+
+      expect(ad5xBlue).toBe('#45A8F9');
+      expect(creator5Blue).toBe('#4CAAF8');
+      expect(ad5xBlue).not.toBe(creator5Blue);
     });
   });
 

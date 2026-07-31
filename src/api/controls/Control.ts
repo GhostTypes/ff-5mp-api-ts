@@ -12,6 +12,7 @@ import type { Filament } from '../filament/Filament';
 import { NetworkUtils } from '../network/NetworkUtils';
 import { Commands } from '../server/Commands';
 import { Endpoints } from '../server/Endpoints';
+import { snapToAD5XPalette } from './ad5xPalette';
 import { snapToCreator5Palette } from './creator5Palette';
 
 /**
@@ -259,13 +260,12 @@ export class Control {
    * that **filament load/unload (`slotAction`) remains AD5X-only** — the Creator 5 firmware
    * has no `ms_cmd`, so {@link slotAction} stays gated to the AD5X.
    *
-   * The firmware accepts arbitrary material strings, but the two models render
-   * the slot color icon differently:
-   *  - AD5X: accepts freeform hex (the leading "#" is stripped before sending).
-   *  - Creator 5 / 5 Pro: renders an icon ONLY when `rgb` is a byte-for-byte,
-   *    case-sensitive match against the firmware's 24-entry palette (WITH the
-   *    "#"); any other value falls back to White. This method snaps the caller's
-   *    color to the nearest palette entry automatically for the Creator 5.
+   * The firmware accepts arbitrary material strings, but both models render the slot
+   * color icon ONLY when `rgb` is a byte-for-byte, case-sensitive match against that
+   * model's own 24-entry firmware palette, sent as uppercase "#RRGGBB"; any other
+   * value falls back to White. This method snaps the caller's color to the nearest
+   * entry in the correct palette automatically — the AD5X and the Creator 5 have
+   * different palettes (see `ad5xPalette.ts` and `creator5Palette.ts`).
    *
    * @param slot The slot number (1-4).
    * @param materialName The material type (e.g., "PLA", "PETG").
@@ -281,15 +281,13 @@ export class Control {
       console.log('configureSlot() error, material station only available on AD5X / Creator 5.');
       return false;
     }
-    // The AD5X and Creator 5 use MUTUALLY EXCLUSIVE color wire formats (see
-    // creator5Palette for the firmware match rules), so model-gate here:
-    //  - AD5X: freeform hex, the leading "#" stripped ("RRGGBB"). Unchanged.
-    //  - Creator 5 / 5 Pro: the firmware renders an icon ONLY on a byte-for-byte
-    //    match against its 24-entry palette (case-sensitive, WITH the "#"). Snap
-    //    the caller's color to the nearest palette entry in uppercase "#RRGGBB".
+    // Both models render a slot icon only on a byte-for-byte match against their own
+    // 24-entry firmware palette, and both take the value as uppercase "#RRGGBB" — the
+    // "#" is part of the wire value on the AD5X too. The palettes differ (Blue is
+    // "#45A8F9" on the AD5X vs "#4CAAF8" on the Creator 5), so only the list changes.
     const rgb = this.client.isCreator5
       ? snapToCreator5Palette(hexRgb).hex
-      : hexRgb.replace(/^#/, '');
+      : snapToAD5XPalette(hexRgb).hex;
     return await this.sendControlCommand(Commands.MaterialStationConfigCmd, {
       slot,
       mt: materialName,
