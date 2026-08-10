@@ -5,6 +5,22 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+## [2.0.0] - 2026-08-10
+
+### Fixed
+
+- **A paused Creator 5 Pro no longer reports as `Unknown`.** The printer sends `status: "pause"`, while the mapping only knew the documented `"pausing"` and `"paused"` — so every pause fell through to `MachineState.Unknown`, and it did so at the worst possible moment: the printer pauses itself when it detects a clog, so the state went blank precisely when the user needed to know why the print had stopped. Observed on pid 41, firmware 1.9.4. `"pause"` now maps to `Paused`; `"paused"` still does, because firmware reporting one is no reason to drop the other. This shipped in `flashforge-python-api` 1.3.5 and was never ported here — FlashForgeUI-Electron and FlashForgeWebUI have carried the bug the whole time.
+
+- **`status: "downloading"` is mapped too.** Reported while a file is being transferred to the printer, and likewise unmapped until now. It maps to `Busy` rather than to a new enum member on purpose: a consumer that pins this enum to a fixed list breaks when a member appears, and mapping onto an existing state cannot break anyone. A dedicated `Downloading` state is worth discussing on its merits; it is not a bugfix.
+
+- **`CompletionTime` no longer recedes while a print is paused.** It was derived as `Date.now() + estimatedTime` on every `fromDetail`, which is only stable while the firmware is counting `estimatedTime` down. It isn't: the field freezes the moment the print stops advancing, so with the second term fixed and the first still moving, the derived timestamp stepped forward one minute per minute and never stopped receding. `CompletionTime` is now `null` unless `MachineState` is `Printing` — `Heating` is excluded for the same reason as the paused states, since the pre-print warmup does not advance the job either and drifts identically, just for minutes rather than hours. Nothing in this repo's consumers reads the field — FlashForgeUI-Electron and FlashForgeWebUI both re-derive the same conversion from `PrintEta` instead, and those four sites are fixed in their own repos — so this carries no user-visible change on its own. It is fixed here because a wrong value on a public model is a trap for the next caller. The derivation originates in the C# `ff-5mp-api` (`MachineInfo.cs:210`), which every port inherited it from.
+
+### Changed
+
+- **BREAKING: `FFMachineInfo.CompletionTime` is now `Date | null`** (was `Date`). Consumers that read it need a null check. `PrintEta` is unchanged and stays correct in every state — the remaining *duration* was never wrong, only its conversion to an absolute timestamp.
+
 ## [1.8.0] - 2026-07-31
 
 ### Fixed
@@ -222,7 +238,9 @@ Slots that an earlier version configured still hold the bare, unprefixed value o
 - AD5X job info parsing returning incomplete data
 - `NetworkUtils.isOk` usage corrected across response handlers
 
-[Unreleased]: https://github.com/GhostTypes/ff-5mp-api-ts/compare/v1.7.1...HEAD
+[Unreleased]: https://github.com/GhostTypes/ff-5mp-api-ts/compare/v2.0.0...HEAD
+[2.0.0]: https://github.com/GhostTypes/ff-5mp-api-ts/compare/v1.8.0...v2.0.0
+[1.8.0]: https://github.com/GhostTypes/ff-5mp-api-ts/compare/v1.7.1...v1.8.0
 [1.7.1]: https://github.com/GhostTypes/ff-5mp-api-ts/compare/v1.7.0...v1.7.1
 [1.3.0]: https://github.com/GhostTypes/ff-5mp-api-ts/compare/v1.2.0...v1.3.0
 [1.2.0]: https://github.com/GhostTypes/ff-5mp-api-ts/compare/v1.1.0...v1.2.0
