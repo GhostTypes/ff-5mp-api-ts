@@ -314,8 +314,16 @@ export interface FFMachineInfo {
 
   /** Estimated time of arrival for the current print, formatted as a string (e.g., "HH:MM"). */
   PrintEta: string;
-  /** Calculated completion time of the current print as a Date object. */
-  CompletionTime: Date;
+  /**
+   * Calculated completion time of the current print as a Date object, or null
+   * whenever the print is not advancing (paused, ready, error, ...).
+   *
+   * The firmware freezes `estimatedTime` outside the printing states, so an
+   * absolute timestamp derived from it would recede in real time rather than
+   * hold. Use `PrintEta` for the remaining duration, which stays valid in
+   * every state.
+   */
+  CompletionTime: Date | null;
   /** Formatted string of the current print job's duration (e.g., "HH:MM"). */
   FormattedRunTime: string;
   /** Formatted string of the printer's total accumulated run time (e.g., "Xh:Ym"). */

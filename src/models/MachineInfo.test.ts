@@ -458,4 +458,113 @@ describe('MachineInfo', () => {
       expect(result.HasDoorSensor).toBe(false);
     });
   });
+
+  describe('MachineState mapping', () => {
+    const machineInfoConverter = new MachineInfo();
+
+    const expectState = (status: string, expected: MachineState) => {
+      const result = machineInfoConverter.fromDetail({
+        ...GENERIC_PRINTER_DETAIL_JSON,
+        status,
+      });
+      expect(result).not.toBeNull();
+      expect(result?.MachineState, status).toBe(expected);
+    };
+
+    it('maps the documented status strings', () => {
+      expectState('ready', MachineState.Ready);
+      expectState('busy', MachineState.Busy);
+      expectState('calibrate_doing', MachineState.Calibrating);
+      expectState('error', MachineState.Error);
+      expectState('heating', MachineState.Heating);
+      expectState('printing', MachineState.Printing);
+      expectState('pausing', MachineState.Pausing);
+      expectState('paused', MachineState.Paused);
+      expectState('cancel', MachineState.Cancelled);
+      expectState('completed', MachineState.Completed);
+    });
+
+    // The Creator 5 Pro sends "pause", not the documented "paused", and it does
+    // so exactly when it pauses itself on a detected clog - so the state went
+    // Unknown at the moment the user most needed to know why the print stopped.
+    // Observed on pid 41, firmware 1.9.4. Ported from flashforge-python-api 1.3.5.
+    it('maps the undocumented "pause" the Creator 5 Pro actually sends', () => {
+      expectState('pause', MachineState.Paused);
+    });
+
+    // Sent while a file is transferring to the printer. Mapped onto the existing
+    // Busy rather than a new enum member: consumers may pin this enum to a fixed
+    // list, so adding a member is breaking for them while reusing one is not.
+    it('maps "downloading" onto Busy', () => {
+      expectState('downloading', MachineState.Busy);
+    });
+
+    it('falls back to Unknown for genuinely unrecognized statuses', () => {
+      expectState('flurbling', MachineState.Unknown);
+      expectState('', MachineState.Unknown);
+    });
+
+    it('is case-insensitive', () => {
+      expectState('Pause', MachineState.Paused);
+      expectState('PRINTING', MachineState.Printing);
+    });
+  });
+
+  describe('CompletionTime', () => {
+    const machineInfoConverter = new MachineInfo();
+
+    // Printing is the only state the firmware counts `estimatedTime` down in,
+    // so it is the only state where `Date.now() + estimatedTime` stays put
+    // across polls.
+    it('derives a completion timestamp while the print is advancing', () => {
+      const before = Date.now();
+      const result = machineInfoConverter.fromDetail({
+        ...GENERIC_PRINTER_DETAIL_JSON,
+        status: 'printing',
+        estimatedTime: 3600,
+      });
+      const after = Date.now();
+
+      expect(result).not.toBeNull();
+      if (!result) return;
+
+      expect(result.CompletionTime).not.toBeNull();
+      expect(result.CompletionTime?.getTime()).toBeGreaterThanOrEqual(before + 3_590_000);
+      expect(result.CompletionTime?.getTime()).toBeLessThanOrEqual(after + 3_610_000);
+      expect(result.PrintEta).toBe('01:00');
+    });
+
+    // The firmware stops counting `estimatedTime` down whenever the print is
+    // not progressing. Deriving `Date.now() + estimatedTime` on every poll
+    // would then walk the completion time forward one minute per minute - a
+    // paused print would appear to recede forever. `PrintEta` stays populated
+    // because the remaining *duration* is still correct; only the absolute
+    // timestamp is not.
+    //
+    // 'heating' belongs here, not above: the pre-print warmup does not advance
+    // the job either, so it drifts the same way, just for minutes not hours.
+    it('returns null when the print is not advancing', () => {
+      for (const status of [
+        'paused',
+        'pause',
+        'pausing',
+        'heating',
+        'ready',
+        'error',
+        'completed',
+      ]) {
+        const result = machineInfoConverter.fromDetail({
+          ...GENERIC_PRINTER_DETAIL_JSON,
+          status,
+          estimatedTime: 3600,
+        });
+
+        expect(result).not.toBeNull();
+        if (!result) return;
+
+        expect(result.CompletionTime, status).toBeNull();
+        expect(result.PrintEta, status).toBe('01:00');
+      }
+    });
+  });
 });

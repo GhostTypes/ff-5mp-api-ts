@@ -28,6 +28,19 @@ const PID_MODEL_NAMES: Record<number, string> = {
   [PID_CREATOR5_PRO]: 'Creator 5 Pro',
 };
 
+// The one state in which the firmware actually counts `estimatedTime` down.
+// Outside it the field freezes at its last value while the wall clock keeps
+// moving, so `Date.now() + estimatedTime` walks forward one minute per minute
+// rather than holding still - a paused print appears to recede forever. The
+// duration stays correct throughout; only its conversion to an absolute
+// timestamp is invalid, which is why `PrintEta` is ungated and `CompletionTime`
+// is not.
+//
+// Heating is deliberately excluded. The pre-print warmup does not advance the
+// job either, so the same drift applies - it just lasts minutes rather than
+// hours, which is why it is easy to miss.
+const ADVANCING_STATES: ReadonlySet<MachineState> = new Set([MachineState.Printing]);
+
 /**
  * Transforms printer detail data from the API response format into a structured `FFMachineInfo` object.
  * This class centralizes the logic for mapping and calculating various properties of the printer's state
@@ -104,7 +117,10 @@ export class MachineInfo {
       const model =
         detail.model || (pid !== undefined ? PID_MODEL_NAMES[pid] : undefined) || detail.name || '';
       const printEta = this.formatTimeFromSeconds(detail.estimatedTime || 0);
-      const completionTime = new Date(Date.now() + (detail.estimatedTime || 0) * 1000);
+      const machineState = this.getMachineState(detail.status || '');
+      const completionTime = ADVANCING_STATES.has(machineState)
+        ? new Date(Date.now() + (detail.estimatedTime || 0) * 1000)
+        : null;
       const formattedRunTime = this.formatTimeFromSeconds(detail.printDuration || 0);
 
       const totalMinutes = detail.cumulativePrintTime || 0;
@@ -217,7 +233,7 @@ export class MachineInfo {
         FilamentType: detail.rightFilamentType || '',
 
         // Machine state
-        MachineState: this.getMachineState(detail.status || ''),
+        MachineState: machineState,
         Status: detail.status || '',
         TotalPrintLayers: detail.targetPrintLayer || 0,
         Tvoc: detail.tvoc || 0,
@@ -265,6 +281,15 @@ export class MachineInfo {
    * Handles various known status strings and defaults to `MachineState.Unknown` for unrecognized statuses,
    * logging a warning in such cases.
    *
+   * An unmapped value costs the consumer everything the field is for: it becomes
+   * `Unknown`, which surfaces as a blank or meaningless state at the moment the
+   * user most needs to know what the printer is doing. Both `pause` and
+   * `downloading` below were found exactly that way.
+   *
+   * Consumers may map this enum onto a fixed set of values, so a *new* member is
+   * a breaking change for them while mapping onto an existing one is not. Prefer
+   * the closest existing state unless a new one is worth coordinating.
+   *
    * @param status The raw status string (e.g., "ready", "printing", "error"). Case-insensitive.
    * @returns The corresponding `MachineState` enum value.
    * @private
@@ -286,12 +311,23 @@ export class MachineInfo {
         return MachineState.Printing;
       case 'pausing':
         return MachineState.Pausing;
+      // The Creator 5 Pro reports "pause" for a print that is paused, where the
+      // documented value is "paused" - both are mapped, because firmware that
+      // reports one is not a reason to drop the other. Observed on pid 41,
+      // firmware 1.9.4, whenever the printer paused itself on a detected clog.
+      case 'pause':
+        return MachineState.Paused;
       case 'paused':
         return MachineState.Paused;
       case 'cancel':
         return MachineState.Cancelled;
       case 'completed':
         return MachineState.Completed;
+      // Reported while a file is being transferred to the printer. Not a print,
+      // but not idle either, so Busy is the honest existing fit; a dedicated
+      // state would need consumers to add it to their option lists first.
+      case 'downloading':
+        return MachineState.Busy;
       default:
         if (validStatus) {
           console.warn(`Unknown machine status received: '${status}'`);
