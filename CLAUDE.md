@@ -6,6 +6,8 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 A TypeScript API library (`@ghosttypes/ff-api`) for controlling FlashForge 3D printers, reverse-engineered from FlashForge software communication. Supports Adventurer 5M/5M Pro, AD5X, Creator 5 / Creator 5 Pro, and legacy Adventurer 3/4 printers. Published to GitHub Packages (npm).
 
+**Current version: 2.0.0** (2026-08-10). The major bump is one breaking change — `FFMachineInfo.CompletionTime` is now `Date | null`; see *CompletionTime Is Gated on an Advancing Print* below. Known consumers (FlashForgeUI-Electron, FlashForgeWebUI) never read that field and were bumped to `^2.0.0` unchanged.
+
 ## Build & Test Commands
 
 - **Build:** `pnpm build` (runs `tsc`, outputs to `dist/`)
@@ -57,6 +59,20 @@ There is **no raw G/M-code passthrough and no axis move/jog** for Creator 5 — 
 ### Data Flow
 
 Raw API responses (`FFPrinterDetail` in `src/models/ff-models.ts`) are transformed into the structured `FFMachineInfo` model by `MachineInfo.fromDetail()` (`src/models/MachineInfo.ts`). This handles status string-to-enum mapping, time formatting, temperature pairing, and boolean conversion from the printer's "open"/"close" string convention.
+
+### Status Mapping: Map Undocumented Statuses onto Existing Members
+
+Firmware sends statuses the documentation does not list. The Creator 5 Pro sends `"pause"` (not the documented `"paused"`) and does so when it pauses itself on a detected clog, so an unmapped value blanks the state at the worst possible moment; `"downloading"` arrives during file transfer. Both are mapped in `getMachineState()` as of 2.0.0, ported from `flashforge-python-api` 1.3.5.
+
+**Map a new status onto an existing `MachineState` member rather than adding one.** A consumer that pins the enum to a fixed list breaks when a member appears; reusing one cannot break anyone. That is why `"downloading"` reads as `Busy`. Adding a member is a feature discussion, not a bugfix, and it is a breaking change for downstreams. The mapping is covered end-to-end by the `MachineState mapping` describe block in `MachineInfo.test.ts` — add a case there for every new status.
+
+### CompletionTime Is Gated on an Advancing Print
+
+`ADVANCING_STATES` in `MachineInfo.ts` contains `Printing` and nothing else. `CompletionTime` is `Date | null` (nullable as of 2.0.0) and is derived only inside that set.
+
+The reason is that `Date.now() + estimatedTime` only holds still while the firmware is counting `estimatedTime` down. It freezes that field the moment the print stops advancing, so with one term fixed and the clock still moving the timestamp walks forward a minute per minute — a paused print appears to recede forever. **`Heating` is deliberately excluded**: the pre-print warmup does not advance the job either and drifts identically, just for minutes rather than hours. Do not "fix" a null `CompletionTime` during a pause by widening this set.
+
+`PrintEta` is ungated and stays correct in every state — the remaining *duration* was never wrong, only its conversion to an absolute timestamp. Prefer it where a duration will do. The bad derivation originates in the C# `ff-5mp-api` (`MachineInfo.cs:210`) that every port inherited; the same gate now exists in `ff-5mp-api-py`, `ff-5mp-hass`, FlashForgeUI-Electron, and FlashForgeWebUI.
 
 ### Model Detection (Pid-First)
 
