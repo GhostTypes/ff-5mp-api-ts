@@ -69,8 +69,24 @@ export class FiveMClient {
   /** HTTP client for making requests to the printer's API. */
   public httpClient: ReturnType<typeof axios.create>;
 
-  /** Flag indicating if the HTTP client is currently busy with a request. */
+  /** True while at least one command is queued or in flight. */
   private httpClientBusy = false;
+
+  /**
+   * Tail of the FIFO command queue. Every command chains onto this promise,
+   * so commands run one at a time in submission order.
+   *
+   * Scope: only state-changing command POSTs go through the queue
+   * (/product, /control, /printGcode). The printer handles one command at a
+   * time, and concurrent commands can interleave or get dropped. Uploads and
+   * read or poll requests (status, detail, file lists, thumbnails, camera)
+   * stay off the queue. Uploads can run for minutes, and pause or stop
+   * commands must never wait behind one. Reads are safe to run in parallel.
+   */
+  private commandQueue: Promise<unknown> = Promise.resolve();
+
+  /** Number of commands queued or in flight. Drives the busy flag. */
+  private queuedCommandCount = 0;
 
   public printerName: string = '';
   public isPro: boolean = false;
@@ -171,18 +187,53 @@ export class FiveMClient {
   }
 
   /**
-   * Checks if the HTTP client is currently busy.
-   * @returns A Promise that resolves to true if the HTTP client is busy, false otherwise.
+   * Checks if a command is queued or in flight.
+   * @returns A Promise that resolves to true if at least one command is queued or in flight, false otherwise.
    */
   public async isHttpClientBusy(): Promise<boolean> {
     return this.httpClientBusy;
   }
 
   /**
-   * Releases the HTTP client, allowing it to be used for new requests.
+   * Clears the HTTP client busy indicator.
+   * The command queue sets and clears the indicator on its own. Call this
+   * method only to reset an indicator that no command updated.
    */
   public releaseHttpClient(): void {
     this.httpClientBusy = false;
+  }
+
+  /**
+   * Runs a command on the client's FIFO command queue.
+   * Commands run one at a time, in submission order. A command that rejects
+   * does not stop later commands from running; the caller still receives
+   * the rejection. Keep uploads and read or poll requests off the queue
+   * (see the scope note on the `commandQueue` field).
+   * @param fn Function that sends the command and returns its promise.
+   * @returns A Promise that resolves or rejects with the result of `fn`.
+   */
+  public async runCommandExclusive<T>(fn: () => Promise<T>): Promise<T> {
+    this.queuedCommandCount++;
+    this.httpClientBusy = true;
+
+    // `fn` runs as both handlers so the command starts even if the previous
+    // tail ever rejects (the tail is built to never reject).
+    const run = this.commandQueue.then(fn, fn);
+
+    // Swallow the rejection in the queue tail so later commands still run.
+    // The caller still receives the rejection from `run`.
+    this.commandQueue = run.then(
+      () => this.settleQueuedCommand(),
+      () => this.settleQueuedCommand()
+    );
+
+    return run;
+  }
+
+  /** Marks one queued command as finished and updates the busy flag. */
+  private settleQueuedCommand(): void {
+    this.queuedCommandCount--;
+    this.httpClientBusy = this.queuedCommandCount > 0;
   }
 
   /**
@@ -411,13 +462,13 @@ export class FiveMClient {
 
   /**
    * Sends a product command to the printer to retrieve control states.
-   * This method sets the `httpClientBusy` flag while the request is in progress.
+   * The POST runs on the client's FIFO command queue, so it waits for earlier
+   * commands to finish before it is sent.
    * @returns A Promise that resolves to true if the product command is sent successfully and valid data is received, false otherwise.
    * @throws Error if there is an HTTP error or an error parsing the response.
    */
   public async sendProductCommand(): Promise<boolean> {
     //console.log("SendProductCommand()");
-    this.httpClientBusy = true;
 
     const payload = {
       serialNumber: this.serialNumber,
@@ -425,7 +476,9 @@ export class FiveMClient {
     };
 
     try {
-      const response = await this.httpClient.post(this.getEndpoint(Endpoints.Product), payload);
+      const response = await this.runCommandExclusive(async () =>
+        this.httpClient.post(this.getEndpoint(Endpoints.Product), payload)
+      );
 
       if (response.status !== 200) return false;
 
@@ -462,8 +515,6 @@ export class FiveMClient {
     } catch (error) {
       console.error(`SendProductCommand HTTP error: ${(error as Error).message}`);
       throw error;
-    } finally {
-      this.httpClientBusy = false;
     }
 
     return false;

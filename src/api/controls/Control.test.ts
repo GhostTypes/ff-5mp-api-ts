@@ -64,8 +64,9 @@ describe('Control', () => {
       filtrationControl: true,
       ledControl: true,
       isPro: true,
-      isHttpClientBusy: vi.fn().mockResolvedValue(undefined),
-      releaseHttpClient: vi.fn(),
+      // Stand-in for the client's FIFO command queue: run the command at once.
+      // Real serialization is covered in FiveMClient.test.ts.
+      runCommandExclusive: vi.fn((fn: () => Promise<unknown>) => fn()),
       getEndpoint: (endpoint: string) => `http://printer:8898${endpoint}`,
     } as any;
 
@@ -448,7 +449,7 @@ describe('Control', () => {
       const result = await control.sendControlCommand('test_cmd', { test: 'value' });
 
       expect(result).toBe(true);
-      expect(mockFiveMClient.isHttpClientBusy).toHaveBeenCalled();
+      expect(mockFiveMClient.runCommandExclusive).toHaveBeenCalled();
       expect(mockedAxios.post).toHaveBeenCalledWith(
         `http://printer:8898${Endpoints.Control}`,
         {
@@ -463,9 +464,9 @@ describe('Control', () => {
           headers: {
             'Content-Type': 'application/json',
           },
+          timeout: 5000,
         }
       );
-      expect(mockFiveMClient.releaseHttpClient).toHaveBeenCalled();
     });
 
     it('should return false for non-OK response', async () => {
@@ -487,12 +488,12 @@ describe('Control', () => {
       expect(result).toBe(false);
     });
 
-    it('should always release HTTP client even on error', async () => {
+    it('should route the command through the queue even on error', async () => {
       mockedAxios.post.mockRejectedValue(new Error('Network error'));
 
       await control.sendControlCommand('test_cmd', {});
 
-      expect(mockFiveMClient.releaseHttpClient).toHaveBeenCalled();
+      expect(mockFiveMClient.runCommandExclusive).toHaveBeenCalled();
     });
   });
 

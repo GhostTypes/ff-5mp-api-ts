@@ -41,6 +41,9 @@ describe('JobControl', () => {
       firmVer: '3.1.3',
       isAD5X: false,
       getEndpoint: (endpoint: string) => `http://printer:8898${endpoint}`,
+      // Stand-in for the client's FIFO command queue: run the command at once.
+      // Real serialization is covered in FiveMClient.test.ts.
+      runCommandExclusive: (fn: () => Promise<unknown>) => fn(),
     } as FiveMClient;
 
     jobControl = new JobControl(mockFiveMClient);
@@ -144,6 +147,7 @@ describe('JobControl', () => {
           headers: {
             'Content-Type': 'application/json',
           },
+          timeout: 5000,
         }
       );
     });
@@ -171,6 +175,7 @@ describe('JobControl', () => {
           headers: {
             'Content-Type': 'application/json',
           },
+          timeout: 5000,
         }
       );
     });
@@ -275,6 +280,7 @@ describe('JobControl', () => {
           headers: {
             'Content-Type': 'application/json',
           },
+          timeout: 5000,
         }
       );
     });
@@ -355,6 +361,7 @@ describe('JobControl', () => {
           headers: {
             'Content-Type': 'application/json',
           },
+          timeout: 5000,
         }
       );
     });

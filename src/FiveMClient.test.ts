@@ -236,4 +236,102 @@ describe('FiveMClient', () => {
       expect(client.capabilities.hasChamberControl).toBe(true);
     });
   });
+
+  // The FIFO command queue serializes command POSTs. Commands fired at the
+  // same time must run strictly one after the other, in submission order,
+  // and a failing command must not stop the commands behind it.
+  describe('command queue (FIFO mutex)', () => {
+    const okProduct = { status: 200, data: { code: 0, message: 'Success', product: {} } };
+    const delay = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+
+    it('runs two commands fired at the same time strictly one at a time', async () => {
+      const client = new FiveMClient('192.168.1.10', 'SN-1', 'CHK-1');
+      let active = 0;
+      let maxActive = 0;
+
+      httpPost.mockImplementation(async () => {
+        active++;
+        maxActive = Math.max(maxActive, active);
+        await delay(20);
+        active--;
+        return okProduct;
+      });
+
+      const results = await Promise.all([client.sendProductCommand(), client.sendProductCommand()]);
+
+      expect(results).toEqual([true, true]);
+      expect(httpPost).toHaveBeenCalledTimes(2);
+      expect(maxActive).toBe(1);
+    });
+
+    it('runs queued commands in FIFO order and keeps their results', async () => {
+      const client = new FiveMClient('192.168.1.10', 'SN-1', 'CHK-1');
+      const order: string[] = [];
+
+      const first = client.runCommandExclusive(async () => {
+        order.push('first-start');
+        await delay(20);
+        order.push('first-end');
+        return 'A';
+      });
+      const second = client.runCommandExclusive(async () => {
+        order.push('second-start');
+        await delay(5);
+        order.push('second-end');
+        return 'B';
+      });
+
+      await expect(first).resolves.toBe('A');
+      await expect(second).resolves.toBe('B');
+      expect(order).toEqual(['first-start', 'first-end', 'second-start', 'second-end']);
+    });
+
+    it('still runs the command after a rejecting one', async () => {
+      const client = new FiveMClient('192.168.1.10', 'SN-1', 'CHK-1');
+      const order: string[] = [];
+
+      const failing = client.runCommandExclusive(async () => {
+        order.push('failing-start');
+        await delay(10);
+        throw new Error('command failed');
+      });
+      const next = client.runCommandExclusive(async () => {
+        order.push('next-start');
+        return 'ok';
+      });
+
+      await expect(failing).rejects.toThrow('command failed');
+      await expect(next).resolves.toBe('ok');
+      expect(order).toEqual(['failing-start', 'next-start']);
+    });
+
+    it('reports busy while a command is in flight or queued, and idle once drained', async () => {
+      const client = new FiveMClient('192.168.1.10', 'SN-1', 'CHK-1');
+      const resolvers: Array<(value: unknown) => void> = [];
+      httpPost.mockImplementation(
+        () =>
+          new Promise((resolve) => {
+            resolvers.push(resolve);
+          })
+      );
+
+      await expect(client.isHttpClientBusy()).resolves.toBe(false);
+
+      const first = client.sendProductCommand();
+      const second = client.sendProductCommand();
+
+      // Only the first command is in flight; the second one waits behind it.
+      await vi.waitFor(() => expect(resolvers.length).toBe(1));
+      await expect(client.isHttpClientBusy()).resolves.toBe(true);
+
+      resolvers[0](okProduct);
+      await vi.waitFor(() => expect(resolvers.length).toBe(2));
+      await expect(client.isHttpClientBusy()).resolves.toBe(true);
+
+      resolvers[1](okProduct);
+      await expect(first).resolves.toBe(true);
+      await expect(second).resolves.toBe(true);
+      await expect(client.isHttpClientBusy()).resolves.toBe(false);
+    });
+  });
 });

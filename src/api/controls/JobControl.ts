@@ -384,11 +384,16 @@ export class JobControl {
     }
 
     try {
-      const response = await axios.post(this.client.getEndpoint(Endpoints.GCodePrint), payload, {
-        headers: {
-          'Content-Type': 'application/json',
-        },
-      });
+      // Print-start is a command POST: run it on the client's FIFO command
+      // queue so it cannot interleave with other commands.
+      const response = await this.client.runCommandExclusive(async () =>
+        axios.post(this.client.getEndpoint(Endpoints.GCodePrint), payload, {
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          timeout: 5000,
+        })
+      );
 
       if (response.status !== 200) return false;
 
@@ -441,11 +446,16 @@ export class JobControl {
     };
 
     try {
-      const response = await axios.post(this.client.getEndpoint(Endpoints.GCodePrint), payload, {
-        headers: {
-          'Content-Type': 'application/json',
-        },
-      });
+      // Print-start is a command POST: run it on the client's FIFO command
+      // queue so it cannot interleave with other commands.
+      const response = await this.client.runCommandExclusive(async () =>
+        axios.post(this.client.getEndpoint(Endpoints.GCodePrint), payload, {
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          timeout: 5000,
+        })
+      );
 
       if (response.status !== 200) return false;
 
@@ -493,11 +503,16 @@ export class JobControl {
     };
 
     try {
-      const response = await axios.post(this.client.getEndpoint(Endpoints.GCodePrint), payload, {
-        headers: {
-          'Content-Type': 'application/json',
-        },
-      });
+      // Print-start is a command POST: run it on the client's FIFO command
+      // queue so it cannot interleave with other commands.
+      const response = await this.client.runCommandExclusive(async () =>
+        axios.post(this.client.getEndpoint(Endpoints.GCodePrint), payload, {
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          timeout: 5000,
+        })
+      );
 
       if (response.status !== 200) return false;
 
@@ -662,11 +677,16 @@ export class JobControl {
     if (hasMappings) payload.materialMappings = params.materialMappings;
 
     try {
-      const response = await axios.post(this.client.getEndpoint(Endpoints.GCodePrint), payload, {
-        headers: {
-          'Content-Type': 'application/json',
-        },
-      });
+      // Print-start is a command POST: run it on the client's FIFO command
+      // queue so it cannot interleave with other commands.
+      const response = await this.client.runCommandExclusive(async () =>
+        axios.post(this.client.getEndpoint(Endpoints.GCodePrint), payload, {
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          timeout: 5000,
+        })
+      );
 
       if (response.status !== 200) return false;
 

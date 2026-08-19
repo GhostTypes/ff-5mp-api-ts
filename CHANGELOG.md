@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- **HTTP commands now run one at a time, in order.** The old "busy check" before each control command never waited: it read a boolean, discarded the answer, and sent the command anyway. Commands fired together could reach the printer at the same time and interleave or get dropped. Each control command also cleared a busy flag that another in-flight command had set, so the flag could report "idle" mid-command. The client now runs every command POST through a first-in, first-out (FIFO) queue: a command waits for the one before it to finish, and a command that fails does not stop the commands behind it. File uploads and read or poll requests (status, detail, file lists, thumbnails, camera) stay off the queue — an upload can run for minutes, and pause or stop commands must never wait behind one.
+
+### Added
+
+- **`FiveMClient.runCommandExclusive()`** — runs a command on that client's FIFO command queue. It is public for callers that send their own command POSTs. It returns the command's result and passes the command's rejection through to the caller. `isHttpClientBusy()` now reports true while at least one command is queued or in flight, and `releaseHttpClient()` only clears the busy indicator; the queue manages it on its own.
+
 ## [2.0.0] - 2026-08-10
 
 ### Fixed

@@ -323,7 +323,8 @@ export class Control {
   /**
    * Sends a generic control command to the printer via HTTP POST.
    * This method is used internally by other specific control methods.
-   * It ensures that the HTTP client is not busy before sending the command and releases it afterward.
+   * The POST runs on the client's FIFO command queue, so this command waits
+   * for earlier commands to finish before it is sent.
    *
    * @param command The specific command string (from `Commands` enum) to send.
    * @param args The arguments or payload specific to the command.
@@ -345,22 +346,22 @@ export class Control {
     console.log(`SendControlCommand:\n${JSON.stringify(payload)}`);
 
     try {
-      await this.client.isHttpClientBusy();
-      const response = await axios.post(this.client.getEndpoint(Endpoints.Control), payload, {
-        headers: {
-          'Content-Type': 'application/json',
-        },
+      return await this.client.runCommandExclusive(async () => {
+        const response = await axios.post(this.client.getEndpoint(Endpoints.Control), payload, {
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          timeout: 5000,
+        });
+
+        const data = response.data;
+        console.log(`Command reply: ${JSON.stringify(data)}`);
+
+        const result = data as GenericResponse;
+        return this.isResponseOk(result);
       });
-
-      const data = response.data;
-      console.log(`Command reply: ${JSON.stringify(data)}`);
-
-      const result = data as GenericResponse;
-      return this.isResponseOk(result);
     } catch (_e) {
       return false;
-    } finally {
-      this.client.releaseHttpClient();
     }
   }
 
