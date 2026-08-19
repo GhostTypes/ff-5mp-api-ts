@@ -405,19 +405,19 @@ export class FiveMClient {
         this.httpOnly = true;
       }
 
-      // Check for Pro model with the machine TypeName (can't be changed by user)
-      // We now rely on MachineInfo.fromDetail to set IsPro and IsAD5X based on detail.name
-      // So, the TCP check for "Pro" might be redundant or could be a fallback.
-      // For now, let's keep it but prioritize what's in machineInfo.
+      // Probe the legacy TCP API. Its only use today is the isPro fallback below,
+      // which is dead code under the current flow (see the note at the branch).
       // HTTP-only printers have no TCP API to probe — skip it (avoids a connect timeout).
       if (!this.httpOnly) {
         const tcpInfo = await this.tcpClient.getPrinterInfo();
         if (tcpInfo) {
-          // If machineInfo hasn't already set isPro, we can use TCP info as a fallback.
-          // However, machineInfo.IsPro (derived from detail.name) should be more reliable.
-          // This line effectively gets overridden by cacheDetails if machineInfo.IsPro is set.
+          // Dead code under the current flow. FFMachineInfo.IsPro is a required
+          // boolean, and MachineInfo.fromDetail always sets it from /detail. So
+          // "!machineInfo.IsPro" means "detail says not-Pro", never "unknown".
+          // cacheDetails() (at the end of verifyConnection) then overwrites this.isPro
+          // with info.IsPro unconditionally. The write below never survives this
+          // method. Candidate for removal — kept in case the flow changes.
           if (tcpInfo.TypeName.includes('Pro') && !machineInfo.IsPro && !machineInfo.IsAD5X) {
-            // Only set this if not already determined by machineInfo, and it's not an AD5X
             this.isPro = true;
           }
         } else {

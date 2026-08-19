@@ -2,7 +2,10 @@
  * @fileoverview Interface defining the capabilities a TCP client must provide
  * to be used with GCodeController.
  *
- * Both FlashForgeClient and FlashForgeA3Client implement this interface.
+ * FlashForgeA4Client is the only class that declares `implements GCodeClientCapabilities`.
+ * FlashForgeClient and FlashForgeA3Client satisfy the same shape without declaring it:
+ * FlashForgeClient passes itself to `new GCodeController(this)`, and the Adventurer 3
+ * side uses its own A3GCodeController (a `GCodeController<FlashForgeA3Client>` subclass).
  */
 
 import type { TempInfo } from '../replays/TempInfo';
@@ -11,8 +14,10 @@ import type { TempInfo } from '../replays/TempInfo';
  * Interface for TCP clients that can be used with GCodeController.
  *
  * This abstraction allows GCodeController to work with different printer clients
- * (FlashForgeClient for legacy printers, FlashForgeA3Client for Adventurer 3)
- * without being tightly coupled to a specific implementation.
+ * without being tightly coupled to a specific implementation. FlashForgeA4Client
+ * declares it directly. FlashForgeClient and FlashForgeA3Client conform to it
+ * structurally: both define `sendCmdOk` and `getTempInfo`, which is what the
+ * GCodeController generic constraint requires.
  */
 export interface GCodeClientCapabilities {
   /**

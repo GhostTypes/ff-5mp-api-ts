@@ -318,11 +318,12 @@ export class Control {
     });
   }
 
-  // Internal methods for sending commands
+  // Public command senders — used by Control, JobControl, and TempControl
 
   /**
    * Sends a generic control command to the printer via HTTP POST.
-   * This method is used internally by other specific control methods.
+   * This method is the shared sender for the control classes: the methods in
+   * this class plus JobControl and TempControl all send through it.
    * The POST runs on the client's FIFO command queue, so this command waits
    * for earlier commands to finish before it is sent.
    *
@@ -418,6 +419,13 @@ export class Control {
     return await this.sendControlCommand(Commands.PrinterControlCmd, payload);
   }
 
+  /**
+   * Sends a job control action (`jobCtl_cmd`) such as "pause", "continue", or "cancel".
+   * Public API: JobControl calls this for pausePrintJob, resumePrintJob, and
+   * cancelPrintJob.
+   * @param command The action string to send.
+   * @returns A Promise that resolves to true if the command succeeds, false otherwise.
+   */
   public async sendJobControlCmd(command: string): Promise<boolean> {
     const payload = {
       jobID: '', // jobID seems to be optional or not strictly enforced by the printer for these actions.
@@ -426,6 +434,8 @@ export class Control {
 
     return await this.sendControlCommand(Commands.JobControlCmd, payload);
   }
+
+  // Internal helpers
 
   /**
    * Sends a command to control the printer's filtration system.

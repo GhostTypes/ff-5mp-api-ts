@@ -58,7 +58,7 @@ export class FlashForgeTcpClient {
    * or too many consecutive errors occur.
    */
   public startKeepAlive(): void {
-    if (this.keepAliveCancellationToken) return; // already running
+    if (this.keepAliveCancellationToken) return; // a stop was already requested (stopKeepAlive); don't start a new loop
     this.keepAliveCancellationToken = false;
 
     const runKeepAlive = async () => {

@@ -6,7 +6,7 @@
 
 import axios from 'axios';
 import type { FiveMClient } from '../../FiveMClient';
-import type { FFGcodeFileEntry } from '../../models/ff-models'; // Import the new model
+import type { FFGcodeFileEntry } from '../../models/ff-models';
 import { NetworkUtils } from '../network/NetworkUtils';
 import { Endpoints } from '../server/Endpoints';
 import type { GenericResponse } from './Control';
@@ -147,17 +147,15 @@ export class Files {
   }
 }
 
-// Updated GCodeListResponse to reflect that gcodeList can be string[] or FFGcodeFileEntry[]
-interface GCodeListResponse extends GenericResponse {
-  gcodeList: string[] | FFGcodeFileEntry[];
-  gcodeListDetail?: FFGcodeFileEntry[]; // AD5X only; absent on the 5M / 5M Pro and the Creator 5 series
-}
-
 /**
  * Represents the response structure for a G-code file list request.
  * @interface GCodeListResponse
  * @extends GenericResponse
  */
+interface GCodeListResponse extends GenericResponse {
+  gcodeList: string[] | FFGcodeFileEntry[];
+  gcodeListDetail?: FFGcodeFileEntry[]; // AD5X only; absent on the 5M / 5M Pro and the Creator 5 series
+}
 
 /**
  * Represents the response structure for a G-code thumbnail request.

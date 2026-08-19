@@ -101,10 +101,6 @@ export class Info {
   }
 }
 
-export interface DetailResponse extends GenericResponse {
-  detail: FFPrinterDetail;
-}
-
 /**
  * Represents the structure of the response from the printer's detail endpoint.
  * @interface DetailResponse

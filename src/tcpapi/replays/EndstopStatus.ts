@@ -6,7 +6,7 @@
  * Represents the status of the printer's endstops and various other machine states.
  * This information is typically parsed from the response of an M119 command or a similar
  * consolidated status report from the printer. It includes endstop states, machine operational status,
- * movement mode, LED status, and the currently loaded file.
+ * movement mode, LED status, filament sensor state, and the currently loaded file.
  */
 export class EndstopStatus {
   /** Parsed endstop states (X-max, Y-max, Z-min). See {@link Endstop}. */
@@ -29,14 +29,23 @@ export class EndstopStatus {
    * to populate the properties of this `EndstopStatus` instance.
    * The replay is expected to be a multi-line string where each line provides specific information.
    *
-   * Parsing logic:
-   * - Line 1 (data[0]): Usually a command echo or header, ignored.
-   * - Line 2 (data[1]): Parsed into the `_Endstop` object.
-   * - Line 3 (data[2]): Parsed to determine `_MachineStatus` by checking for keywords like "BUILDING_FROM_SD", "PAUSED", "READY".
-   * - Line 4 (data[3]): Parsed to determine `_MoveMode` by checking for keywords like "MOVING", "HOMING", "READY".
-   * - Line 5 (data[4]): Parsed into the `_Status` object.
-   * - Line 6 (data[5]): Parsed to determine `_LedEnabled` (1 for true, 0 for false).
-   * - Line 7 (data[6]): Parsed to get `_CurrentFile`, or null if empty.
+   * The parser matches keywords and line prefixes, never line positions. Line order
+   * does not matter; each field below is found with `lines.find(...)`:
+   * - Endstop line: the line containing both "X-max:" and "Y-max:" is parsed into `_Endstop`.
+   * - `MachineStatus:` line: parsed to determine `_MachineStatus` by checking for keywords
+   *   like "BUILDING_FROM_SD", "PAUSED", "READY".
+   * - `MoveMode:` line: parsed to determine `_MoveMode` by checking for keywords
+   *   like "MOVING", "HOMING", "READY".
+   * - `Status ` line: parsed into the `_Status` object. Optional.
+   * - `FilamentStatus:` line: stored in `_FilamentStatus`. Optional.
+   * - LED line: parsed to determine `_LedEnabled`. `LEDStatus:` carries the state as
+   *   a word ("on"/"off"); `LED:` carries it as a number (1 = on, 0 = off). Optional;
+   *   `_LedEnabled` stays false without it.
+   * - Current file line: `CurrentFile:` or the legacy `PrintFileName:` variant is parsed
+   *   into `_CurrentFile`. Optional; null when absent or empty.
+   *
+   * Parsing fails and returns null when the endstop, `MachineStatus:`, or `MoveMode:`
+   * lines are missing.
    *
    * @param replay The raw multi-line string response from the printer.
    * @returns The populated `EndstopStatus` instance, or null if parsing fails or the replay is invalid.
