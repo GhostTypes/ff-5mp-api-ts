@@ -50,10 +50,10 @@ export class Files {
    * Pro** - returns bare file names, so their entries have no `gcodeToolDatas`.
    *
    * The Creator 5 is the surprise there, and it is firmware, not a parsing gap: it is
-   * newer hardware than the AD5X but reports less (confirmed against a Creator 5 Pro,
-   * 2026-08-05). Do not describe this as "AD5X and newer" - that phrasing cost a
-   * downstream integration three releases of chasing a bug that was never in the code.
-   * Callers needing per-tool data on a Creator 5 must parse the 3mf at upload time.
+   * newer hardware than the AD5X but reports less (confirmed against a live Creator 5
+   * Pro, 2026-08-05). Do not describe this method as "AD5X and newer" — only the AD5X
+   * sends `gcodeListDetail`. Callers needing per-tool data on a Creator 5 must parse
+   * the 3mf at upload time.
    *
    * @returns A Promise that resolves to an array of `FFGcodeFileEntry` objects.
    *          Returns an empty array if the request fails or an error occurs.

@@ -484,7 +484,7 @@ export interface AD5XSingleColorJobParams {
  *
  * Unlike {@link AD5XMaterialMapping}, the Creator 5 performs material matching at
  * print-start (`POST /printGcode`) and its mapping carries only three fields — no
- * tool/slot colors. The firmware stores `toolId + 1` internally.
+ * tool/slot colors. The firmware numbers tools from 1; `toolId` here is 0-based.
  */
 export interface Creator5MaterialMapping {
   /** Gcode tool / extruder index, 0-based (T0–T3). */

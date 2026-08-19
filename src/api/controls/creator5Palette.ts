@@ -4,8 +4,8 @@
  *
  * The Creator 5 `msConfig_cmd` only renders a color icon when the `rgb` field is
  * an EXACT, case-sensitive, byte-for-byte match against one of the firmware's 24
- * built-in palette strings (compared via `std::operator==` @0x0042c5e0 in
- * `firmwareExe` 1.9.2). A non-match leaves the slot's color index at 0 (White).
+ * built-in palette strings (verified in firmware 1.9.2). A non-match leaves the
+ * slot's color index at 0 (White).
  * These values DIFFER from the AD5X palette (e.g. Blue is `#4CAAF8` here vs
  * `#45A8F9` on the AD5X), so callers must snap against THIS list specifically.
  *
@@ -22,7 +22,7 @@ import { buildPaletteLab, type PaletteColor, snapToPalette } from './paletteSnap
 export type Creator5PaletteColor = PaletteColor;
 
 /**
- * The firmware's 24-entry UI palette (firmwareExe 1.9.2, Ghidra-confirmed).
+ * The firmware's 24-entry UI palette (verified in firmware 1.9.2).
  * Index 0 (White) is also what the firmware falls back to on a no-match.
  */
 export const CREATOR5_PALETTE: readonly Creator5PaletteColor[] = [

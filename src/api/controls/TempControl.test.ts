@@ -288,7 +288,7 @@ describe('TempControl', () => {
   });
 
   // Creator 5 (isCreator5) drives its tools ONLY via the `nozzles` array; the
-  // firmware's doTemperatureControl handler never reads rightNozzle/leftNozzle.
+  // firmware's temperature-control handler never reads rightNozzle/leftNozzle.
   // The generic setExtruderTemp/cancelExtruderTemp must therefore emit a 4-element
   // `nozzles` array targeting the primary tool (T0) rather than rightNozzle.
   // The describe above (httpOnly without isCreator5) covers the AD5X / 5M path,

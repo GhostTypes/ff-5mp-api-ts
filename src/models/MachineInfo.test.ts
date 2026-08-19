@@ -324,7 +324,7 @@ describe('MachineInfo', () => {
 
     // --- Creator 5 series ---
 
-    // Trimmed from a live Creator 5 Pro capture (firmware 1.9.2).
+    // Trimmed from a live Creator 5 Pro response (firmware 1.9.2).
     const CREATOR5_PRO_DETAIL_JSON: FFPrinterDetail = {
       camera: 1,
       cameraStreamUrl: 'http://10.0.0.14:8080/?action=stream',

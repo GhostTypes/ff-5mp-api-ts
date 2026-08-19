@@ -518,7 +518,7 @@ describe('JobControl', () => {
       (mockFiveMClient as { isCreator5: boolean }).isCreator5 = true;
     });
 
-    it('POSTs the Creator 5-native /printGcode body matching the captured shape', async () => {
+    it('POSTs the Creator 5-native /printGcode body the FlashForge app sends', async () => {
       mockedAxios.post.mockResolvedValue({ status: 200, data: { code: 0, message: 'Success' } });
 
       const result = await jobControl.startCreator5Job({
@@ -546,7 +546,7 @@ describe('JobControl', () => {
       expect(mockedAxios.post).toHaveBeenCalledTimes(1);
       const [url, body] = mockedAxios.post.mock.calls[0];
       expect(url).toBe(`http://printer:8898${Endpoints.GCodePrint}`);
-      // Confirmed C5 capture: flowCalibration/timeLapseVideo always present, mappings
+      // Confirmed on a live C5: flowCalibration/timeLapseVideo always present, mappings
       // carry colors (same shape as AD5X), and no useMatlStation/gcodeToolCnt (those
       // live on the upload) or firstLayerInspection (doesn't exist on the C5).
       expect(body).toEqual({

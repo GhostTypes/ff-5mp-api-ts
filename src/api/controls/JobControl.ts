@@ -647,10 +647,10 @@ export class JobControl {
     }
 
     // Fields the /printGcode handler reads, matching the exact body the FlashForge
-    // app sends (confirmed via a live C5 capture). The firmware does NOT read
+    // app sends (confirmed against a live Creator 5). The firmware does NOT read
     // useMatlStation, gcodeToolCnt, or firstLayerInspection here — those live on the
     // upload request (firstLayerInspection doesn't exist on the C5 at all). flowCalibration
-    // and timeLapseVideo are always present (default false) to mirror the captured body.
+    // and timeLapseVideo are always present (default false) to mirror the app's body.
     const payload: Record<string, unknown> = {
       serialNumber: this.client.serialNumber,
       checkCode: this.client.checkCode,
@@ -681,7 +681,7 @@ export class JobControl {
   /**
    * Validates Creator 5 material mappings: toolId 0-3, slotId 1-4, non-empty
    * materialName, and #RRGGBB tool/slot colors. The C5 mapping shape is identical
-   * to the AD5X (confirmed via a live /printGcode capture — it carries the same
+   * to the AD5X (confirmed against a live Creator 5 — it carries the same
    * toolMaterialColor / slotMaterialColor fields).
    * @param materialMappings Array of Creator 5 mappings to validate.
    * @returns True if all mappings are valid, false otherwise.

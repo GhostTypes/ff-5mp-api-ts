@@ -444,10 +444,10 @@ export class FiveMClient {
           // override. isCreator5Pro is already set here (verifyConnection ->
           // cacheDetails runs before initControl -> sendProductCommand).
           if (this.isCreator5Pro) this.capabilities.hasFiltration = true;
-          // Both the Creator 5 and Creator 5 Pro have a heated chamber (firmware
-          // Klipper config defines `[heater_generic chamber_heater]` identically on
-          // both), but /product's chamberTempCtrlState is an unreliable signal for
-          // it. Enable chamber control by model so it doesn't depend on that flag.
+          // Both the Creator 5 and Creator 5 Pro have a heated chamber (the firmware
+          // defines it as a generic heater, identically on both models), but
+          // /product's chamberTempCtrlState is an unreliable signal for it. Enable
+          // chamber control by model so it doesn't depend on that flag.
           if (this.isCreator5 || this.isCreator5Pro) this.capabilities.hasChamberControl = true;
           this.ledControl = this.capabilities.hasLed;
           this.filtrationControl = this.capabilities.hasFiltration;
