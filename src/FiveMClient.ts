@@ -1,7 +1,6 @@
 /**
  * @fileoverview Main client for controlling FlashForge 5M/5M Pro/AD5X printers via dual HTTP/TCP protocols.
  */
-// src/FiveMClient.ts
 import axios from 'axios';
 import { Control, type GenericResponse } from './api/controls/Control';
 import { Files } from './api/controls/Files';
@@ -179,7 +178,6 @@ export class FiveMClient {
   public async initialize(): Promise<boolean> {
     const connected = await this.verifyConnection();
     if (connected) {
-      //console.log("Connected to printer successfully");
       return true;
     }
     console.log('Failed to connect to printer');
@@ -244,7 +242,6 @@ export class FiveMClient {
    * @returns A Promise that resolves to true if control initialization is successful, false otherwise.
    */
   public async initControl(): Promise<boolean> {
-    //console.log("InitControl()");
     if (await this.sendProductCommand()) {
       // Creator 5 / 5 Pro expose no TCP control channel; verifyConnection runs
       // before initControl and sets httpOnly when such a model is detected.
@@ -294,7 +291,6 @@ export class FiveMClient {
   public cacheDetails(info: FFMachineInfo | null): boolean {
     if (!info) return false;
 
-    // console.log(JSON.stringify(info, null, 2)); // Useful for debugging
     this.printerName = info.Name || '';
     this.isPro = info.IsPro; // Use the value from MachineInfo
     this.isAD5X = info.IsAD5X; // Cache the AD5X status
@@ -468,7 +464,6 @@ export class FiveMClient {
    * @throws Error if there is an HTTP error or an error parsing the response.
    */
   public async sendProductCommand(): Promise<boolean> {
-    //console.log("SendProductCommand()");
 
     const payload = {
       serialNumber: this.serialNumber,
@@ -504,8 +499,6 @@ export class FiveMClient {
           if (this.isCreator5 || this.isCreator5Pro) this.capabilities.hasChamberControl = true;
           this.ledControl = this.capabilities.hasLed;
           this.filtrationControl = this.capabilities.hasFiltration;
-          //console.log("LedControl: " + this.ledControl);
-          //console.log("FiltrationControl: " + this.filtrationControl);
           return true;
         }
       } catch (error) {

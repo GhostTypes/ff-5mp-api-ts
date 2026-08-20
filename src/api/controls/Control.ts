@@ -2,7 +2,6 @@
  * @fileoverview HTTP API control module for FlashForge 5M printers.
  * Provides methods for controlling printer hardware including axes, filtration, camera, fans, LEDs, and filament operations via the HTTP control endpoint.
  */
-// src/api/controls/Control.ts
 
 import axios from 'axios';
 import type { FiveMClient } from '../../FiveMClient';

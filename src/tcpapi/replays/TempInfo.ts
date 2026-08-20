@@ -1,7 +1,6 @@
 /**
  * @fileoverview Parses M105 command responses to extract extruder and bed temperatures with current and target values.
  */
-// src/tcpapi/replays/TempInfo.ts
 /**
  * Represents the temperature information for the printer's extruder and bed.
  * This data is typically parsed from the response of an M105 G-code command,

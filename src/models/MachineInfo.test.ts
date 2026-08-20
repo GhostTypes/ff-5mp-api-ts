@@ -17,7 +17,7 @@ const AD5X_PRINTER_DETAIL_JSON: FFPrinterDetail = {
   chamberFanSpeed: 0,
   chamberTargetTemp: 0,
   chamberTemp: 0,
-  clearFanStatus: 'open', // This field was in the example but not in FFPrinterDetail, assuming it's not standard or a typo. Will omit.
+  clearFanStatus: 'open',
   coolingFanLeftSpeed: 0,
   coolingFanSpeed: 0,
   cumulativeFilament: 0.0,

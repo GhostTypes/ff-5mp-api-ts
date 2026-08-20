@@ -2,7 +2,6 @@
  * @fileoverview HTTP API job management module for FlashForge 5M printers.
  * Manages print job operations including pause/resume/cancel, file uploads with firmware-specific handling, and AD5X multi-color printing with material station support.
  */
-// src/api/controls/JobControl.ts
 
 import * as fs from 'node:fs';
 import * as path from 'node:path';

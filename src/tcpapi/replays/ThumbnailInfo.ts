@@ -1,7 +1,6 @@
 /**
  * @fileoverview Parses M662 command responses to extract PNG thumbnail images from printer files.
  */
-// src/tcpapi/replays/ThumbnailInfo.ts
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 
@@ -58,15 +57,14 @@ export class ThumbnailInfo {
         // Ensure there's enough space for the full signature
         if (
           binaryBuffer[i] === 0x89 &&
-          binaryBuffer[i + 1] === 0x50 && // P
-          binaryBuffer[i + 2] === 0x4e && // N
-          binaryBuffer[i + 3] === 0x47 && // G
-          binaryBuffer[i + 4] === 0x0d && // CR
-          binaryBuffer[i + 5] === 0x0a && // LF
-          binaryBuffer[i + 6] === 0x1a && // SUB
+          binaryBuffer[i + 1] === 0x50 &&
+          binaryBuffer[i + 2] === 0x4e &&
+          binaryBuffer[i + 3] === 0x47 &&
+          binaryBuffer[i + 4] === 0x0d &&
+          binaryBuffer[i + 5] === 0x0a &&
+          binaryBuffer[i + 6] === 0x1a &&
           binaryBuffer[i + 7] === 0x0a
         ) {
-          // LF
           pngStart = i;
           break;
         }

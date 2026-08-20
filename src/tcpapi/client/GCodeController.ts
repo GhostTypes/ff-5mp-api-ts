@@ -2,7 +2,6 @@
  * @fileoverview Abstraction layer for sending specific G-code commands to FlashForge printers,
  * wrapping operations like LED control, job management, homing, and temperature control.
  */
-// src/tcpapi/client/GCodeController.ts
 import type { GCodeClientCapabilities } from './GCodeClientCapabilities';
 import { GCodes } from './GCodes';
 

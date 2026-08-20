@@ -3,7 +3,6 @@
  *
  * Defines success/error codes for API responses: 0 (Ok) and 1 (Error).
  */
-// src/api/network/FNetCode.ts
 /**
  * Represents network operation codes, typically used in API responses
  * to indicate the success or failure of a requested operation.

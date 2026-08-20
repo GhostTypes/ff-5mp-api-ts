@@ -1,7 +1,6 @@
 /**
  * @fileoverview Parses M27 command responses to extract print job progress including SD card bytes and layer counts.
  */
-// src/tcpapi/replays/PrintStatus.ts
 /**
  * Represents the status of an ongoing print job, including SD card byte progress and layer progress.
  * This information is typically parsed from the response of an M27 G-code command,

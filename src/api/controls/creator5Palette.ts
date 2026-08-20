@@ -14,7 +14,6 @@
  * palette contents differ, so {@link Control.configureSlot} model-gates which list
  * it snaps against.
  */
-// src/api/controls/creator5Palette.ts
 
 import { buildPaletteLab, type PaletteColor, snapToPalette } from './paletteSnap';
 

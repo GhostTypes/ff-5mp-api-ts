@@ -2,7 +2,6 @@
  * @fileoverview G-code and M-code command constants for FlashForge TCP communication,
  * providing prefixed command strings for printer operations.
  */
-// src/tcpapi/client/GCodes.ts
 export class GCodes {
   /** Command to initiate a control session with the printer (login). */
   public static readonly CmdLogin = '~M601 S1';

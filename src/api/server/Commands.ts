@@ -4,7 +4,6 @@
  * Defines command type identifiers sent in API payloads to control printer
  * functions like lighting, print jobs, temperature, and camera.
  */
-// src/api/server/Commands.ts
 /**
  * Defines a collection of command strings used for interacting with the printer's API.
  * These command strings are typically sent as part of a payload to specific API endpoints

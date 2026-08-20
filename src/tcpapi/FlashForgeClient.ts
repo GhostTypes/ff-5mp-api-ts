@@ -2,7 +2,6 @@
  * @fileoverview High-level TCP client for FlashForge 3D printers, providing printer control
  * workflows (LED, job management, homing, temperature, filament) via G-code commands.
  */
-// src/tcpapi/FlashForgeClient.ts
 
 import type { Filament } from '../api/filament/Filament';
 import { GCodeController } from './client/GCodeController';
@@ -397,7 +396,6 @@ export class FlashForgeClient extends FlashForgeTcpClient {
   public async getThumbnail(fileName: string): Promise<ThumbnailInfo | null> {
     // Ensure the filename has the required /data/ prefix
     const filePath = fileName.startsWith('/data/') ? fileName : `/data/${fileName}`;
-    //console.log(`Getting thumbnail for: ${filePath}`);
 
     try {
       const response = await this.sendCommandAsync(`${GCodes.CmdGetThumbnail} ${filePath}`);

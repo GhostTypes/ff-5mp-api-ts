@@ -4,7 +4,6 @@
  * Defines URL paths for printer control operations including status queries,
  * file management, print job control, and authentication.
  */
-// src/api/server/Endpoints.ts
 /**
  * Defines a collection of API endpoint paths for interacting with the FlashForge 3D printer.
  * These paths are appended to the printer's base IP address and port to form complete URLs

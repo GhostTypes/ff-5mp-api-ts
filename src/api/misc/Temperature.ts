@@ -4,7 +4,6 @@
  * Simple immutable container for numeric temperature values (typically Celsius)
  * with getValue() and toString() accessors.
  */
-// src/api/misc/Temperature.ts
 /**
  * Represents a temperature value.
  * This class is a simple wrapper around a numeric temperature value,

@@ -4,7 +4,6 @@
  * TCP G-code/M-code commands; HTTP-only printers (Creator 5 / 5 Pro, no TCP
  * channel) use the HTTP `temperatureCtl_cmd` instead.
  */
-// src/api/controls/TempControl.ts
 import type { FiveMClient } from '../../FiveMClient';
 import type { FlashForgeClient } from '../../tcpapi/FlashForgeClient';
 import { Commands } from '../server/Commands';

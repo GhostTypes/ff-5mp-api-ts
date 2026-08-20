@@ -4,7 +4,6 @@
  * Provides helper functions for validating API responses, checking if
  * GenericResponse objects indicate successful operations.
  */
-// src/api/network/NetworkUtils.ts
 import type { GenericResponse } from '../controls/Control';
 import { FNetCode } from './FNetCode';
 
