@@ -7,7 +7,21 @@ on:
     paths:
       - 'src/**'
       - 'package.json'
+      - 'pnpm-lock.yaml'
       - 'tsconfig.json'
+      - 'vitest.config.ts'
+      - '.github/workflows/test.yml'
+
+  # Run on direct pushes to main, with the same code-path filter as
+  # pull_request so docs-only commits skip CI
+  push:
+    branches: [ main ]
+    paths:
+      - 'src/**'
+      - 'package.json'
+      - 'pnpm-lock.yaml'
+      - 'tsconfig.json'
+      - 'vitest.config.ts'
       - '.github/workflows/test.yml'
 
   # Allow manual trigger from Actions tab
