@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.0.1] - 2026-08-20
+
 ### Fixed
 
 - **HTTP commands now run one at a time, in order.** The old "busy check" before each control command never waited: it read a boolean, discarded the answer, and sent the command anyway. Commands fired together could reach the printer at the same time and interleave or get dropped. Each control command also cleared a busy flag that another in-flight command had set, so the flag could report "idle" mid-command. The client now runs every command POST through a first-in, first-out (FIFO) queue: a command waits for the one before it to finish, and a command that fails does not stop the commands behind it. File uploads and read or poll requests (status, detail, file lists, thumbnails, camera) stay off the queue — an upload can run for minutes, and pause or stop commands must never wait behind one.
@@ -246,7 +248,8 @@ Slots that an earlier version configured still hold the bare, unprefixed value o
 - AD5X job info parsing returning incomplete data
 - `NetworkUtils.isOk` usage corrected across response handlers
 
-[Unreleased]: https://github.com/GhostTypes/ff-5mp-api-ts/compare/v2.0.0...HEAD
+[Unreleased]: https://github.com/GhostTypes/ff-5mp-api-ts/compare/v2.0.1...HEAD
+[2.0.1]: https://github.com/GhostTypes/ff-5mp-api-ts/compare/v2.0.0...v2.0.1
 [2.0.0]: https://github.com/GhostTypes/ff-5mp-api-ts/compare/v1.8.0...v2.0.0
 [1.8.0]: https://github.com/GhostTypes/ff-5mp-api-ts/compare/v1.7.1...v1.8.0
 [1.7.1]: https://github.com/GhostTypes/ff-5mp-api-ts/compare/v1.7.0...v1.7.1
