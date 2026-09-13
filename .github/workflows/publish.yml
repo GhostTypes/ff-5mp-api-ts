@@ -73,7 +73,7 @@ jobs:
         run: npm install -g npm@latest
 
       - name: Publish to npm (public, trusted publishing)
-        run: npm publish --registry=https://registry.npmjs.org/
+        run: npm publish --registry=https://registry.npmjs.org/ "--@ghosttypes:registry=https://registry.npmjs.org/"
 
       - name: Report error details if failed
         if: failure()
