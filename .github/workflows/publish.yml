@@ -16,10 +16,12 @@ on:
 permissions:
   contents: read
   packages: write
+  id-token: write # npm trusted publishing (OIDC)
 
 jobs:
   build-and-publish:
     runs-on: ubuntu-latest
+    environment: release # must match the npm trusted-publisher registration
     steps:
       - uses: actions/checkout@v4
 
@@ -31,7 +33,7 @@ jobs:
       - name: Set up Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: '20'
+          node-version: '22'
           registry-url: 'https://npm.pkg.github.com'
           scope: '@ghosttypes'
           cache: 'pnpm'
@@ -67,10 +69,11 @@ jobs:
         env:
           NODE_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Publish to npm (public)
-        run: pnpm publish --no-git-checks --registry=https://registry.npmjs.org/
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+      - name: Upgrade npm for trusted publishing (OIDC needs >= 11.5.1)
+        run: npm install -g npm@latest
+
+      - name: Publish to npm (public, trusted publishing)
+        run: npm publish --registry=https://registry.npmjs.org/
 
       - name: Report error details if failed
         if: failure()
